@@ -3,92 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SGN — 3D Star Map (Core / Mid / Outer)</title>
+  <title>SGN — Vanilla WebGL Star Map</title>
   <style>
-    html, body { margin:0; height:100%; background:#0b0e13; color:#e8e6df; font-family:system-ui,Segoe UI,Arial; }
-    #app { position:fixed; inset:0; }
-    .hud {
-      position:fixed; top:12px; left:12px; padding:10px 12px; background:#1117; border:1px solid #333; border-radius:10px; backdrop-filter: blur(4px);
-      font-size:14px; line-height:1.4;
-    }
-    .hud code { background:#0006; padding:0 6px; border-radius:6px; }
+    html,body{margin:0;height:100%;background:#0b0e13;color:#e8e6df;font-family:system-ui,Segoe UI,Arial}
+    #hud{position:fixed;top:12px;left:12px;padding:10px 12px;background:#1117;border:1px solid #333;border-radius:10px;backdrop-filter:blur(4px);font-size:14px}
+    canvas{display:block;width:100vw;height:100vh}
   </style>
 </head>
 <body>
-  <div id="app"></div>
-  <div class="hud">
-    <div><strong>SGN Star Map</strong> — drag to orbit, wheel to zoom, right-drag to pan.</div>
-    <div>Owner: <code>Arandorë Eldainë</code> (all systems)</div>
-  </div>
-
-  <!-- One and only module script — uses CDN imports -->
-  <script type="module">
-    import * as THREE from "https://unpkg.com/three@0.161.0/build/three.module.js";
-    import { OrbitControls } from "https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js";
-
-    const app = document.getElementById('app');
-    const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
-    app.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0e13);
-
-    const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 50000);
-    camera.position.set(0, 0, 1500);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-
-    scene.add(new THREE.DirectionalLight(0xffffff, 0.6).position.set(1,1,1));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-
-    const url = "./systems.json";
-    const ownerName = "Arandorë Eldainë";
-
-    fetch(url).then(r => r.json()).then(data => {
-      const imgW = data?.image_size?.width  ?? 1090;
-      const imgH = data?.image_size?.height ?? 1494;
-      const SCALE = 2200, aspect = imgW / imgH, worldW = SCALE, worldH = SCALE / aspect;
-
-      const mat = new THREE.MeshBasicMaterial({ color: 0xffdd88 });
-      const geo = new THREE.SphereGeometry(6, 16, 16);
-      const group = new THREE.Group();
-
-      for (const sys of data.systems || []) {
-        let xn = sys.coords?.x_norm, yn = sys.coords?.y_norm;
-        if (xn == null || yn == null) { const px = sys.pixel?.x, py = sys.pixel?.y; if (px==null||py==null) continue; xn = px/imgW; yn = py/imgH; }
-        const x = (xn - 0.5) * worldW, y = -(yn - 0.5) * worldH, z = 0;
-        const dot = new THREE.Mesh(geo, mat);
-        dot.position.set(x, y, z);
-        dot.userData = { id: sys.id, name: sys.name, owner: sys.owner || ownerName };
-        group.add(dot);
-      }
-      scene.add(group);
-
-      const tip = document.createElement('div');
-      tip.style.cssText = "position:fixed;padding:6px 8px;background:#111c;border:1px solid #444;border-radius:8px;pointer-events:none;display:none;color:#fff;font:12px system-ui";
-      document.body.appendChild(tip);
-      const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
-      addEventListener('mousemove', e => {
-        mouse.x = (e.clientX/innerWidth)*2-1; mouse.y = -(e.clientY/innerHeight)*2+1;
-        ray.setFromCamera(mouse, camera);
-        const hit = ray.intersectObjects(group.children, false)[0];
-        tip.style.display = hit ? 'block' : 'none';
-        if (hit) {
-          const d = hit.object.userData;
-          tip.innerHTML = `<strong>${d.name}</strong><br/>Owner: ${d.owner}<br/><small>${d.id}</small>`;
-          tip.style.left = (e.clientX + 12) + "px"; tip.style.top  = (e.clientY + 12) + "px";
-        }
-      });
-    });
-
-    addEventListener('resize', () => {
-      camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
-    });
-
-    (function loop(){ controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
-  </script>
+  <div id="hud"><strong>SGN Star Map (Vanilla)</strong> — drag to orbit, wheel to zoom</div>
+  <canvas id="gl"></canvas>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
