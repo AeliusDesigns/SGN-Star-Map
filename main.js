@@ -100,5 +100,48 @@ fetch(url).then(r=>r.json()).then(data=>{
 
   // Upload positions to GPU
   const vbo = gl.createBuffer();
-  gl.bindBuffer(gl
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(locPos);
+  gl.vertexAttribPointer(locPos, 3, gl.FLOAT, false, 0, 0);
 
+  requestAnimationFrame(loop);
+});
+
+/* Simple orbit camera */
+let yaw = 0, pitch = 0, dist = 1800;
+let dragging = false, lastX=0, lastY=0;
+canvas.addEventListener('mousedown', e=>{ dragging = true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('mouseup', ()=> dragging=false);
+window.addEventListener('mousemove', e=>{
+  if(!dragging) return;
+  const dx = e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+  yaw += dx * 0.005;
+  pitch += dy * 0.005;
+  pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, pitch));
+});
+window.addEventListener('wheel', e=>{
+  dist *= (1 + Math.sign(e.deltaY)*0.1);
+  dist = Math.max(300, Math.min(6000, dist));
+});
+
+/* Render loop */
+function loop(){
+  gl.clearColor(0.043, 0.055, 0.075, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  if (positions) {
+    const aspect = canvas.width / canvas.height;
+    const proj = mat4Perspective(55*Math.PI/180, aspect, 0.1, 50000);
+    const rot = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+    const view = mat4Translate(0,0,-dist);
+    const mv = mat4Mul(rot, view);
+    const mvp = mat4Mul(mv, proj); // NOTE: we’re using column-major order matching our helpers
+
+    // WebGL expects column-major; our math matches that layout
+    gl.uniformMatrix4fv(locMVP, false, new Float32Array(mvp));
+    gl.drawArrays(gl.POINTS, 0, count);
+  }
+  requestAnimationFrame(loop);
+}
