@@ -1,0 +1,1613 @@
+{
+  "image_size": {
+    "width": 1090,
+    "height": 1494
+  },
+  "systems": [
+    {
+      "id": "PBJ-SYS-001",
+      "name": "System 001",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.151846,
+        "y_norm": 0.166862
+      },
+      "pixel": {
+        "x": 165.51,
+        "y": 249.29
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-002",
+      "name": "System 002",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.182072,
+        "y_norm": 0.18775
+      },
+      "pixel": {
+        "x": 198.46,
+        "y": 280.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-003",
+      "name": "System 003",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.151376,
+        "y_norm": 0.189759
+      },
+      "pixel": {
+        "x": 165.0,
+        "y": 283.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-004",
+      "name": "System 004",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.246769,
+        "y_norm": 0.210079
+      },
+      "pixel": {
+        "x": 268.98,
+        "y": 313.86
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-005",
+      "name": "System 005",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.183197,
+        "y_norm": 0.210198
+      },
+      "pixel": {
+        "x": 199.68,
+        "y": 314.04
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-006",
+      "name": "System 006",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.212844,
+        "y_norm": 0.227912
+      },
+      "pixel": {
+        "x": 232.0,
+        "y": 340.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-007",
+      "name": "System 007",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.438048,
+        "y_norm": 0.239649
+      },
+      "pixel": {
+        "x": 477.47,
+        "y": 358.04
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-008",
+      "name": "System 008",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.217436,
+        "y_norm": 0.256662
+      },
+      "pixel": {
+        "x": 237.0,
+        "y": 383.45
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-009",
+      "name": "System 009",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.341282,
+        "y_norm": 0.26372
+      },
+      "pixel": {
+        "x": 372.0,
+        "y": 394.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-010",
+      "name": "System 010",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.267343,
+        "y_norm": 0.290503
+      },
+      "pixel": {
+        "x": 291.4,
+        "y": 434.01
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-011",
+      "name": "System 011",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.394498,
+        "y_norm": 0.314105
+      },
+      "pixel": {
+        "x": 430.0,
+        "y": 469.27
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-012",
+      "name": "System 012",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.302203,
+        "y_norm": 0.31573
+      },
+      "pixel": {
+        "x": 329.4,
+        "y": 471.7
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-013",
+      "name": "System 013",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.333695,
+        "y_norm": 0.3299
+      },
+      "pixel": {
+        "x": 363.73,
+        "y": 492.87
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-014",
+      "name": "System 014",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.451314,
+        "y_norm": 0.336231
+      },
+      "pixel": {
+        "x": 491.93,
+        "y": 502.33
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-015",
+      "name": "System 015",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.365058,
+        "y_norm": 0.343432
+      },
+      "pixel": {
+        "x": 397.91,
+        "y": 513.09
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-016",
+      "name": "System 016",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.275921,
+        "y_norm": 0.375625
+      },
+      "pixel": {
+        "x": 300.75,
+        "y": 561.18
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-017",
+      "name": "System 017",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.471726,
+        "y_norm": 0.376212
+      },
+      "pixel": {
+        "x": 514.18,
+        "y": 562.06
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-018",
+      "name": "System 018",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.411782,
+        "y_norm": 0.376951
+      },
+      "pixel": {
+        "x": 448.84,
+        "y": 563.17
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-019",
+      "name": "System 019",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.687405,
+        "y_norm": 0.401942
+      },
+      "pixel": {
+        "x": 749.27,
+        "y": 600.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-020",
+      "name": "System 020",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.482912,
+        "y_norm": 0.402711
+      },
+      "pixel": {
+        "x": 526.37,
+        "y": 601.65
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-021",
+      "name": "System 021",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.382398,
+        "y_norm": 0.40676
+      },
+      "pixel": {
+        "x": 416.81,
+        "y": 607.7
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-022",
+      "name": "System 022",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.518807,
+        "y_norm": 0.408763
+      },
+      "pixel": {
+        "x": 565.5,
+        "y": 610.69
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-023",
+      "name": "System 023",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.531045,
+        "y_norm": 0.415452
+      },
+      "pixel": {
+        "x": 578.84,
+        "y": 620.69
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-024",
+      "name": "System 024",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.715075,
+        "y_norm": 0.42679
+      },
+      "pixel": {
+        "x": 779.43,
+        "y": 637.62
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-025",
+      "name": "System 025",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.499012,
+        "y_norm": 0.430555
+      },
+      "pixel": {
+        "x": 543.92,
+        "y": 643.25
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-026",
+      "name": "System 026",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.448355,
+        "y_norm": 0.438191
+      },
+      "pixel": {
+        "x": 488.71,
+        "y": 654.66
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-027",
+      "name": "System 027",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.525605,
+        "y_norm": 0.443916
+      },
+      "pixel": {
+        "x": 572.91,
+        "y": 663.21
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-028",
+      "name": "System 028",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.653157,
+        "y_norm": 0.44772
+      },
+      "pixel": {
+        "x": 711.94,
+        "y": 668.89
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-029",
+      "name": "System 029",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.563979,
+        "y_norm": 0.450629
+      },
+      "pixel": {
+        "x": 614.74,
+        "y": 673.24
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-030",
+      "name": "System 030",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.491921,
+        "y_norm": 0.457758
+      },
+      "pixel": {
+        "x": 536.19,
+        "y": 683.89
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-031",
+      "name": "System 031",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.40641,
+        "y_norm": 0.460995
+      },
+      "pixel": {
+        "x": 442.99,
+        "y": 688.73
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-032",
+      "name": "System 032",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.651376,
+        "y_norm": 0.463186
+      },
+      "pixel": {
+        "x": 710.0,
+        "y": 692.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-033",
+      "name": "System 033",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.572919,
+        "y_norm": 0.467916
+      },
+      "pixel": {
+        "x": 624.48,
+        "y": 699.07
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-034",
+      "name": "System 034",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.722477,
+        "y_norm": 0.470214
+      },
+      "pixel": {
+        "x": 787.5,
+        "y": 702.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-035",
+      "name": "System 035",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.447569,
+        "y_norm": 0.484424
+      },
+      "pixel": {
+        "x": 487.85,
+        "y": 723.73
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-036",
+      "name": "System 036",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.511009,
+        "y_norm": 0.488286
+      },
+      "pixel": {
+        "x": 557.0,
+        "y": 729.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-037",
+      "name": "System 037",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.589371,
+        "y_norm": 0.489083
+      },
+      "pixel": {
+        "x": 642.41,
+        "y": 730.69
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-038",
+      "name": "System 038",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.53123,
+        "y_norm": 0.489693
+      },
+      "pixel": {
+        "x": 579.04,
+        "y": 731.6
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-039",
+      "name": "System 039",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.495564,
+        "y_norm": 0.494189
+      },
+      "pixel": {
+        "x": 540.16,
+        "y": 738.32
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-040",
+      "name": "System 040",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.659364,
+        "y_norm": 0.501013
+      },
+      "pixel": {
+        "x": 718.71,
+        "y": 748.51
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-041",
+      "name": "System 041",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.694495,
+        "y_norm": 0.506024
+      },
+      "pixel": {
+        "x": 757.0,
+        "y": 756.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-042",
+      "name": "System 042",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.738071,
+        "y_norm": 0.508252
+      },
+      "pixel": {
+        "x": 804.5,
+        "y": 759.33
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-043",
+      "name": "System 043",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.5713,
+        "y_norm": 0.51225
+      },
+      "pixel": {
+        "x": 622.72,
+        "y": 765.3
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-044",
+      "name": "System 044",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.537156,
+        "y_norm": 0.51506
+      },
+      "pixel": {
+        "x": 585.5,
+        "y": 769.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-045",
+      "name": "System 045",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.529073,
+        "y_norm": 0.523203
+      },
+      "pixel": {
+        "x": 576.69,
+        "y": 781.67
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-046",
+      "name": "System 046",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.450225,
+        "y_norm": 0.52696
+      },
+      "pixel": {
+        "x": 490.74,
+        "y": 787.28
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-047",
+      "name": "System 047",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.596884,
+        "y_norm": 0.542965
+      },
+      "pixel": {
+        "x": 650.6,
+        "y": 811.19
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-048",
+      "name": "System 048",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.540973,
+        "y_norm": 0.550731
+      },
+      "pixel": {
+        "x": 589.66,
+        "y": 822.79
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-049",
+      "name": "System 049",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.475713,
+        "y_norm": 0.564876
+      },
+      "pixel": {
+        "x": 518.53,
+        "y": 843.93
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-050",
+      "name": "System 050",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.626407,
+        "y_norm": 0.567773
+      },
+      "pixel": {
+        "x": 682.78,
+        "y": 848.25
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-051",
+      "name": "System 051",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.577763,
+        "y_norm": 0.576741
+      },
+      "pixel": {
+        "x": 629.76,
+        "y": 861.65
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-052",
+      "name": "System 052",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.521147,
+        "y_norm": 0.590372
+      },
+      "pixel": {
+        "x": 568.05,
+        "y": 882.02
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-053",
+      "name": "System 053",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.630585,
+        "y_norm": 0.607237
+      },
+      "pixel": {
+        "x": 687.34,
+        "y": 907.21
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-054",
+      "name": "System 054",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.578313,
+        "y_norm": 0.60928
+      },
+      "pixel": {
+        "x": 630.36,
+        "y": 910.26
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-055",
+      "name": "System 055",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.556389,
+        "y_norm": 0.617802
+      },
+      "pixel": {
+        "x": 606.46,
+        "y": 923.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-056",
+      "name": "System 056",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.532569,
+        "y_norm": 0.623159
+      },
+      "pixel": {
+        "x": 580.5,
+        "y": 931.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-057",
+      "name": "System 057",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.48945,
+        "y_norm": 0.625502
+      },
+      "pixel": {
+        "x": 533.5,
+        "y": 934.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-058",
+      "name": "System 058",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.464782,
+        "y_norm": 0.632374
+      },
+      "pixel": {
+        "x": 506.61,
+        "y": 944.77
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-059",
+      "name": "System 059",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.598241,
+        "y_norm": 0.638774
+      },
+      "pixel": {
+        "x": 652.08,
+        "y": 954.33
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-060",
+      "name": "System 060",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.750806,
+        "y_norm": 0.64252
+      },
+      "pixel": {
+        "x": 818.38,
+        "y": 959.93
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-061",
+      "name": "System 061",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.547788,
+        "y_norm": 0.644298
+      },
+      "pixel": {
+        "x": 597.09,
+        "y": 962.58
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-062",
+      "name": "System 062",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.652006,
+        "y_norm": 0.644839
+      },
+      "pixel": {
+        "x": 710.69,
+        "y": 963.39
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-063",
+      "name": "System 063",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.611468,
+        "y_norm": 0.647351
+      },
+      "pixel": {
+        "x": 666.5,
+        "y": 967.14
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-064",
+      "name": "System 064",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.62605,
+        "y_norm": 0.655106
+      },
+      "pixel": {
+        "x": 682.39,
+        "y": 978.73
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-065",
+      "name": "System 065",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.586697,
+        "y_norm": 0.661647
+      },
+      "pixel": {
+        "x": 639.5,
+        "y": 988.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-066",
+      "name": "System 066",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.741284,
+        "y_norm": 0.669679
+      },
+      "pixel": {
+        "x": 808.0,
+        "y": 1000.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-067",
+      "name": "System 067",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.747248,
+        "y_norm": 0.669679
+      },
+      "pixel": {
+        "x": 814.5,
+        "y": 1000.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-068",
+      "name": "System 068",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.511236,
+        "y_norm": 0.670046
+      },
+      "pixel": {
+        "x": 557.25,
+        "y": 1001.05
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-069",
+      "name": "System 069",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.579869,
+        "y_norm": 0.68107
+      },
+      "pixel": {
+        "x": 632.06,
+        "y": 1017.52
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-070",
+      "name": "System 070",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.620642,
+        "y_norm": 0.68407
+      },
+      "pixel": {
+        "x": 676.5,
+        "y": 1022.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-071",
+      "name": "System 071",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.60367,
+        "y_norm": 0.686412
+      },
+      "pixel": {
+        "x": 658.0,
+        "y": 1025.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-072",
+      "name": "System 072",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.742894,
+        "y_norm": 0.687138
+      },
+      "pixel": {
+        "x": 809.75,
+        "y": 1026.58
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-073",
+      "name": "System 073",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.652683,
+        "y_norm": 0.689661
+      },
+      "pixel": {
+        "x": 711.42,
+        "y": 1030.35
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-074",
+      "name": "System 074",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.588532,
+        "y_norm": 0.695448
+      },
+      "pixel": {
+        "x": 641.5,
+        "y": 1039.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-075",
+      "name": "System 075",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.619224,
+        "y_norm": 0.699074
+      },
+      "pixel": {
+        "x": 674.95,
+        "y": 1044.42
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-076",
+      "name": "System 076",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.497759,
+        "y_norm": 0.708884
+      },
+      "pixel": {
+        "x": 542.56,
+        "y": 1059.07
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-077",
+      "name": "System 077",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.731651,
+        "y_norm": 0.718206
+      },
+      "pixel": {
+        "x": 797.5,
+        "y": 1073.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-078",
+      "name": "System 078",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.738073,
+        "y_norm": 0.71921
+      },
+      "pixel": {
+        "x": 804.5,
+        "y": 1074.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-079",
+      "name": "System 079",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.551385,
+        "y_norm": 0.72614
+      },
+      "pixel": {
+        "x": 601.01,
+        "y": 1084.85
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-080",
+      "name": "System 080",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.591284,
+        "y_norm": 0.732211
+      },
+      "pixel": {
+        "x": 644.5,
+        "y": 1093.92
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-081",
+      "name": "System 081",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.647248,
+        "y_norm": 0.735944
+      },
+      "pixel": {
+        "x": 705.5,
+        "y": 1099.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-082",
+      "name": "System 082",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.704475,
+        "y_norm": 0.736832
+      },
+      "pixel": {
+        "x": 767.88,
+        "y": 1100.83
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-083",
+      "name": "System 083",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.626606,
+        "y_norm": 0.738286
+      },
+      "pixel": {
+        "x": 683.0,
+        "y": 1103.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-084",
+      "name": "System 084",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.47161,
+        "y_norm": 0.743869
+      },
+      "pixel": {
+        "x": 514.05,
+        "y": 1111.34
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-085",
+      "name": "System 085",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.509633,
+        "y_norm": 0.747323
+      },
+      "pixel": {
+        "x": 555.5,
+        "y": 1116.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-086",
+      "name": "System 086",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.578342,
+        "y_norm": 0.773658
+      },
+      "pixel": {
+        "x": 630.39,
+        "y": 1155.85
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-087",
+      "name": "System 087",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.642745,
+        "y_norm": 0.777622
+      },
+      "pixel": {
+        "x": 700.59,
+        "y": 1161.77
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-088",
+      "name": "System 088",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.482526,
+        "y_norm": 0.779648
+      },
+      "pixel": {
+        "x": 525.95,
+        "y": 1164.79
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-089",
+      "name": "System 089",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.548839,
+        "y_norm": 0.794534
+      },
+      "pixel": {
+        "x": 598.24,
+        "y": 1187.03
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-090",
+      "name": "System 090",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.600087,
+        "y_norm": 0.808346
+      },
+      "pixel": {
+        "x": 654.1,
+        "y": 1207.67
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-091",
+      "name": "System 091",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.634404,
+        "y_norm": 0.812584
+      },
+      "pixel": {
+        "x": 691.5,
+        "y": 1214.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-092",
+      "name": "System 092",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.53243,
+        "y_norm": 0.813712
+      },
+      "pixel": {
+        "x": 580.35,
+        "y": 1215.69
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-093",
+      "name": "System 093",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.619266,
+        "y_norm": 0.814926
+      },
+      "pixel": {
+        "x": 675.0,
+        "y": 1217.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-094",
+      "name": "System 094",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.654692,
+        "y_norm": 0.816749
+      },
+      "pixel": {
+        "x": 713.61,
+        "y": 1220.22
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-095",
+      "name": "System 095",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.464833,
+        "y_norm": 0.823728
+      },
+      "pixel": {
+        "x": 506.67,
+        "y": 1230.65
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-096",
+      "name": "System 096",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.571216,
+        "y_norm": 0.829722
+      },
+      "pixel": {
+        "x": 622.62,
+        "y": 1239.61
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-097",
+      "name": "System 097",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.527882,
+        "y_norm": 0.837739
+      },
+      "pixel": {
+        "x": 575.39,
+        "y": 1251.58
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-098",
+      "name": "System 098",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.469266,
+        "y_norm": 0.8417
+      },
+      "pixel": {
+        "x": 511.5,
+        "y": 1257.5
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-099",
+      "name": "System 099",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.463303,
+        "y_norm": 0.842035
+      },
+      "pixel": {
+        "x": 505.0,
+        "y": 1258.0
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-100",
+      "name": "System 100",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.620738,
+        "y_norm": 0.850074
+      },
+      "pixel": {
+        "x": 676.6,
+        "y": 1270.01
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-101",
+      "name": "System 101",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.567924,
+        "y_norm": 0.853139
+      },
+      "pixel": {
+        "x": 619.04,
+        "y": 1274.59
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-102",
+      "name": "System 102",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.471844,
+        "y_norm": 0.86572
+      },
+      "pixel": {
+        "x": 514.31,
+        "y": 1293.39
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-103",
+      "name": "System 103",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.567706,
+        "y_norm": 0.870886
+      },
+      "pixel": {
+        "x": 618.8,
+        "y": 1301.1
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-104",
+      "name": "System 104",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.581881,
+        "y_norm": 0.898706
+      },
+      "pixel": {
+        "x": 634.25,
+        "y": 1342.67
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-105",
+      "name": "System 105",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.593807,
+        "y_norm": 0.899794
+      },
+      "pixel": {
+        "x": 647.25,
+        "y": 1344.29
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-106",
+      "name": "System 106",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.528767,
+        "y_norm": 0.905627
+      },
+      "pixel": {
+        "x": 576.36,
+        "y": 1353.01
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    },
+    {
+      "id": "PBJ-SYS-107",
+      "name": "System 107",
+      "owner": "Arandor\u00eb Eldain\u00eb",
+      "coords": {
+        "x_norm": 0.487333,
+        "y_norm": 0.922547
+      },
+      "pixel": {
+        "x": 531.19,
+        "y": 1378.28
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.8
+    }
+  ]
+}
