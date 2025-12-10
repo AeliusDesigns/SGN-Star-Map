@@ -181,10 +181,7 @@ function loop(){
     gl.drawArrays(gl.POINTS, 0, starCount);
   }
 
-  requestAnimationFrame(loop);
-}
-
-// ===== Simple lane editor =====
+  // ===== Simple lane editor =====
 let editMode = false;
 let pickA = null;
 let lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
@@ -281,3 +278,5 @@ window.addEventListener('keydown', (e)=>{
 // minor: show selected in console
 setInterval(()=>{ if(editMode && pickA) console.log('Picked:', pickA); }, 2000);
 
+  requestAnimationFrame(loop);
+}
