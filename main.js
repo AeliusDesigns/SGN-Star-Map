@@ -4,6 +4,7 @@ let gl = canvas.getContext('webgl2', { antialias: true });
 if (!gl) gl = canvas.getContext('webgl', { antialias: true });
 if (!gl) alert('WebGL not supported');
 
+// Resize
 function resize() {
   const dpr = 1; // keep lightweight & consistent
   canvas.width = Math.floor(innerWidth * dpr);
@@ -16,24 +17,53 @@ addEventListener('resize', resize);
 resize();
 
 // --- tiny matrix helpers ---
-function mat4Mul(a,b){const o=new Float32Array(16);
-  for(let r=0;r<4;r++)for(let c=0;c<4;c++)
-    o[r*4+c]=a[r*4+0]*b[0*4+c]+a[r*4+1]*b[1*4+c]+a[r*4+2]*b[2*4+c]+a[r*4+3]*b[3*4+c];return o;}
-function mat4Perspective(fovy,aspect,near,far){const f=1/Math.tan(fovy/2),nf=1/(near-far);
-  return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,(2*far*near)*nf,0]);}
-function mat4Translate(x,y,z){return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);}
-function mat4RotateY(a){const c=Math.cos(a),s=Math.sin(a);
-  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);}
-function mat4RotateX(a){const c=Math.cos(a),s=Math.sin(a);
-  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);}
+function mat4Mul(a, b) {
+  const o = new Float32Array(16);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
+    o[r*4+c] =
+      a[r*4+0]*b[0*4+c] +
+      a[r*4+1]*b[1*4+c] +
+      a[r*4+2]*b[2*4+c] +
+      a[r*4+3]*b[3*4+c];
+  return o;
+}
+function mat4Perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, (2*far*near)*nf, 0
+  ]);
+}
+function mat4Translate(x, y, z) {
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+}
+function mat4RotateY(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([ c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1 ]);
+}
+function mat4RotateX(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([ 1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1 ]);
+}
 
 // --- shader helpers ---
-function compile(type, src){const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s); return s;}
-function makeProgram(vsSrc, fsSrc){
-  const p=gl.createProgram(); gl.attachShader(p,compile(gl.VERTEX_SHADER,vsSrc));
-  gl.attachShader(p,compile(gl.FRAGMENT_SHADER,fsSrc)); gl.linkProgram(p);
-  if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw gl.getProgramInfoLog(p);
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw gl.getShaderInfoLog(s);
+  return s;
+}
+function makeProgram(vsSrc, fsSrc) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.linkStatus || gl.LINK_STATUS))
+    throw gl.getProgramInfoLog(p);
   return p;
 }
 
@@ -80,52 +110,64 @@ const uMVP_lines  = gl.getUniformLocation(progLines,  'uMVP');
 const uColorLines = gl.getUniformLocation(progLines,  'uColor');
 
 // --- camera/orbit ---
-let yaw=0, pitch=0, dist=1800, dragging=false, lx=0, ly=0;
-canvas.addEventListener('mousedown', e=>{dragging=true; lx=e.clientX; ly=e.clientY;});
-addEventListener('mouseup', ()=>dragging=false);
-addEventListener('mousemove', e=>{
-  if(!dragging) return;
-  const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY;
-  yaw+=dx*0.005; pitch+=dy*0.005; pitch=Math.max(-1.55, Math.min(1.55, pitch));
+let yaw = 0, pitch = 0, dist = 1800, dragging = false, lx = 0, ly = 0;
+canvas.addEventListener('mousedown', e => { dragging = true; lx = e.clientX; ly = e.clientY; });
+addEventListener('mouseup', () => dragging = false);
+addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - lx, dy = e.clientY - ly;
+  lx = e.clientX; ly = e.clientY;
+  yaw += dx * 0.005;
+  pitch += dy * 0.005;
+  pitch = Math.max(-1.55, Math.min(1.55, pitch));
 });
-addEventListener('wheel', e=>{ dist*= (1 + Math.sign(e.deltaY)*0.12); dist=Math.max(300, Math.min(6000, dist)); });
+addEventListener('wheel', e => {
+  dist *= (1 + Math.sign(e.deltaY) * 0.12);
+  dist = Math.max(300, Math.min(6000, dist));
+});
 
 // --- data buffers ---
-let starsVBO=null, starCount=0;
-let linesVBO=null, lineVertCount=0;
+let starsVBO = null, starCount = 0;
+let linesVBO = null, lineVertCount = 0;
 
-// NOTE: update this if your JSON path/filename differs
+// JSON path
 const jsonURL = './systems.json';
 
-fetch(jsonURL).then(r=>r.json()).then(data=>{
-  // dimensions (fall back to image if present, else use your numbers)
+// Keep these accessible for the editor and render
+let idToWorld = new Map();
+let systems = [];
+let lanesSet = new Set();
+
+fetch(jsonURL).then(r => r.json()).then(data => {
+  // dimensions
   const imgW = data?.image_size?.width  ?? 1090;
   const imgH = data?.image_size?.height ?? 1494;
-  const SCALE = 2200, aspect = imgW/imgH;
-  const worldW = SCALE, worldH = SCALE/aspect;
+  const SCALE = 2200, aspect = imgW / imgH;
+  const worldW = SCALE, worldH = SCALE / aspect;
 
   const toWorld = (xn, yn) => {
     const x = (xn - 0.5) * worldW;
     const y = -(yn - 0.5) * worldH;
     const z = 0; // flat layer for now
-    return [x,y,z];
+    return [x, y, z];
   };
 
   // build star positions
   const stars = [];
-  const idToWorld = new Map();
-  (data.systems || []).forEach(sys=>{
+  idToWorld = new Map();
+  systems = data.systems || [];
+  systems.forEach(sys => {
     let xn = sys.coords?.x_norm, yn = sys.coords?.y_norm;
-    if (xn==null || yn==null) {
-      const px=sys.pixel?.x, py=sys.pixel?.y;
-      if (px==null || py==null) return;
-      xn = px/imgW; yn = py/imgH;
+    if (xn == null || yn == null) {
+      const px = sys.pixel?.x, py = sys.pixel?.y;
+      if (px == null || py == null) return;
+      xn = px / imgW; yn = py / imgH;
     }
-    const [x,y,z] = toWorld(xn,yn);
-    stars.push(x,y,z);
-    idToWorld.set(sys.id, [x,y,z]);
+    const [x, y, z] = toWorld(xn, yn);
+    stars.push(x, y, z);
+    idToWorld.set(sys.id, [x, y, z]);
   });
-  starCount = stars.length/3;
+  starCount = stars.length / 3;
   starsVBO = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
@@ -133,32 +175,121 @@ fetch(jsonURL).then(r=>r.json()).then(data=>{
   // build lane segments (each lane adds two vertices)
   const lanes = data.lanes || [];
   const lineVerts = [];
-  for (const [a,b] of lanes) {
+  for (const [a, b] of lanes) {
     const pa = idToWorld.get(a), pb = idToWorld.get(b);
     if (!pa || !pb) continue;
-    lineVerts.push(pa[0],pa[1],pa[2], pb[0],pb[1],pb[2]);
+    lineVerts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
   }
-  lineVertCount = lineVerts.length/3;
-  if (lineVertCount>0) {
+  lineVertCount = lineVerts.length / 3;
+  if (lineVertCount > 0) {
     linesVBO = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lineVerts), gl.STATIC_DRAW);
   }
 
+  // ===== Simple lane editor =====
+  let editMode = false;
+  let pickA = null;
+  lanesSet = new Set(lanes.map(([a, b]) => [a, b].sort().join('::')));
+
+  function projectToScreen(x, y, z) {
+    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+    const view = mat4Translate(0, 0, -dist);
+    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+    const v = new Float32Array([x, y, z, 1]);
+    const m = mvp;
+    const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
+    const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
+    const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
+    const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
+    if (cw === 0) return null;
+    const ndcX = cx / cw, ndcY = cy / cw;
+    return [
+      Math.round((ndcX * 0.5 + 0.5) * canvas.width),
+      Math.round((-ndcY * 0.5 + 0.5) * canvas.height),
+      cz / cw
+    ];
+  }
+
+  function rebuildLinesVBOFromSet() {
+    const lanesArr = Array.from(lanesSet).map(s => s.split('::'));
+    const verts = [];
+    for (const [a, b] of lanesArr) {
+      const pa = idToWorld.get(a), pb = idToWorld.get(b);
+      if (!pa || !pb) continue;
+      verts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
+    }
+    lineVertCount = verts.length / 3;
+    if (!linesVBO) linesVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+  }
+
+  canvas.addEventListener('click', (e) => {
+    if (!editMode) return;
+    const mx = e.clientX * (canvas.width / canvas.clientWidth);
+    const my = e.clientY * (canvas.height / canvas.clientHeight);
+    let best = null, bestId = null, r2 = 18 * 18;
+    for (const sys of systems) {
+      const id = sys.id;
+      const w = idToWorld.get(id);
+      if (!w) continue;
+      const p = projectToScreen(w[0], w[1], w[2]);
+      if (!p) continue;
+      const dx = p[0] - mx, dy = p[1] - my;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < r2 && (best === null || d2 < best)) { best = d2; bestId = id; }
+    }
+    if (!bestId) return;
+    if (!pickA) {
+      pickA = bestId;
+    } else {
+      const key = [pickA, bestId].sort().join('::');
+      if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
+      pickA = null;
+      rebuildLinesVBOFromSet();
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'e') {
+      editMode = !editMode;
+      console.log(`Edit Mode: ${editMode ? 'ON' : 'OFF'}`);
+    }
+    if (e.key.toLowerCase() === 'x') {
+      const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
+      const out = {
+        image_size: data.image_size,
+        systems: data.systems,
+        lanes: lanesOut
+      };
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'systems.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      console.log(`Exported ${lanesOut.length} lanes`);
+    }
+  });
+
+  // Start render
   requestAnimationFrame(loop);
 });
 
-function loop(){
-  gl.clearColor(0.043,0.055,0.075,1);
+// --- render loop ---
+function loop() {
+  gl.clearColor(0.043, 0.055, 0.075, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  const proj = mat4Perspective(55*Math.PI/180, canvas.width/canvas.height, 0.1, 50000);
+  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
   const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(0,0,-dist);
+  const view = mat4Translate(0, 0, -dist);
   const mvp  = mat4Mul(rot, mat4Mul(view, proj));
 
   // draw lanes first (so points sit on top)
-  if (linesVBO && lineVertCount>0) {
+  if (linesVBO && lineVertCount > 0) {
     gl.useProgram(progLines);
     gl.uniformMatrix4fv(uMVP_lines, false, mvp);
     gl.uniform3f(uColorLines, 1.0, 0.85, 0.35); // warm yellow
@@ -169,7 +300,7 @@ function loop(){
   }
 
   // draw stars
-  if (starsVBO && starCount>0) {
+  if (starsVBO && starCount > 0) {
     gl.useProgram(progPoints);
     gl.uniformMatrix4fv(uMVP_points, false, mvp);
     gl.uniform1f(uSize, 6.0);
@@ -177,106 +308,10 @@ function loop(){
     gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
     gl.enableVertexAttribArray(aPos_points);
     gl.vertexAttribPointer(aPos_points, 3, gl.FLOAT, false, 0, 0);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.POINTS, 0, starCount);
   }
-
-  // ===== Simple lane editor =====
-let editMode = false;
-let pickA = null;
-let lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
-const systems = data.systems || [];
-const screenPos = new Map(); // id -> [sx, sy] each frame
-
-function projectToScreen(x,y,z){
-  // project world -> clip
-  const proj = mat4Perspective(55*Math.PI/180, canvas.width/canvas.height, 0.1, 50000);
-  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(0,0,-dist);
-  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-  const v = new Float32Array([x,y,z,1]);
-  // multiply
-  const m = mvp;
-  const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
-  const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
-  const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
-  const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
-  if (cw === 0) return null;
-  const ndcX = cx/cw, ndcY = cy/cw;
-  return [
-    Math.round((ndcX*0.5+0.5)*canvas.width),
-    Math.round((-ndcY*0.5+0.5)*canvas.height),
-    cz/cw
-  ];
-}
-
-function rebuildLinesVBOFromSet(){
-  const lanes = Array.from(lanesSet).map(s => s.split('::'));
-  const verts = [];
-  for (const [a,b] of lanes){
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    verts.push(pa[0],pa[1],pa[2], pb[0],pb[1],pb[2]);
-  }
-  lineVertCount = verts.length/3;
-  if (!linesVBO) linesVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-}
-
-canvas.addEventListener('click', (e)=>{
-  if (!editMode) return;
-  // find nearest star under cursor
-  const mx = e.clientX * (canvas.width / canvas.clientWidth);
-  const my = e.clientY * (canvas.height / canvas.clientHeight);
-  let best = null, bestId = null, r2 = 18*18;
-  for (const sys of systems){
-    const id = sys.id;
-    const w = idToWorld.get(id);
-    if (!w) continue;
-    const p = projectToScreen(w[0],w[1],w[2]);
-    if (!p) continue;
-    screenPos.set(id, p);
-    const dx = p[0]-mx, dy = p[1]-my;
-    const d2 = dx*dx + dy*dy;
-    if (d2 < r2 && (best===null || d2 < best)) { best = d2; bestId = id; }
-  }
-  if (!bestId) return;
-  if (!pickA) {
-    pickA = bestId;
-  } else {
-    const a = [pickA, bestId].sort().join('::');
-    if (lanesSet.has(a)) lanesSet.delete(a); else lanesSet.add(a);
-    pickA = null;
-    rebuildLinesVBOFromSet();
-  }
-});
-
-window.addEventListener('keydown', (e)=>{
-  if (e.key.toLowerCase()==='e') {
-    editMode = !editMode;
-    console.log(`Edit Mode: ${editMode ? 'ON' : 'OFF'}`);
-  }
-  if (e.key.toLowerCase()==='x') {
-    // export systems.json with updated lanes
-    const lanesOut = Array.from(lanesSet).map(s=>s.split('::'));
-    const out = {
-      image_size: data.image_size,
-      systems: data.systems,
-      lanes: lanesOut
-    };
-    const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'systems.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    console.log(`Exported ${lanesOut.length} lanes`);
-  }
-});
-
-// minor: show selected in console
-setInterval(()=>{ if(editMode && pickA) console.log('Picked:', pickA); }, 2000);
 
   requestAnimationFrame(loop);
 }
