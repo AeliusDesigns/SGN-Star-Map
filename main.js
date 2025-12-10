@@ -62,7 +62,7 @@ function makeProgram(vsSrc, fsSrc) {
   gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
   gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
   gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.linkStatus || gl.LINK_STATUS))
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS))
     throw gl.getProgramInfoLog(p);
   return p;
 }
@@ -226,6 +226,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
   }
 
+  // Add/remove lane by clicking two stars (when edit mode ON)
   canvas.addEventListener('click', (e) => {
     if (!editMode) return;
     const mx = e.clientX * (canvas.width / canvas.clientWidth);
@@ -252,12 +253,70 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     }
   });
 
+  // --- helpers to map mouse and delete nearest lane ---
+  function mouseToCanvas(e){
+    const mx = e.clientX * (canvas.width  / canvas.clientWidth);
+    const my = e.clientY * (canvas.height / canvas.clientHeight);
+    return [mx, my];
+  }
+  function distPointToSeg(px,py, ax,ay, bx,by){
+    const abx = bx - ax, aby = by - ay;
+    const apx = px - ax, apy = py - ay;
+    const len2 = abx*abx + aby*aby || 1;
+    let t = (apx*abx + apy*aby) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + t*abx, cy = ay + t*aby;
+    const dx = px - cx, dy = py - cy;
+    return Math.hypot(dx, dy);
+  }
+  function deleteNearestLane(mx, my){
+    let bestKey = null, bestD = 1e9;
+    for (const key of lanesSet){
+      const [a,b] = key.split('::');
+      const pa = idToWorld.get(a), pb = idToWorld.get(b);
+      if (!pa || !pb) continue;
+      const sa = projectToScreen(pa[0], pa[1], pa[2]);
+      const sb = projectToScreen(pb[0], pb[1], pb[2]);
+      if (!sa || !sb) continue;
+      const d = distPointToSeg(mx, my, sa[0], sa[1], sb[0], sb[1]);
+      if (d < bestD) { bestD = d; bestKey = key; }
+    }
+    if (bestKey && bestD < 20){ // 20 px snap distance
+      lanesSet.delete(bestKey);
+      rebuildLinesVBOFromSet();
+      console.log('Deleted lane:', bestKey);
+    } else {
+      console.log('No lane near cursor to delete.');
+    }
+  }
+
+  // Middle click near a lane to delete it (when edit mode ON)
+  canvas.addEventListener('auxclick', (e)=>{
+    if (!editMode || e.button !== 1) return;  // middle mouse
+    const [mx,my] = mouseToCanvas(e);
+    deleteNearestLane(mx, my);
+  });
+
+  // Keyboard controls
   window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 'e') {
+    const k = e.key.toLowerCase();
+    if (k === 'e') {
       editMode = !editMode;
       console.log(`Edit Mode: ${editMode ? 'ON' : 'OFF'}`);
     }
-    if (e.key.toLowerCase() === 'x') {
+    if (!editMode) return;
+
+    if (k === 'c') { // clear all lanes
+      lanesSet.clear();
+      rebuildLinesVBOFromSet();
+      console.log('Cleared all lanes.');
+    }
+    if (k === 'r') { // restore original JSON lanes
+      lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
+      rebuildLinesVBOFromSet();
+      console.log('Restored lanes from JSON.');
+    }
+    if (k === 'x') { // export
       const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
       const out = {
         image_size: data.image_size,
