@@ -183,3 +183,101 @@ function loop(){
 
   requestAnimationFrame(loop);
 }
+
+// ===== Simple lane editor =====
+let editMode = false;
+let pickA = null;
+let lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
+const systems = data.systems || [];
+const screenPos = new Map(); // id -> [sx, sy] each frame
+
+function projectToScreen(x,y,z){
+  // project world -> clip
+  const proj = mat4Perspective(55*Math.PI/180, canvas.width/canvas.height, 0.1, 50000);
+  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+  const view = mat4Translate(0,0,-dist);
+  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+  const v = new Float32Array([x,y,z,1]);
+  // multiply
+  const m = mvp;
+  const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
+  const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
+  const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
+  const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
+  if (cw === 0) return null;
+  const ndcX = cx/cw, ndcY = cy/cw;
+  return [
+    Math.round((ndcX*0.5+0.5)*canvas.width),
+    Math.round((-ndcY*0.5+0.5)*canvas.height),
+    cz/cw
+  ];
+}
+
+function rebuildLinesVBOFromSet(){
+  const lanes = Array.from(lanesSet).map(s => s.split('::'));
+  const verts = [];
+  for (const [a,b] of lanes){
+    const pa = idToWorld.get(a), pb = idToWorld.get(b);
+    if (!pa || !pb) continue;
+    verts.push(pa[0],pa[1],pa[2], pb[0],pb[1],pb[2]);
+  }
+  lineVertCount = verts.length/3;
+  if (!linesVBO) linesVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+}
+
+canvas.addEventListener('click', (e)=>{
+  if (!editMode) return;
+  // find nearest star under cursor
+  const mx = e.clientX * (canvas.width / canvas.clientWidth);
+  const my = e.clientY * (canvas.height / canvas.clientHeight);
+  let best = null, bestId = null, r2 = 18*18;
+  for (const sys of systems){
+    const id = sys.id;
+    const w = idToWorld.get(id);
+    if (!w) continue;
+    const p = projectToScreen(w[0],w[1],w[2]);
+    if (!p) continue;
+    screenPos.set(id, p);
+    const dx = p[0]-mx, dy = p[1]-my;
+    const d2 = dx*dx + dy*dy;
+    if (d2 < r2 && (best===null || d2 < best)) { best = d2; bestId = id; }
+  }
+  if (!bestId) return;
+  if (!pickA) {
+    pickA = bestId;
+  } else {
+    const a = [pickA, bestId].sort().join('::');
+    if (lanesSet.has(a)) lanesSet.delete(a); else lanesSet.add(a);
+    pickA = null;
+    rebuildLinesVBOFromSet();
+  }
+});
+
+window.addEventListener('keydown', (e)=>{
+  if (e.key.toLowerCase()==='e') {
+    editMode = !editMode;
+    console.log(`Edit Mode: ${editMode ? 'ON' : 'OFF'}`);
+  }
+  if (e.key.toLowerCase()==='x') {
+    // export systems.json with updated lanes
+    const lanesOut = Array.from(lanesSet).map(s=>s.split('::'));
+    const out = {
+      image_size: data.image_size,
+      systems: data.systems,
+      lanes: lanesOut
+    };
+    const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'systems.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    console.log(`Exported ${lanesOut.length} lanes`);
+  }
+});
+
+// minor: show selected in console
+setInterval(()=>{ if(editMode && pickA) console.log('Picked:', pickA); }, 2000);
+
