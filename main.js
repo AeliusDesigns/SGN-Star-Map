@@ -111,15 +111,30 @@ const uColorLines = gl.getUniformLocation(progLines,  'uColor');
 
 // --- camera/orbit ---
 let yaw = 0, pitch = 0, dist = 1800, dragging = false, lx = 0, ly = 0;
-canvas.addEventListener('mousedown', e => { dragging = true; lx = e.clientX; ly = e.clientY; });
-addEventListener('mouseup', () => dragging = false);
+// (added) panning state
+let panning = false, panX = 0, panY = 0;
+
+// prevent context menu during RMB pan
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+  lx = e.clientX; ly = e.clientY;
+  if (e.button === 2) panning = true;   // right button -> pan
+  else dragging = true;                 // left button  -> orbit
+});
+addEventListener('mouseup', () => { dragging = false; panning = false; });
 addEventListener('mousemove', e => {
-  if (!dragging) return;
   const dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
-  yaw += dx * 0.005;
-  pitch += dy * 0.005;
-  pitch = Math.max(-1.55, Math.min(1.55, pitch));
+  if (dragging) {
+    yaw   += dx * 0.005;
+    pitch += dy * 0.005;
+    pitch = Math.max(-1.55, Math.min(1.55, pitch));
+  } else if (panning) {
+    const s = dist / 1000;  // pan speed scales with zoom distance
+    panX -= dx * s;
+    panY += dy * s;
+  }
 });
 addEventListener('wheel', e => {
   dist *= (1 + Math.sign(e.deltaY) * 0.12);
@@ -344,7 +359,7 @@ function loop() {
 
   const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
   const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(0, 0, -dist);
+  const view = mat4Translate(-panX, -panY, -dist); // (updated) include panning
   const mvp  = mat4Mul(rot, mat4Mul(view, proj));
 
   // draw lanes first (so points sit on top)
