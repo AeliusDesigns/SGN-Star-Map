@@ -1,0 +1,1834 @@
+{
+  "image_size": {
+    "width": 1138,
+    "height": 1671
+  },
+  "systems": [
+    {
+      "id": "SGN-SYS-001",
+      "name": "System 001",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.153779,
+        "y_norm": 0.168163
+      },
+      "pixel": {
+        "x": 175,
+        "y": 281
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-002",
+      "name": "System 002",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.184534,
+        "y_norm": 0.192101
+      },
+      "pixel": {
+        "x": 210,
+        "y": 321
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-003",
+      "name": "System 003",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.210896,
+        "y_norm": 0.208857
+      },
+      "pixel": {
+        "x": 240,
+        "y": 349
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-004",
+      "name": "System 004",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.151142,
+        "y_norm": 0.210652
+      },
+      "pixel": {
+        "x": 172,
+        "y": 352
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-005",
+      "name": "System 005",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.248682,
+        "y_norm": 0.213046
+      },
+      "pixel": {
+        "x": 283,
+        "y": 356
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-006",
+      "name": "System 006",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.456942,
+        "y_norm": 0.241771
+      },
+      "pixel": {
+        "x": 520,
+        "y": 404
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-007",
+      "name": "System 007",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.217926,
+        "y_norm": 0.259126
+      },
+      "pixel": {
+        "x": 248,
+        "y": 433
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-008",
+      "name": "System 008",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.35413,
+        "y_norm": 0.263914
+      },
+      "pixel": {
+        "x": 403,
+        "y": 441
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-009",
+      "name": "System 009",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.27065,
+        "y_norm": 0.293238
+      },
+      "pixel": {
+        "x": 308,
+        "y": 490
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-010",
+      "name": "System 010",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.412127,
+        "y_norm": 0.314782
+      },
+      "pixel": {
+        "x": 469,
+        "y": 526
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-011",
+      "name": "System 011",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.308436,
+        "y_norm": 0.319569
+      },
+      "pixel": {
+        "x": 351,
+        "y": 534
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-012",
+      "name": "System 012",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.345343,
+        "y_norm": 0.332735
+      },
+      "pixel": {
+        "x": 393,
+        "y": 556
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-013",
+      "name": "System 013",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.477153,
+        "y_norm": 0.338719
+      },
+      "pixel": {
+        "x": 543,
+        "y": 566
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-014",
+      "name": "System 014",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.376977,
+        "y_norm": 0.347696
+      },
+      "pixel": {
+        "x": 429,
+        "y": 581
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-015",
+      "name": "System 015",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.492091,
+        "y_norm": 0.375823
+      },
+      "pixel": {
+        "x": 560,
+        "y": 628
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-016",
+      "name": "System 016",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.282953,
+        "y_norm": 0.37702
+      },
+      "pixel": {
+        "x": 322,
+        "y": 630
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-017",
+      "name": "System 017",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.43058,
+        "y_norm": 0.381209
+      },
+      "pixel": {
+        "x": 490,
+        "y": 637
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-018",
+      "name": "System 018",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.506151,
+        "y_norm": 0.404548
+      },
+      "pixel": {
+        "x": 576,
+        "y": 676
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-019",
+      "name": "System 019",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.728471,
+        "y_norm": 0.405745
+      },
+      "pixel": {
+        "x": 829,
+        "y": 678
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-020",
+      "name": "System 020",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.40246,
+        "y_norm": 0.412328
+      },
+      "pixel": {
+        "x": 458,
+        "y": 689
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-021",
+      "name": "System 021",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.56239,
+        "y_norm": 0.417115
+      },
+      "pixel": {
+        "x": 640,
+        "y": 697
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-022",
+      "name": "System 022",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.761863,
+        "y_norm": 0.417115
+      },
+      "pixel": {
+        "x": 867,
+        "y": 697
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-023",
+      "name": "System 023",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.525483,
+        "y_norm": 0.432675
+      },
+      "pixel": {
+        "x": 598,
+        "y": 723
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-024",
+      "name": "System 024",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.468366,
+        "y_norm": 0.439856
+      },
+      "pixel": {
+        "x": 533,
+        "y": 735
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-025",
+      "name": "System 025",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.754833,
+        "y_norm": 0.441652
+      },
+      "pixel": {
+        "x": 859,
+        "y": 738
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-026",
+      "name": "System 026",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.550967,
+        "y_norm": 0.448235
+      },
+      "pixel": {
+        "x": 627,
+        "y": 749
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-027",
+      "name": "System 027",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.688928,
+        "y_norm": 0.451227
+      },
+      "pixel": {
+        "x": 784,
+        "y": 754
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-028",
+      "name": "System 028",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.592267,
+        "y_norm": 0.453022
+      },
+      "pixel": {
+        "x": 674,
+        "y": 757
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-029",
+      "name": "System 029",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.517575,
+        "y_norm": 0.459605
+      },
+      "pixel": {
+        "x": 589,
+        "y": 768
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-030",
+      "name": "System 030",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.422671,
+        "y_norm": 0.468582
+      },
+      "pixel": {
+        "x": 481,
+        "y": 783
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-031",
+      "name": "System 031",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.602812,
+        "y_norm": 0.469779
+      },
+      "pixel": {
+        "x": 686,
+        "y": 785
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-032",
+      "name": "System 032",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.465729,
+        "y_norm": 0.485937
+      },
+      "pixel": {
+        "x": 530,
+        "y": 812
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-033",
+      "name": "System 033",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.558875,
+        "y_norm": 0.491921
+      },
+      "pixel": {
+        "x": 636,
+        "y": 822
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-034",
+      "name": "System 034",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.615114,
+        "y_norm": 0.494315
+      },
+      "pixel": {
+        "x": 700,
+        "y": 826
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-035",
+      "name": "System 035",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.514938,
+        "y_norm": 0.49611
+      },
+      "pixel": {
+        "x": 586,
+        "y": 829
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-036",
+      "name": "System 036",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.700351,
+        "y_norm": 0.508677
+      },
+      "pixel": {
+        "x": 797,
+        "y": 850
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-037",
+      "name": "System 037",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.782074,
+        "y_norm": 0.512268
+      },
+      "pixel": {
+        "x": 890,
+        "y": 856
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-038",
+      "name": "System 038",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.604569,
+        "y_norm": 0.518851
+      },
+      "pixel": {
+        "x": 688,
+        "y": 867
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-039",
+      "name": "System 039",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.557996,
+        "y_norm": 0.528426
+      },
+      "pixel": {
+        "x": 635,
+        "y": 883
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-040",
+      "name": "System 040",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.47188,
+        "y_norm": 0.532615
+      },
+      "pixel": {
+        "x": 537,
+        "y": 890
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-041",
+      "name": "System 041",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.575571,
+        "y_norm": 0.546379
+      },
+      "pixel": {
+        "x": 655,
+        "y": 913
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-042",
+      "name": "System 042",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.633568,
+        "y_norm": 0.546379
+      },
+      "pixel": {
+        "x": 721,
+        "y": 913
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-043",
+      "name": "System 043",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.565026,
+        "y_norm": 0.566128
+      },
+      "pixel": {
+        "x": 643,
+        "y": 946
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-044",
+      "name": "System 044",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.500879,
+        "y_norm": 0.56912
+      },
+      "pixel": {
+        "x": 570,
+        "y": 951
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-045",
+      "name": "System 045",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.664323,
+        "y_norm": 0.572113
+      },
+      "pixel": {
+        "x": 756,
+        "y": 956
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-046",
+      "name": "System 046",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.604569,
+        "y_norm": 0.581089
+      },
+      "pixel": {
+        "x": 688,
+        "y": 971
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-047",
+      "name": "System 047",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.543058,
+        "y_norm": 0.59605
+      },
+      "pixel": {
+        "x": 618,
+        "y": 996
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-048",
+      "name": "System 048",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.676626,
+        "y_norm": 0.610413
+      },
+      "pixel": {
+        "x": 770,
+        "y": 1020
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-049",
+      "name": "System 049",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.611599,
+        "y_norm": 0.616397
+      },
+      "pixel": {
+        "x": 696,
+        "y": 1030
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-050",
+      "name": "System 050",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.586116,
+        "y_norm": 0.622382
+      },
+      "pixel": {
+        "x": 667,
+        "y": 1040
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-051",
+      "name": "System 051",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.482425,
+        "y_norm": 0.634949
+      },
+      "pixel": {
+        "x": 549,
+        "y": 1061
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-052",
+      "name": "System 052",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.63884,
+        "y_norm": 0.636744
+      },
+      "pixel": {
+        "x": 727,
+        "y": 1064
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-053",
+      "name": "System 053",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.693322,
+        "y_norm": 0.644524
+      },
+      "pixel": {
+        "x": 789,
+        "y": 1077
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-054",
+      "name": "System 054",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.793497,
+        "y_norm": 0.645123
+      },
+      "pixel": {
+        "x": 903,
+        "y": 1078
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-055",
+      "name": "System 055",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.62478,
+        "y_norm": 0.648115
+      },
+      "pixel": {
+        "x": 711,
+        "y": 1083
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-056",
+      "name": "System 056",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.585237,
+        "y_norm": 0.648713
+      },
+      "pixel": {
+        "x": 666,
+        "y": 1084
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-057",
+      "name": "System 057",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.661687,
+        "y_norm": 0.661879
+      },
+      "pixel": {
+        "x": 753,
+        "y": 1106
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-058",
+      "name": "System 058",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.538664,
+        "y_norm": 0.675643
+      },
+      "pixel": {
+        "x": 613,
+        "y": 1129
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-059",
+      "name": "System 059",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.611599,
+        "y_norm": 0.686415
+      },
+      "pixel": {
+        "x": 696,
+        "y": 1147
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-060",
+      "name": "System 060",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.788225,
+        "y_norm": 0.688809
+      },
+      "pixel": {
+        "x": 897,
+        "y": 1151
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-061",
+      "name": "System 061",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.688928,
+        "y_norm": 0.69599
+      },
+      "pixel": {
+        "x": 784,
+        "y": 1163
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-062",
+      "name": "System 062",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.579086,
+        "y_norm": 0.700778
+      },
+      "pixel": {
+        "x": 659,
+        "y": 1171
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-063",
+      "name": "System 063",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.653779,
+        "y_norm": 0.705566
+      },
+      "pixel": {
+        "x": 744,
+        "y": 1179
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-064",
+      "name": "System 064",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.519332,
+        "y_norm": 0.718133
+      },
+      "pixel": {
+        "x": 591,
+        "y": 1200
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-065",
+      "name": "System 065",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.581722,
+        "y_norm": 0.725314
+      },
+      "pixel": {
+        "x": 662,
+        "y": 1212
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-066",
+      "name": "System 066",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.621265,
+        "y_norm": 0.734291
+      },
+      "pixel": {
+        "x": 707,
+        "y": 1227
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-067",
+      "name": "System 067",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.771529,
+        "y_norm": 0.741472
+      },
+      "pixel": {
+        "x": 878,
+        "y": 1239
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-068",
+      "name": "System 068",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.720562,
+        "y_norm": 0.744464
+      },
+      "pixel": {
+        "x": 820,
+        "y": 1244
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-069",
+      "name": "System 069",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.495606,
+        "y_norm": 0.749252
+      },
+      "pixel": {
+        "x": 564,
+        "y": 1252
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-070",
+      "name": "System 070",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.579086,
+        "y_norm": 0.761819
+      },
+      "pixel": {
+        "x": 659,
+        "y": 1273
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-071",
+      "name": "System 071",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.609842,
+        "y_norm": 0.779174
+      },
+      "pixel": {
+        "x": 694,
+        "y": 1302
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-072",
+      "name": "System 072",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.679262,
+        "y_norm": 0.783962
+      },
+      "pixel": {
+        "x": 773,
+        "y": 1310
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-073",
+      "name": "System 073",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.505272,
+        "y_norm": 0.78456
+      },
+      "pixel": {
+        "x": 575,
+        "y": 1311
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-074",
+      "name": "System 074",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.578207,
+        "y_norm": 0.797726
+      },
+      "pixel": {
+        "x": 658,
+        "y": 1333
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-075",
+      "name": "System 075",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.628295,
+        "y_norm": 0.813884
+      },
+      "pixel": {
+        "x": 715,
+        "y": 1360
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-076",
+      "name": "System 076",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.56239,
+        "y_norm": 0.818671
+      },
+      "pixel": {
+        "x": 640,
+        "y": 1368
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-077",
+      "name": "System 077",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.691564,
+        "y_norm": 0.822861
+      },
+      "pixel": {
+        "x": 787,
+        "y": 1375
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-078",
+      "name": "System 078",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.487698,
+        "y_norm": 0.829443
+      },
+      "pixel": {
+        "x": 555,
+        "y": 1386
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-079",
+      "name": "System 079",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.601054,
+        "y_norm": 0.836026
+      },
+      "pixel": {
+        "x": 684,
+        "y": 1397
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-080",
+      "name": "System 080",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.557996,
+        "y_norm": 0.842609
+      },
+      "pixel": {
+        "x": 635,
+        "y": 1408
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-081",
+      "name": "System 081",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.655536,
+        "y_norm": 0.856972
+      },
+      "pixel": {
+        "x": 746,
+        "y": 1432
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-082",
+      "name": "System 082",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.596661,
+        "y_norm": 0.860563
+      },
+      "pixel": {
+        "x": 679,
+        "y": 1438
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-083",
+      "name": "System 083",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.496485,
+        "y_norm": 0.868941
+      },
+      "pixel": {
+        "x": 565,
+        "y": 1452
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-084",
+      "name": "System 084",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.594903,
+        "y_norm": 0.877319
+      },
+      "pixel": {
+        "x": 677,
+        "y": 1466
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-085",
+      "name": "System 085",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.558875,
+        "y_norm": 0.894075
+      },
+      "pixel": {
+        "x": 636,
+        "y": 1494
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-086",
+      "name": "System 086",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.618629,
+        "y_norm": 0.906643
+      },
+      "pixel": {
+        "x": 704,
+        "y": 1515
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-087",
+      "name": "System 087",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.510545,
+        "y_norm": 0.928785
+      },
+      "pixel": {
+        "x": 581,
+        "y": 1552
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    },
+    {
+      "id": "SGN-SYS-088",
+      "name": "System 088",
+      "owner": "Arandorë Eldainë",
+      "coords": {
+        "x_norm": 0.558875,
+        "y_norm": 0.929384
+      },
+      "pixel": {
+        "x": 636,
+        "y": 1553
+      },
+      "source": "extracted_from_map_image",
+      "confidence": 0.9
+    }
+  ],
+  "lanes": [
+    [
+      "SGN-SYS-019",
+      "SGN-SYS-022"
+    ],
+    [
+      "SGN-SYS-022",
+      "SGN-SYS-025"
+    ],
+    [
+      "SGN-SYS-025",
+      "SGN-SYS-027"
+    ],
+    [
+      "SGN-SYS-019",
+      "SGN-SYS-027"
+    ],
+    [
+      "SGN-SYS-027",
+      "SGN-SYS-036"
+    ],
+    [
+      "SGN-SYS-025",
+      "SGN-SYS-037"
+    ],
+    [
+      "SGN-SYS-036",
+      "SGN-SYS-037"
+    ],
+    [
+      "SGN-SYS-054",
+      "SGN-SYS-060"
+    ],
+    [
+      "SGN-SYS-060",
+      "SGN-SYS-067"
+    ],
+    [
+      "SGN-SYS-067",
+      "SGN-SYS-068"
+    ],
+    [
+      "SGN-SYS-034",
+      "SGN-SYS-036"
+    ],
+    [
+      "SGN-SYS-034",
+      "SGN-SYS-038"
+    ],
+    [
+      "SGN-SYS-038",
+      "SGN-SYS-042"
+    ],
+    [
+      "SGN-SYS-042",
+      "SGN-SYS-045"
+    ],
+    [
+      "SGN-SYS-034",
+      "SGN-SYS-045"
+    ],
+    [
+      "SGN-SYS-045",
+      "SGN-SYS-046"
+    ],
+    [
+      "SGN-SYS-041",
+      "SGN-SYS-042"
+    ],
+    [
+      "SGN-SYS-041",
+      "SGN-SYS-046"
+    ],
+    [
+      "SGN-SYS-041",
+      "SGN-SYS-043"
+    ],
+    [
+      "SGN-SYS-043",
+      "SGN-SYS-046"
+    ],
+    [
+      "SGN-SYS-046",
+      "SGN-SYS-047"
+    ],
+    [
+      "SGN-SYS-046",
+      "SGN-SYS-049"
+    ],
+    [
+      "SGN-SYS-048",
+      "SGN-SYS-049"
+    ],
+    [
+      "SGN-SYS-046",
+      "SGN-SYS-048"
+    ],
+    [
+      "SGN-SYS-048",
+      "SGN-SYS-053"
+    ],
+    [
+      "SGN-SYS-052",
+      "SGN-SYS-053"
+    ],
+    [
+      "SGN-SYS-052",
+      "SGN-SYS-057"
+    ],
+    [
+      "SGN-SYS-055",
+      "SGN-SYS-057"
+    ],
+    [
+      "SGN-SYS-053",
+      "SGN-SYS-057"
+    ],
+    [
+      "SGN-SYS-053",
+      "SGN-SYS-061"
+    ],
+    [
+      "SGN-SYS-061",
+      "SGN-SYS-063"
+    ],
+    [
+      "SGN-SYS-063",
+      "SGN-SYS-068"
+    ],
+    [
+      "SGN-SYS-061",
+      "SGN-SYS-068"
+    ],
+    [
+      "SGN-SYS-066",
+      "SGN-SYS-068"
+    ],
+    [
+      "SGN-SYS-055",
+      "SGN-SYS-059"
+    ],
+    [
+      "SGN-SYS-059",
+      "SGN-SYS-061"
+    ],
+    [
+      "SGN-SYS-062",
+      "SGN-SYS-063"
+    ],
+    [
+      "SGN-SYS-062",
+      "SGN-SYS-064"
+    ],
+    [
+      "SGN-SYS-062",
+      "SGN-SYS-065"
+    ],
+    [
+      "SGN-SYS-064",
+      "SGN-SYS-065"
+    ],
+    [
+      "SGN-SYS-031",
+      "SGN-SYS-034"
+    ],
+    [
+      "SGN-SYS-028",
+      "SGN-SYS-031"
+    ],
+    [
+      "SGN-SYS-021",
+      "SGN-SYS-028"
+    ],
+    [
+      "SGN-SYS-028",
+      "SGN-SYS-033"
+    ],
+    [
+      "SGN-SYS-026",
+      "SGN-SYS-028"
+    ],
+    [
+      "SGN-SYS-023",
+      "SGN-SYS-026"
+    ],
+    [
+      "SGN-SYS-018",
+      "SGN-SYS-023"
+    ],
+    [
+      "SGN-SYS-015",
+      "SGN-SYS-018"
+    ],
+    [
+      "SGN-SYS-015",
+      "SGN-SYS-021"
+    ],
+    [
+      "SGN-SYS-018",
+      "SGN-SYS-021"
+    ],
+    [
+      "SGN-SYS-021",
+      "SGN-SYS-023"
+    ],
+    [
+      "SGN-SYS-021",
+      "SGN-SYS-026"
+    ],
+    [
+      "SGN-SYS-024",
+      "SGN-SYS-032"
+    ],
+    [
+      "SGN-SYS-029",
+      "SGN-SYS-032"
+    ],
+    [
+      "SGN-SYS-029",
+      "SGN-SYS-033"
+    ],
+    [
+      "SGN-SYS-035",
+      "SGN-SYS-039"
+    ],
+    [
+      "SGN-SYS-033",
+      "SGN-SYS-039"
+    ],
+    [
+      "SGN-SYS-033",
+      "SGN-SYS-035"
+    ],
+    [
+      "SGN-SYS-035",
+      "SGN-SYS-040"
+    ],
+    [
+      "SGN-SYS-040",
+      "SGN-SYS-044"
+    ],
+    [
+      "SGN-SYS-039",
+      "SGN-SYS-044"
+    ],
+    [
+      "SGN-SYS-050",
+      "SGN-SYS-056"
+    ],
+    [
+      "SGN-SYS-051",
+      "SGN-SYS-056"
+    ],
+    [
+      "SGN-SYS-050",
+      "SGN-SYS-051"
+    ],
+    [
+      "SGN-SYS-049",
+      "SGN-SYS-050"
+    ],
+    [
+      "SGN-SYS-051",
+      "SGN-SYS-058"
+    ],
+    [
+      "SGN-SYS-058",
+      "SGN-SYS-064"
+    ],
+    [
+      "SGN-SYS-030",
+      "SGN-SYS-032"
+    ],
+    [
+      "SGN-SYS-032",
+      "SGN-SYS-040"
+    ],
+    [
+      "SGN-SYS-020",
+      "SGN-SYS-024"
+    ],
+    [
+      "SGN-SYS-020",
+      "SGN-SYS-030"
+    ],
+    [
+      "SGN-SYS-016",
+      "SGN-SYS-020"
+    ],
+    [
+      "SGN-SYS-017",
+      "SGN-SYS-020"
+    ],
+    [
+      "SGN-SYS-013",
+      "SGN-SYS-017"
+    ],
+    [
+      "SGN-SYS-010",
+      "SGN-SYS-013"
+    ],
+    [
+      "SGN-SYS-010",
+      "SGN-SYS-014"
+    ],
+    [
+      "SGN-SYS-014",
+      "SGN-SYS-017"
+    ],
+    [
+      "SGN-SYS-010",
+      "SGN-SYS-017"
+    ],
+    [
+      "SGN-SYS-012",
+      "SGN-SYS-014"
+    ],
+    [
+      "SGN-SYS-010",
+      "SGN-SYS-012"
+    ],
+    [
+      "SGN-SYS-006",
+      "SGN-SYS-010"
+    ],
+    [
+      "SGN-SYS-006",
+      "SGN-SYS-008"
+    ],
+    [
+      "SGN-SYS-008",
+      "SGN-SYS-011"
+    ],
+    [
+      "SGN-SYS-009",
+      "SGN-SYS-011"
+    ],
+    [
+      "SGN-SYS-011",
+      "SGN-SYS-012"
+    ],
+    [
+      "SGN-SYS-008",
+      "SGN-SYS-009"
+    ],
+    [
+      "SGN-SYS-007",
+      "SGN-SYS-009"
+    ],
+    [
+      "SGN-SYS-004",
+      "SGN-SYS-007"
+    ],
+    [
+      "SGN-SYS-003",
+      "SGN-SYS-004"
+    ],
+    [
+      "SGN-SYS-002",
+      "SGN-SYS-003"
+    ],
+    [
+      "SGN-SYS-001",
+      "SGN-SYS-002"
+    ],
+    [
+      "SGN-SYS-001",
+      "SGN-SYS-004"
+    ],
+    [
+      "SGN-SYS-002",
+      "SGN-SYS-005"
+    ],
+    [
+      "SGN-SYS-005",
+      "SGN-SYS-007"
+    ],
+    [
+      "SGN-SYS-003",
+      "SGN-SYS-007"
+    ],
+    [
+      "SGN-SYS-066",
+      "SGN-SYS-071"
+    ],
+    [
+      "SGN-SYS-065",
+      "SGN-SYS-070"
+    ],
+    [
+      "SGN-SYS-069",
+      "SGN-SYS-070"
+    ],
+    [
+      "SGN-SYS-064",
+      "SGN-SYS-069"
+    ],
+    [
+      "SGN-SYS-064",
+      "SGN-SYS-070"
+    ],
+    [
+      "SGN-SYS-069",
+      "SGN-SYS-073"
+    ],
+    [
+      "SGN-SYS-078",
+      "SGN-SYS-083"
+    ],
+    [
+      "SGN-SYS-078",
+      "SGN-SYS-080"
+    ],
+    [
+      "SGN-SYS-076",
+      "SGN-SYS-078"
+    ],
+    [
+      "SGN-SYS-076",
+      "SGN-SYS-080"
+    ],
+    [
+      "SGN-SYS-083",
+      "SGN-SYS-085"
+    ],
+    [
+      "SGN-SYS-080",
+      "SGN-SYS-085"
+    ],
+    [
+      "SGN-SYS-085",
+      "SGN-SYS-087"
+    ],
+    [
+      "SGN-SYS-085",
+      "SGN-SYS-088"
+    ],
+    [
+      "SGN-SYS-087",
+      "SGN-SYS-088"
+    ],
+    [
+      "SGN-SYS-083",
+      "SGN-SYS-087"
+    ],
+    [
+      "SGN-SYS-084",
+      "SGN-SYS-086"
+    ],
+    [
+      "SGN-SYS-081",
+      "SGN-SYS-084"
+    ],
+    [
+      "SGN-SYS-081",
+      "SGN-SYS-086"
+    ],
+    [
+      "SGN-SYS-081",
+      "SGN-SYS-082"
+    ],
+    [
+      "SGN-SYS-079",
+      "SGN-SYS-082"
+    ],
+    [
+      "SGN-SYS-075",
+      "SGN-SYS-079"
+    ],
+    [
+      "SGN-SYS-072",
+      "SGN-SYS-077"
+    ],
+    [
+      "SGN-SYS-077",
+      "SGN-SYS-081"
+    ],
+    [
+      "SGN-SYS-072",
+      "SGN-SYS-075"
+    ],
+    [
+      "SGN-SYS-075",
+      "SGN-SYS-077"
+    ],
+    [
+      "SGN-SYS-074",
+      "SGN-SYS-076"
+    ],
+    [
+      "SGN-SYS-074",
+      "SGN-SYS-079"
+    ],
+    [
+      "SGN-SYS-074",
+      "SGN-SYS-075"
+    ],
+    [
+      "SGN-SYS-071",
+      "SGN-SYS-074"
+    ],
+    [
+      "SGN-SYS-066",
+      "SGN-SYS-072"
+    ]
+  ]
+}
