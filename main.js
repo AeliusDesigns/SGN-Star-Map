@@ -1,4 +1,4 @@
-// === Vanilla WebGL star map with LANES ===
+// === Vanilla WebGL star map with LANES + Hover Highlight + Rename ===
 const canvas = document.getElementById('gl');
 let gl = canvas.getContext('webgl2', { antialias: true });
 if (!gl) gl = canvas.getContext('webgl', { antialias: true });
@@ -109,9 +109,57 @@ const aPos_lines  = gl.getAttribLocation(progLines, 'position');
 const uMVP_lines  = gl.getUniformLocation(progLines,  'uMVP');
 const uColorLines = gl.getUniformLocation(progLines,  'uColor');
 
-// --- camera/orbit ---
+// --- NEW: HALO shader (animated ring around hovered star) ---
+const VS_HALO = `
+attribute vec3 position;
+uniform mat4 uMVP;
+uniform float uPixelSize;
+void main(){
+  gl_Position = uMVP * vec4(position, 1.0);
+  gl_PointSize = uPixelSize; // size in pixels
+}`;
+const FS_HALO = `
+precision mediump float;
+uniform float uTime;
+uniform vec3 uColGlow;
+uniform vec3 uColCore;
+
+void main(){
+  // Point sprite coords [-1..+1]
+  vec2 uv = gl_PointCoord * 2.0 - 1.0;
+  float r = length(uv);
+
+  // Donut ring band
+  float inner = 0.55;
+  float outer = 0.85;
+  float ring = smoothstep(inner, inner+0.02, r) * (1.0 - smoothstep(outer-0.02, outer, r));
+
+  // Rotating "scanner" arc around the ring
+  float ang = atan(uv.y, uv.x); // [-pi, +pi]
+  float turns = 3.0;            // number of bright arcs
+  float speed = 1.8;            // rotation speed
+  float phase = fract((ang / 6.2831853) * turns + uTime * speed);
+  float scanner = smoothstep(0.05, 0.0, abs(phase - 0.5) - 0.25);
+
+  // Soft glow falloff
+  float glow = exp(-6.0 * (r*r));
+
+  // Combine
+  vec3 col = mix(uColGlow, uColCore, 0.35);
+  float alpha = clamp(ring * (0.55 + 0.45*scanner) + glow*0.15, 0.0, 1.0);
+  gl_FragColor = vec4(col, alpha);
+}`;
+
+const progHalo = makeProgram(VS_HALO, FS_HALO);
+const aPos_halo   = gl.getAttribLocation(progHalo, 'position');
+const uMVP_halo   = gl.getUniformLocation(progHalo, 'uMVP');
+const uPix_halo   = gl.getUniformLocation(progHalo, 'uPixelSize');
+const uTime_halo  = gl.getUniformLocation(progHalo, 'uTime');
+const uColGlow    = gl.getUniformLocation(progHalo, 'uColGlow');
+const uColCore    = gl.getUniformLocation(progHalo, 'uColCore');
+
+// --- camera/orbit/pan ---
 let yaw = 0, pitch = 0, dist = 1800, dragging = false, lx = 0, ly = 0;
-// (added) panning state
 let panning = false, panX = 0, panY = 0;
 
 // prevent context menu during RMB pan
@@ -148,115 +196,133 @@ let linesVBO = null, lineVertCount = 0;
 // JSON path
 const jsonURL = './systems.json';
 
-// Keep these accessible for the editor and render
+// Globals for interactivity/export
 let idToWorld = new Map();
 let systems = [];
 let lanesSet = new Set();
+let imgW = 1090, imgH = 1494, worldW = 2200, worldH = 2200*(1090/1494);
 
+// Hover tooltip + hover id
+const tip = document.createElement('div');
+tip.style.cssText = "position:fixed;padding:6px 8px;background:#111c;border:1px solid #444;border-radius:8px;pointer-events:none;display:none;color:#fff;font:12px/1.3 system-ui";
+document.body.appendChild(tip);
+let mouseX = 0, mouseY = 0;
+addEventListener('mousemove', (e)=>{ mouseX = e.clientX; mouseY = e.clientY; });
+
+let hoveredId = null;       // currently hovered system id
+let haloVBO = null;         // single-vertex buffer for halo
+let t0 = performance.now(); // time base for animation
+
+// Projection helper reused for hover/picking
+function projectToScreen(x, y, z, mvp){
+  const v = new Float32Array([x,y,z,1]);
+  const m = mvp;
+  const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
+  const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
+  const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
+  const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
+  if (!cw) return null;
+  const ndcX = cx/cw, ndcY = cy/cw;
+  return [
+    Math.round((ndcX*0.5+0.5)*canvas.width),
+    Math.round((-ndcY*0.5+0.5)*canvas.height),
+    cz/cw
+  ];
+}
+
+// Find nearest system id to given client coords (within r pixels)
+function findNearestSystemId(clientX, clientY, mvp, r=18){
+  const mx = clientX * (canvas.width  / canvas.clientWidth);
+  const my = clientY * (canvas.height / canvas.clientHeight);
+  let best = null, bestId = null, r2 = r*r;
+  for (const sys of systems){
+    const p = idToWorld.get(sys.id);
+    if (!p) continue;
+    const s = projectToScreen(p[0], p[1], p[2], mvp);
+    if (!s) continue;
+    const dx = s[0] - mx, dy = s[1] - my;
+    const d2 = dx*dx + dy*dy;
+    if (d2 < r2 && (best===null || d2 < best)){ best = d2; bestId = sys.id; }
+  }
+  return bestId;
+}
+
+// Rebuild star buffer from current systems/idToWorld
+function rebuildStarsVBO(){
+  const stars = [];
+  for (const sys of systems){
+    const p = idToWorld.get(sys.id);
+    if (!p) continue;
+    stars.push(p[0], p[1], p[2]);
+  }
+  starCount = stars.length/3;
+  if (!starsVBO) starsVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
+}
+
+// Rebuild line buffer from lanesSet/idToWorld
+function rebuildLinesVBOFromSet() {
+  const lanesArr = Array.from(lanesSet).map(s => s.split('::'));
+  const verts = [];
+  for (const [a, b] of lanesArr) {
+    const pa = idToWorld.get(a), pb = idToWorld.get(b);
+    if (!pa || !pb) continue;
+    verts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
+  }
+  lineVertCount = verts.length / 3;
+  if (!linesVBO) linesVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+}
+
+// Load JSON and boot
 fetch(jsonURL).then(r => r.json()).then(data => {
   // dimensions
-  const imgW = data?.image_size?.width  ?? 1090;
-  const imgH = data?.image_size?.height ?? 1494;
+  imgW = data?.image_size?.width  ?? 1090;
+  imgH = data?.image_size?.height ?? 1494;
   const SCALE = 2200, aspect = imgW / imgH;
-  const worldW = SCALE, worldH = SCALE / aspect;
+  worldW = SCALE; worldH = SCALE / aspect;
 
-  const toWorld = (xn, yn) => {
+  const toWorldXY = (xn, yn) => {
     const x = (xn - 0.5) * worldW;
     const y = -(yn - 0.5) * worldH;
-    const z = 0; // flat layer for now
-    return [x, y, z];
+    return [x, y];
   };
 
-  // build star positions
-  const stars = [];
+  // build star positions (z = 0 unless your JSON already has it)
   idToWorld = new Map();
   systems = data.systems || [];
-  systems.forEach(sys => {
+  for (const sys of systems){
     let xn = sys.coords?.x_norm, yn = sys.coords?.y_norm;
     if (xn == null || yn == null) {
       const px = sys.pixel?.x, py = sys.pixel?.y;
-      if (px == null || py == null) return;
+      if (px == null || py == null) continue;
       xn = px / imgW; yn = py / imgH;
     }
-    const [x, y, z] = toWorld(xn, yn);
-    stars.push(x, y, z);
+    const [x, y] = toWorldXY(xn, yn);
+    const z = (sys.coords && typeof sys.coords.z === 'number') ? sys.coords.z : 0.0; // keep flat unless provided
     idToWorld.set(sys.id, [x, y, z]);
-  });
-  starCount = stars.length / 3;
-  starsVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
+  }
+  rebuildStarsVBO();
 
-  // build lane segments (each lane adds two vertices)
+  // lanes
   const lanes = data.lanes || [];
-  const lineVerts = [];
-  for (const [a, b] of lanes) {
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    lineVerts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
-  }
-  lineVertCount = lineVerts.length / 3;
-  if (lineVertCount > 0) {
-    linesVBO = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lineVerts), gl.STATIC_DRAW);
-  }
+  lanesSet = new Set(lanes.map(([a,b]) => [a,b].sort().join('::')));
+  rebuildLinesVBOFromSet();
 
-  // ===== Simple lane editor =====
+  // lane editor
   let editMode = false;
   let pickA = null;
-  lanesSet = new Set(lanes.map(([a, b]) => [a, b].sort().join('::')));
 
-  function projectToScreen(x, y, z) {
-    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-    const view = mat4Translate(0, 0, -dist);
-    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-    const v = new Float32Array([x, y, z, 1]);
-    const m = mvp;
-    const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
-    const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
-    const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
-    const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
-    if (cw === 0) return null;
-    const ndcX = cx / cw, ndcY = cy / cw;
-    return [
-      Math.round((ndcX * 0.5 + 0.5) * canvas.width),
-      Math.round((-ndcY * 0.5 + 0.5) * canvas.height),
-      cz / cw
-    ];
-  }
-
-  function rebuildLinesVBOFromSet() {
-    const lanesArr = Array.from(lanesSet).map(s => s.split('::'));
-    const verts = [];
-    for (const [a, b] of lanesArr) {
-      const pa = idToWorld.get(a), pb = idToWorld.get(b);
-      if (!pa || !pb) continue;
-      verts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
-    }
-    lineVertCount = verts.length / 3;
-    if (!linesVBO) linesVBO = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-  }
-
-  // Add/remove lane by clicking two stars (when edit mode ON)
   canvas.addEventListener('click', (e) => {
     if (!editMode) return;
-    const mx = e.clientX * (canvas.width / canvas.clientWidth);
-    const my = e.clientY * (canvas.height / canvas.clientHeight);
-    let best = null, bestId = null, r2 = 18 * 18;
-    for (const sys of systems) {
-      const id = sys.id;
-      const w = idToWorld.get(id);
-      if (!w) continue;
-      const p = projectToScreen(w[0], w[1], w[2]);
-      if (!p) continue;
-      const dx = p[0] - mx, dy = p[1] - my;
-      const d2 = dx*dx + dy*dy;
-      if (d2 < r2 && (best === null || d2 < best)) { best = d2; bestId = id; }
-    }
+    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+    const view = mat4Translate(-panX, -panY, -dist);
+    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+
+    const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
     if (!bestId) return;
     if (!pickA) {
       pickA = bestId;
@@ -268,7 +334,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     }
   });
 
-  // --- helpers to map mouse and delete nearest lane ---
+  // Middle-click: delete nearest lane (in edit mode)
   function mouseToCanvas(e){
     const mx = e.clientX * (canvas.width  / canvas.clientWidth);
     const my = e.clientY * (canvas.height / canvas.clientHeight);
@@ -284,19 +350,19 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     const dx = px - cx, dy = py - cy;
     return Math.hypot(dx, dy);
   }
-  function deleteNearestLane(mx, my){
+  function deleteNearestLane(mx, my, mvp){
     let bestKey = null, bestD = 1e9;
     for (const key of lanesSet){
       const [a,b] = key.split('::');
       const pa = idToWorld.get(a), pb = idToWorld.get(b);
       if (!pa || !pb) continue;
-      const sa = projectToScreen(pa[0], pa[1], pa[2]);
-      const sb = projectToScreen(pb[0], pb[1], pb[2]);
+      const sa = projectToScreen(pa[0], pa[1], pa[2], mvp);
+      const sb = projectToScreen(pb[0], pb[1], pb[2], mvp);
       if (!sa || !sb) continue;
       const d = distPointToSeg(mx, my, sa[0], sa[1], sb[0], sb[1]);
       if (d < bestD) { bestD = d; bestKey = key; }
     }
-    if (bestKey && bestD < 20){ // 20 px snap distance
+    if (bestKey && bestD < 20){
       lanesSet.delete(bestKey);
       rebuildLinesVBOFromSet();
       console.log('Deleted lane:', bestKey);
@@ -304,12 +370,31 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       console.log('No lane near cursor to delete.');
     }
   }
-
-  // Middle click near a lane to delete it (when edit mode ON)
   canvas.addEventListener('auxclick', (e)=>{
     if (!editMode || e.button !== 1) return;  // middle mouse
+    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+    const view = mat4Translate(-panX, -panY, -dist);
+    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
     const [mx,my] = mouseToCanvas(e);
-    deleteNearestLane(mx, my);
+    deleteNearestLane(mx, my, mvp);
+  });
+
+  // Double-click to rename
+  canvas.addEventListener('dblclick', (e)=>{
+    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+    const view = mat4Translate(-panX, -panY, -dist);
+    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+    const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+    if (!id) return;
+    const sys = systems.find(s => s.id === id);
+    const curr = sys?.name || id;
+    const nn = prompt('Rename system:', curr);
+    if (nn && nn.trim()){
+      sys.name = nn.trim();
+      console.log(`Renamed ${id} -> ${sys.name}`);
+    }
   });
 
   // Keyboard controls
@@ -331,11 +416,11 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       rebuildLinesVBOFromSet();
       console.log('Restored lanes from JSON.');
     }
-    if (k === 'x') { // export
+    if (k === 'x') { // export (keeps names; z if present already)
       const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
       const out = {
         image_size: data.image_size,
-        systems: data.systems,
+        systems: systems,
         lanes: lanesOut
       };
       const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
@@ -344,9 +429,12 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       a.download = 'systems.json';
       a.click();
       URL.revokeObjectURL(a.href);
-      console.log(`Exported ${lanesOut.length} lanes`);
+      console.log(`Exported ${lanesOut.length} lanes, ${systems.length} systems`);
     }
   });
+
+  // Single-vertex buffer for halo
+  haloVBO = gl.createBuffer();
 
   // Start render
   requestAnimationFrame(loop);
@@ -354,37 +442,80 @@ fetch(jsonURL).then(r => r.json()).then(data => {
 
 // --- render loop ---
 function loop() {
+  const t = (performance.now() - t0) * 0.001; // seconds
   gl.clearColor(0.043, 0.055, 0.075, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
   const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(-panX, -panY, -dist); // (updated) include panning
+  const view = mat4Translate(-panX, -panY, -dist);
   const mvp  = mat4Mul(rot, mat4Mul(view, proj));
 
-  // draw lanes first (so points sit on top)
+  // lanes first
   if (linesVBO && lineVertCount > 0) {
     gl.useProgram(progLines);
     gl.uniformMatrix4fv(uMVP_lines, false, mvp);
-    gl.uniform3f(uColorLines, 1.0, 0.85, 0.35); // warm yellow
+    gl.uniform3f(uColorLines, 1.0, 0.85, 0.35);
     gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
     gl.enableVertexAttribArray(aPos_lines);
     gl.vertexAttribPointer(aPos_lines, 3, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.LINES, 0, lineVertCount);
   }
 
-  // draw stars
+  // stars
   if (starsVBO && starCount > 0) {
     gl.useProgram(progPoints);
     gl.uniformMatrix4fv(uMVP_points, false, mvp);
     gl.uniform1f(uSize, 6.0);
-    gl.uniform3f(uColorPts, 1.0, 0.92, 0.6); // star color
+    gl.uniform3f(uColorPts, 1.0, 0.92, 0.6);
     gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
     gl.enableVertexAttribArray(aPos_points);
     gl.vertexAttribPointer(aPos_points, 3, gl.FLOAT, false, 0, 0);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.POINTS, 0, starCount);
+  }
+
+  // Determine hovered system (within 18px)
+  hoveredId = null;
+  if (systems.length){
+    hoveredId = findNearestSystemId(mouseX, mouseY, mvp, 18);
+    if (hoveredId){
+      const sys = systems.find(s => s.id === hoveredId);
+      tip.innerHTML = `<strong>${sys.name || sys.id}</strong><br/><small>${sys.id}</small>`;
+      tip.style.left = (mouseX + 12) + 'px';
+      tip.style.top  = (mouseY + 12) + 'px';
+      tip.style.display = 'block';
+    } else {
+      tip.style.display = 'none';
+    }
+  }
+
+  // Draw animated HALO on hovered star
+  if (hoveredId && haloVBO){
+    const p = idToWorld.get(hoveredId);
+    if (p){
+      gl.useProgram(progHalo);
+      gl.uniformMatrix4fv(uMVP_halo, false, mvp);
+      gl.uniform1f(uPix_halo, 34.0);         // halo pixel size
+      gl.uniform1f(uTime_halo, t);
+      gl.uniform3f(uColGlow, 0.35, 0.95, 1.0); // neon cyan glow
+      gl.uniform3f(uColCore, 1.0, 0.95, 0.50); // warm core tint
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(aPos_halo);
+      gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
+
+      // Additive-ish blending for nice glow
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+      gl.drawArrays(gl.POINTS, 0, 1);
+
+      // Restore default alpha blending for other passes (optional)
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
   }
 
   requestAnimationFrame(loop);
