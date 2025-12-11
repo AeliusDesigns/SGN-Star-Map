@@ -281,6 +281,46 @@ function requireEditor() {
   return false;
 }
 
+// === HOLOGRAM: widget container (DOM) ===
+const holo = document.createElement('div');
+holo.id = 'holo';
+holo.className = 'off';
+holo.innerHTML = `
+  <div class="holo-wrap">
+    <div id="holo-canvas"></div>
+    <div class="holo-scanlines"></div>
+    <button class="holo-close" title="Close">✕</button>
+    <div class="holo-label">Hologram</div>
+  </div>
+`;
+document.body.appendChild(holo);
+
+const style = document.createElement('style');
+style.textContent = `
+  #holo{position:fixed;left:14px;bottom:14px;z-index:12;width:240px;height:240px;
+        pointer-events:none;opacity:0;transform:translateY(8px);
+        transition:opacity .18s,transform .18s}
+  #holo.on{opacity:1;transform:translateY(0);pointer-events:auto}
+  #holo .holo-wrap{position:relative;width:100%;height:100%;
+        background:radial-gradient(140px 140px at 60% 60%,#0af3,transparent 70%);
+        border:1px solid #29c; border-radius:12px; padding:10px;
+        box-shadow:0 0 20px #0ff3,inset 0 0 12px #0ff2; backdrop-filter:blur(2px)}
+  #holo #holo-canvas{position:absolute;inset:10px}
+  #holo svg{width:100%;height:100%;filter:drop-shadow(0 0 4px #7ff);
+        animation:spin 36s linear infinite, breathe 2.6s ease-in-out infinite}
+  #holo .holo-scanlines{position:absolute;inset:10px;
+        background:repeating-linear-gradient(to bottom,#0ff2 0 1px,transparent 2px 4px);
+        mix-blend-mode:screen;opacity:.08;border-radius:8px;pointer-events:none}
+  #holo .holo-label{position:absolute;left:10px;bottom:8px;color:#bff;
+        font:12px/1.2 system-ui;text-shadow:0 0 6px #0ff;letter-spacing:.3px}
+  #holo .holo-close{position:absolute;right:8px;top:6px;width:22px;height:22px;
+        border-radius:6px;border:1px solid #3bd;background:#083247cc;color:#cff;
+        cursor:pointer;font-weight:700;box-shadow:0 0 6px #0ff4}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  @keyframes breathe{0%,100%{opacity:.88}50%{opacity:1}}
+`;
+document.head.appendChild(style);
+
 // === System details persistence (framework) ===
 const SYSGEN_VERSION = "v1"; // bump when generator changes
 function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
@@ -530,6 +570,137 @@ function planetEditorRow(p,i){
       <input class="pNotes" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
     </div>
   </div>`;
+}
+
+// === HOLOGRAM API + SVGs (Installation uses Lesser Ark; "Artificial world" removed) ===
+const HOLO_COLOR = '#7ff';
+const holoCanvas = document.getElementById('holo-canvas');
+const holoLabel  = document.querySelector('#holo .holo-label');
+document.querySelector('#holo .holo-close').onclick = () => hideHolo();
+window.addEventListener('keydown', e => { if (e.key === 'Escape') hideHolo(); });
+
+function showHoloVector(type='Shield world', label='Object'){
+  holoCanvas.innerHTML = '';
+  holoCanvas.appendChild(makeSVGFor(type));
+  holoLabel.textContent = label || (type || 'Hologram');
+  holo.classList.add('on');
+}
+function hideHolo(){ holo.classList.remove('on'); }
+
+// --- SVG helpers ---
+const NS = 'http://www.w3.org/2000/svg';
+function S(tag, attrs={}, children=[]){
+  const el = document.createElementNS(NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  (Array.isArray(children)?children:[children]).forEach(c=> c && el.appendChild(c));
+  return el;
+}
+function defsGlow(){
+  return S('defs',{},[
+    S('filter',{id:'g',x:'-50%',y:'-50%',width:'200%',height:'200%'},
+      S('feGaussianBlur',{stdDeviation:'2',result:'b'})
+    ),
+    S('radialGradient',{id:'grad',cx:'50%',cy:'50%',r:'60%'},
+      [S('stop',{offset:'0%','stop-color':'#bff'}),
+       S('stop',{offset:'100%','stop-color':'#0ff'})])
+  ]);
+}
+function baseSVG(){
+  const svg = S('svg',{viewBox:'0 0 100 100',fill:'none',stroke:HOLO_COLOR,'stroke-width':'1.3'});
+  svg.appendChild(defsGlow());
+  return svg;
+}
+function ring(svg, r, w, dash){
+  svg.appendChild(S('circle',{
+    cx:50, cy:50, r:r, stroke:HOLO_COLOR, 'stroke-width':w,
+    'stroke-dasharray':dash||'0', 'stroke-linecap':'round'
+  }));
+}
+
+// --- planet-type silhouettes ---
+function svgShieldWorld(){
+  const s = baseSVG();
+  ring(s, 34, 1.6, '6 3'); ring(s, 24, 0.8, '2 2');
+  for (let i=0;i<8;i++){
+    const a=(i/8)*Math.PI*2, x1=50+Math.cos(a)*18, y1=50+Math.sin(a)*18;
+    const x2=50+Math.cos(a)*34, y2=50+Math.sin(a)*34;
+    s.appendChild(S('path',{d:`M${x1},${y1} L${x2},${y2}`,opacity:.9}));
+    const x3=50+Math.cos(a)*38, y3=50+Math.sin(a)*38;
+    s.appendChild(S('circle',{cx:x3,cy:y3,r:1.2,fill:'url(#grad)',stroke:'none',filter:'url(#g)'}));
+  }
+  return s;
+}
+function svgEcumenopolis(){
+  const s=baseSVG();
+  s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
+  for (let i=-3;i<=3;i++){ const r=30*Math.cos((i/6)*Math.PI/2); s.appendChild(S('circle',{cx:50,cy:50,r:Math.abs(r),opacity:.35})); }
+  for (let i=0;i<6;i++){ const a=(i/6)*Math.PI, x=50+Math.cos(a)*30, y=50+Math.sin(a)*30;
+    s.appendChild(S('path',{d:`M${50-x+50},${50-y+50} A30 30 0 0 1 ${x},${y}`,opacity:.35}));
+  }
+  for (let i=0;i<36;i++){
+    const a=(i/36)*Math.PI*2, r1=28, r2=30+(i%3===0?4:2);
+    const x1=50+Math.cos(a)*r1, y1=50+Math.sin(a)*r1;
+    const x2=50+Math.cos(a)*r2, y2=50+Math.sin(a)*r2;
+    s.appendChild(S('line',{x1,y1,x2,y2,opacity:.9}));
+  }
+  return s;
+}
+function svgGas(){
+  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:32,opacity:.3}));
+  for (let i=0;i<6;i++){ const y=25+i*9, w=i%2?4:2; s.appendChild(S('path',{d:`M18,${y} C35,${y-w} 65,${y+w} 82,${y}`,opacity:.9}));}
+  return s;
+}
+function svgRocky(){
+  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
+  [[62,44,3.4],[40,60,2.8],[53,66,1.8],[38,40,1.6]].forEach(([x,y,r])=>{
+    s.appendChild(S('circle',{cx:x,cy:y,r,opacity:.9}));
+    s.appendChild(S('circle',{cx:x,cy:y,r:r*1.6,opacity:.25,'stroke-dasharray':'2 2'}));
+  }); return s;
+}
+function svgOcean(){
+  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
+  for(let i=0;i<4;i++){ const r=18+i*4; s.appendChild(S('path',{d:`M20,50 A${r} ${r} 0 0 1 80,50`,opacity:.6})); }
+  return s;
+}
+function svgIce(){
+  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
+  [[20,40,80,60],[30,30,70,70],[50,20,50,80]].forEach(([x1,y1,x2,y2])=>{
+    s.appendChild(S('line',{x1,y1,x2,y2,opacity:.9}));
+  }); return s;
+}
+
+// Lesser Ark (used for "Installation")
+function svgLesserArk(){
+  const s=baseSVG();
+  s.appendChild(S('circle',{cx:50,cy:50,r:10,fill:'url(#grad)',stroke:'none',filter:'url(#g)'}));
+  for(let i=0;i<8;i++){
+    const a=(i/8)*Math.PI*2, r1=12, r2=44, w1=3.6, w2=1.2;
+    const x1=50+Math.cos(a)*r1, y1=50+Math.sin(a)*r1;
+    const x2=50+Math.cos(a)*r2, y2=50+Math.sin(a)*r2;
+    const nx=Math.cos(a+Math.PI/2), ny=Math.sin(a+Math.PI/2);
+    const p=`M ${x1-nx*w1},${y1-ny*w1}
+             L ${x2-nx*w2},${y2-ny*w2}
+             L ${x2+nx*w2},${y2+ny*w2}
+             L ${x1+nx*w1},${y1+ny*w1} Z`;
+    s.appendChild(S('path',{d:p,fill:'none'}));
+    const x3=50+Math.cos(a)*(r2+4), y3=50+Math.sin(a)*(r2+4);
+    s.appendChild(S('circle',{cx:x3,cy:y3,r:1.3,fill:'url(#grad)',stroke:'none',filter:'url(#g)'}));
+  }
+  return s;
+}
+
+// selector
+function makeSVGFor(type){
+  const t=(type||'').toLowerCase();
+  if (t.includes('installation'))  return svgLesserArk();
+  if (t.includes('shield'))        return svgShieldWorld();
+  if (t.includes('ecumen'))        return svgEcumenopolis();
+  if (t.includes('gas'))           return svgGas();
+  if (t.includes('ocean'))         return svgOcean();
+  if (t.includes('rocky'))         return svgRocky();
+  if (t.includes('ice'))           return svgIce();
+  if (t.includes('ark'))           return svgLesserArk();
+  return svgRocky();
 }
 
 // Projection helper reused for hover/picking
