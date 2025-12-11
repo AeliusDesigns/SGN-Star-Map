@@ -1,4 +1,4 @@
-// === Vanilla WebGL star map with LANES + Hover Highlight + Rename ===
+// === Vanilla WebGL star map with LANES + Hover Highlight + Rename + Select + System Panel Framework ===
 const canvas = document.getElementById('gl');
 let gl = canvas.getContext('webgl2', { antialias: true });
 if (!gl) gl = canvas.getContext('webgl', { antialias: true });
@@ -109,7 +109,7 @@ const aPos_lines  = gl.getAttribLocation(progLines, 'position');
 const uMVP_lines  = gl.getUniformLocation(progLines,  'uMVP');
 const uColorLines = gl.getUniformLocation(progLines,  'uColor');
 
-// --- NEW: HALO shader (animated ring around hovered star) ---
+// --- HALO shaders (hover + selection) ---
 const VS_HALO = `
 attribute vec3 position;
 uniform mat4 uMVP;
@@ -125,26 +125,24 @@ uniform vec3 uColGlow;
 uniform vec3 uColCore;
 
 void main(){
-  // Point sprite coords [-1..+1]
   vec2 uv = gl_PointCoord * 2.0 - 1.0;
   float r = length(uv);
 
-  // Donut ring band
+  // Ring band
   float inner = 0.55;
   float outer = 0.85;
   float ring = smoothstep(inner, inner+0.02, r) * (1.0 - smoothstep(outer-0.02, outer, r));
 
-  // Rotating "scanner" arc around the ring
-  float ang = atan(uv.y, uv.x); // [-pi, +pi]
-  float turns = 3.0;            // number of bright arcs
-  float speed = 1.8;            // rotation speed
+  // Rotating arc
+  float ang = atan(uv.y, uv.x);
+  float turns = 3.0;
+  float speed = 1.8;
   float phase = fract((ang / 6.2831853) * turns + uTime * speed);
   float scanner = smoothstep(0.05, 0.0, abs(phase - 0.5) - 0.25);
 
-  // Soft glow falloff
+  // Soft core glow
   float glow = exp(-6.0 * (r*r));
 
-  // Combine
   vec3 col = mix(uColGlow, uColCore, 0.35);
   float alpha = clamp(ring * (0.55 + 0.45*scanner) + glow*0.15, 0.0, 1.0);
   gl_FragColor = vec4(col, alpha);
@@ -209,9 +207,129 @@ document.body.appendChild(tip);
 let mouseX = 0, mouseY = 0;
 addEventListener('mousemove', (e)=>{ mouseX = e.clientX; mouseY = e.clientY; });
 
-let hoveredId = null;       // currently hovered system id
-let haloVBO = null;         // single-vertex buffer for halo
-let t0 = performance.now(); // time base for animation
+let hoveredId = null;         // hovered system id
+let selectedId = null;        // sticky selection
+let haloVBO = null;           // single-vertex buffer for halos
+let t0 = performance.now();   // time base for animation
+
+// === System details persistence (framework) ===
+const SYSGEN_VERSION = "v1"; // bump when your generator changes
+
+function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
+function getCachedSystem(id){
+  try { const raw = localStorage.getItem(sysKey(id)); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function setCachedSystem(id, details){
+  try { localStorage.setItem(sysKey(id), JSON.stringify(details)); } catch {}
+}
+function prngSeed(str){
+  // Simple xorshift32 from string
+  let h = 2166136261 >>> 0;
+  for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let s = h || 0xdeadbeef;
+  return () => { // [0,1)
+    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    return ((s>>>0) / 4294967296);
+  };
+}
+// Placeholder deterministic generator (swap in your RealisticGen here)
+function generateDeterministic(id){
+  const rnd = prngSeed(id);
+  const kinds = ["Main Sequence", "K-Dwarf", "G-Dwarf", "F-Dwarf", "M-Dwarf", "Subgiant", "Giant", "Neutron", "Black Hole"];
+  const kind = kinds[Math.floor(rnd()*kinds.length)];
+  const planetCount = 1 + Math.floor(rnd()*10);
+  const planets = Array.from({length: planetCount}, (_,i)=>({
+    name: `P${i+1}`,
+    semi_major_AU: +(0.2 + rnd()*15).toFixed(2),
+    type: rnd()<0.3 ? "Rocky" : (rnd()<0.7 ? "Ice" : "Gas"),
+    notes: rnd()<0.15 ? "In resonance" : undefined
+  }));
+  return {
+    version: SYSGEN_VERSION,
+    system_id: id,
+    seeded: true,
+    generated_at: new Date().toISOString(),
+    star: { kind },
+    planets
+  };
+}
+async function ensureSystemDetails(id){
+  let det = getCachedSystem(id);
+  if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
+  return det;
+}
+function regenerateSystemDetails(id){
+  const det = generateDeterministic(id);
+  setCachedSystem(id, det);
+  return det;
+}
+function exportSystemDetails(id){
+  const det = getCachedSystem(id);
+  if (!det) return;
+  const blob = new Blob([JSON.stringify(det, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `system_${id}_${SYSGEN_VERSION}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- right-side system panel (framework UI) ---
+const panel = document.createElement('div');
+panel.style.cssText = `
+  position:fixed; top:0; right:0; height:100vh; width:340px; background:#0b0f14e6;
+  border-left:1px solid #243143; color:#e8f0ff; font:14px/1.4 system-ui;
+  transform:translateX(100%); transition:transform .18s ease; display:flex; flex-direction:column; z-index:10;
+`;
+panel.innerHTML = `
+  <div style="padding:12px 14px; border-bottom:1px solid #243143; display:flex; justify-content:space-between; align-items:center;">
+    <strong id="sp-title">System</strong>
+    <button id="sp-close" style="background:#17202b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Close</button>
+  </div>
+  <div id="sp-body" style="padding:12px 14px; overflow:auto; flex:1;">
+    <em>Select a star and press Enter, or double-click a star.</em>
+  </div>
+  <div style="padding:10px 14px; border-top:1px solid #243143; display:flex; gap:8px;">
+    <button id="sp-gen"  style="flex:1;background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Generate/Load</button>
+    <button id="sp-re"   style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Regenerate</button>
+    <button id="sp-exp"  style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Export</button>
+  </div>
+`;
+document.body.appendChild(panel);
+const spTitle = panel.querySelector('#sp-title');
+const spBody  = panel.querySelector('#sp-body');
+panel.querySelector('#sp-close').onclick = () => hidePanel();
+panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d); } };
+panel.querySelector('#sp-re').onclick    = ()=>{ if(selectedId){ const d = regenerateSystemDetails(selectedId); renderPanel(selectedId, d); } };
+panel.querySelector('#sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
+
+function showPanel(){ panel.style.transform = 'translateX(0)'; }
+function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
+function renderPanel(id, details){
+  const sys = systems.find(s=>s.id===id);
+  spTitle.textContent = sys?.name || id;
+  const star = details?.star || {};
+  const planets = details?.planets || [];
+  spBody.innerHTML = `
+    <div style="margin-bottom:10px;">
+      <div><strong>ID:</strong> ${id}</div>
+      <div><strong>Name:</strong> ${sys?.name || '(unnamed)'}</div>
+      <div><strong>Star:</strong> ${star.kind || '—'}</div>
+      <div><strong>Version:</strong> ${details?.version || '—'}</div>
+    </div>
+    <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      ${planets.map(p=>`
+        <div style="border:1px solid #243143; border-radius:8px; padding:8px;">
+          <div><strong>${p.name}</strong> — ${p.type ?? 'Unknown'}</div>
+          <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
+          ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
+        </div>
+      `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
+    </div>
+  `;
+  showPanel();
+}
 
 // Projection helper reused for hover/picking
 function projectToScreen(x, y, z, mvp){
@@ -290,7 +408,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     return [x, y];
   };
 
-  // build star positions (z = 0 unless your JSON already has it)
+  // stars (z = 0 unless JSON has it)
   idToWorld = new Map();
   systems = data.systems || [];
   for (const sys of systems){
@@ -301,7 +419,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       xn = px / imgW; yn = py / imgH;
     }
     const [x, y] = toWorldXY(xn, yn);
-    const z = (sys.coords && typeof sys.coords.z === 'number') ? sys.coords.z : 0.0; // keep flat unless provided
+    const z = (sys.coords && typeof sys.coords.z === 'number') ? sys.coords.z : 0.0;
     idToWorld.set(sys.id, [x, y, z]);
   }
   rebuildStarsVBO();
@@ -316,21 +434,26 @@ fetch(jsonURL).then(r => r.json()).then(data => {
   let pickA = null;
 
   canvas.addEventListener('click', (e) => {
-    if (!editMode) return;
     const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
     const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
     const view = mat4Translate(-panX, -panY, -dist);
     const mvp  = mat4Mul(rot, mat4Mul(view, proj));
 
-    const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-    if (!bestId) return;
-    if (!pickA) {
-      pickA = bestId;
+    if (editMode){
+      const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+      if (!bestId) return;
+      if (!pickA) {
+        pickA = bestId;
+      } else {
+        const key = [pickA, bestId].sort().join('::');
+        if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
+        pickA = null;
+        rebuildLinesVBOFromSet();
+      }
     } else {
-      const key = [pickA, bestId].sort().join('::');
-      if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
-      pickA = null;
-      rebuildLinesVBOFromSet();
+      // selection (sticky) when NOT in lane edit
+      const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+      if (id) selectedId = id;
     }
   });
 
@@ -380,14 +503,22 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     deleteNearestLane(mx, my, mvp);
   });
 
-  // Double-click to rename
-  canvas.addEventListener('dblclick', (e)=>{
+  // Double-click to rename OR open panel if already selected
+  canvas.addEventListener('dblclick', async (e)=>{
     const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
     const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
     const view = mat4Translate(-panX, -panY, -dist);
     const mvp  = mat4Mul(rot, mat4Mul(view, proj));
     const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
     if (!id) return;
+
+    // If the double-clicked star is currently selected, open the panel.
+    if (selectedId === id){
+      const details = await ensureSystemDetails(id);
+      renderPanel(id, details);
+      return;
+    }
+    // Else: perform rename as before
     const sys = systems.find(s => s.id === id);
     const curr = sys?.name || id;
     const nn = prompt('Rename system:', curr);
@@ -398,12 +529,21 @@ fetch(jsonURL).then(r => r.json()).then(data => {
   });
 
   // Keyboard controls
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', async (e) => {
     const k = e.key.toLowerCase();
     if (k === 'e') {
       editMode = !editMode;
       console.log(`Edit Mode: ${editMode ? 'ON' : 'OFF'}`);
+      return;
     }
+    // Open details panel for selected star
+    if (k === 'enter' && selectedId){
+      const details = await ensureSystemDetails(selectedId);
+      renderPanel(selectedId, details);
+      return;
+    }
+
+    // Lane editor-only keys
     if (!editMode) return;
 
     if (k === 'c') { // clear all lanes
@@ -433,7 +573,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     }
   });
 
-  // Single-vertex buffer for halo
+  // Single-vertex buffer for halos
   haloVBO = gl.createBuffer();
 
   // Start render
@@ -491,29 +631,48 @@ function loop() {
     }
   }
 
-  // Draw animated HALO on hovered star
+  // Draw animated HALO on hovered star (cyan)
   if (hoveredId && haloVBO){
     const p = idToWorld.get(hoveredId);
     if (p){
       gl.useProgram(progHalo);
       gl.uniformMatrix4fv(uMVP_halo, false, mvp);
-      gl.uniform1f(uPix_halo, 34.0);         // halo pixel size
+      gl.uniform1f(uPix_halo, 34.0);
       gl.uniform1f(uTime_halo, t);
-      gl.uniform3f(uColGlow, 0.35, 0.95, 1.0); // neon cyan glow
-      gl.uniform3f(uColCore, 1.0, 0.95, 0.50); // warm core tint
+      gl.uniform3f(uColGlow, 0.35, 0.95, 1.0);
+      gl.uniform3f(uColCore, 1.0, 0.95, 0.50);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
       gl.enableVertexAttribArray(aPos_halo);
       gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
 
-      // Additive-ish blending for nice glow
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-
       gl.drawArrays(gl.POINTS, 0, 1);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+  }
 
-      // Restore default alpha blending for other passes (optional)
+  // Draw a distinct HALO on selected star (gold)
+  if (selectedId && haloVBO){
+    const p = idToWorld.get(selectedId);
+    if (p){
+      gl.useProgram(progHalo);
+      gl.uniformMatrix4fv(uMVP_halo, false, mvp);
+      gl.uniform1f(uPix_halo, 42.0); // slightly bigger
+      gl.uniform1f(uTime_halo, t * 0.7); // slower spin
+      gl.uniform3f(uColGlow, 1.0, 0.85, 0.35);
+      gl.uniform3f(uColCore, 1.0, 0.98, 0.7);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(aPos_halo);
+      gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
+
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      gl.drawArrays(gl.POINTS, 0, 1);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     }
   }
