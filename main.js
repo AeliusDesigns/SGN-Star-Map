@@ -502,7 +502,8 @@ function arcPath(cx,cy,r, a0deg,a1deg){
   return `M ${x0},${y0} A ${r} ${r} 0 ${large} 1 ${x1},${y1}`;
 }
 
-// ——— Router ———
+// ——— Router (unchanged types except our improved planet looks) ———
+// NOTE: “Artificial world” remains removed; “Installation” => Lesser Ark.
 function makeSVGFor(type){
   const t=(type||'').toLowerCase();
   if (t.includes('installation') || t.includes('ark')) return svgLesserArk();
