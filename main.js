@@ -877,6 +877,25 @@ function exportSystemDetails(id){
   URL.revokeObjectURL(a.href);
 }
 
+function openBodyDetails(type, name) {
+  // You already have an info panel area used by renderPanel()
+  const infoPanel = document.querySelector('#info-panel');
+  if (!infoPanel) return;
+
+  // Set up the details section dynamically
+  infoPanel.innerHTML = `
+    <div class="body-header">${name}</div>
+    <div class="body-type">${type}</div>
+    <div class="body-desc">Click edit to rename or change properties.</div>
+  `;
+
+  // Optional: visually indicate the selected body
+  document.querySelectorAll('.planet-card').forEach(c => c.classList.remove('active'));
+  const match = Array.from(document.querySelectorAll('.planet-card'))
+                     .find(c => c.textContent.includes(name));
+  if (match) match.classList.add('active');
+}
+
 // Renders read or edit mode
 function renderPanel(id, details, edit=false){
   const sys = systems.find(s=>s.id===id);
@@ -910,7 +929,7 @@ function renderPanel(id, details, edit=false){
     spBody.querySelectorAll('.planet-card').forEach(el => {
       const t = el.dataset.type || 'Rocky';
       const n = el.dataset.name || 'Object';
-      el.addEventListener('click', () => showHoloVector(t, n));
+      el.addEventListener('click', () => openBodyDetails(t, n));
     });
 
   } else {
