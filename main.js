@@ -445,7 +445,8 @@ function renderPanel(id, details, edit=false){
       <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
       <div style="display:flex; flex-direction:column; gap:6px;">
         ${planets.map((p,i)=>`
-          <div style="border:1px solid #243143; border-radius:8px; padding:8px;">
+          <div class="planet-card" data-type="${p.type ?? ''}" data-name="${p.name || ('Planet '+(i+1))}"
+            style="border:1px solid #243143; border-radius:8px; padding:8px; cursor:pointer;">
             <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
             <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
             ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
@@ -487,6 +488,13 @@ function renderPanel(id, details, edit=false){
         </div>
       </form>
     `;
+
+    // Enable hologram on planet click
+    spBody.querySelectorAll('.planet-card').forEach(el => {
+      const t = el.dataset.type || 'Rocky';
+      const n = el.dataset.name || 'Object';
+      el.addEventListener('click', () => showHoloVector(t, n));
+    });
 
     // wire up editor actions
     const form = spBody.querySelector('#sys-edit');
@@ -575,8 +583,8 @@ function planetEditorRow(p,i){
 // === HOLOGRAM API + SVGs (Installation uses Lesser Ark; "Artificial world" removed) ===
 const HOLO_COLOR = '#7ff';
 const holoCanvas = document.getElementById('holo-canvas');
-const holoLabel  = document.querySelector('#holo .holo-label');
-document.querySelector('#holo .holo-close').onclick = () => hideHolo();
+const holoLabel  = holo.querySelector('.holo-label');
+holo.querySelector('.holo-close').onclick = () => hideHolo();
 window.addEventListener('keydown', e => { if (e.key === 'Escape') hideHolo(); });
 
 function showHoloVector(type='Shield world', label='Object'){
