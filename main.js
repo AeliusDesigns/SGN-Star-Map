@@ -507,17 +507,40 @@ function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphere
 function svgLesserArk(){
   const svg = baseSVG();
   addPolarGrid(svg);
+
   const g = S('g',{filter:'url(#chromatic)'});
   const arms = 8;
-  for (let i=0;i<arms;i++){
+
+  for (let i=0; i<arms; i++){
     const rot = (i/arms)*360;
     g.appendChild(S('g',{transform:`rotate(${rot} 100 100)`},[
-      S('path',{d:'M95 35 C92 60, 92 140, 95 165 L105 165 C108 140, 108 60, 105 35 Z', fill:'#bff6ff','fill-opacity':'.12', stroke:'#aaf1ff','stroke-opacity':'.35','stroke-width':'1'}),
-      S('path',{d:'M95 35 C85 32, 60 40, 45 55 C70 70, 130 130, 155 145 C152 118, 122 62, 105 35 Z', fill:'#bff6ff','fill-opacity':'.08', stroke:'#aaf1ff','stroke-opacity':'.25','stroke-width':'1'}),
-      S('path',{d:'M100 25 L96 35 L104 35 Z', fill:'#e7fdff', 'fill-opacity':'.8'})
+      // Nib silhouette
+      S('path',{
+        d: 'M100 40 L95 80 C94 100, 94 120, 95 140 L105 140 C106 120, 106 100, 105 80 Z',
+        fill:'#bff6ff','fill-opacity':'.12',
+        stroke:'#aaf1ff','stroke-opacity':'.35','stroke-width':'1'
+      }),
+      // Inner contour
+      S('path',{
+        d: 'M100 40 C97 38, 90 45, 85 55 C100 70, 120 130, 135 140 C132 120, 115 70, 105 40 Z',
+        fill:'#bff6ff','fill-opacity':'.08',
+        stroke:'#aaf1ff','stroke-opacity':'.25','stroke-width':'1'
+      }),
+      // Tip highlight
+      S('path',{
+        d: 'M100 30 L96 40 L104 40 Z',
+        fill:'#e7fdff', 'fill-opacity':'.8'
+      })
     ]));
   }
-  g.appendChild(S('circle',{cx:100,cy:100,r:30,fill:'#dbffff','fill-opacity':'.08',stroke:'#bdf4ff','stroke-opacity':'.6'}));
+
+  // Central mass
+  g.appendChild(S('circle',{
+    cx:100, cy:100, r:32,
+    fill:'#dbffff','fill-opacity':'.08',
+    stroke:'#bdf4ff','stroke-opacity':'.6'
+  }));
+
   svg.appendChild(g);
   addSweepingRings(svg);
   return svg;
