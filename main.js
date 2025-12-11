@@ -520,7 +520,7 @@ function planetEditorRow(p,i){
 
       <label><strong>Type</strong></label>
       <select class="pType" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
-        ${opt('Rocky', p.type)}${opt('Ice', p.type)}${opt('Gas', p.type)}${opt('Ocean', p.type)}${opt('Desert', p.type)}
+        ${opt('Rocky', p.type)}${opt('Ice', p.type)}${opt('Gas', p.type)}${opt('Ocean', p.type)}${opt('Desert', p.type)}${opt('Shield World', p.type)}${opt('Ecumenopolis', p.type)}${opt('Installation', p.type)}${opt('Habitat', p.type)}
       </select>
 
       <label><strong>Orbit (AU)</strong></label>
