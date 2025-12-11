@@ -505,44 +505,58 @@ function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphere
 
 // SPECIALS
 function svgLesserArk(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
+  const svg = baseSVG();               // 200x200 viewBox, matches your other SVGs
+  const g   = S('g', { fill:'#000', stroke:'none' }); // pure black silhouette
 
-  const g = S('g',{filter:'url(#chromatic)'});
-  const arms = 8;
-
-  for (let i=0; i<arms; i++){
-    const rot = (i/arms)*360;
-    g.appendChild(S('g',{transform:`rotate(${rot} 100 100)`},[
-      // Nib silhouette
-      S('path',{
-        d: 'M100 40 L95 80 C94 100, 94 120, 95 140 L105 140 C106 120, 106 100, 105 80 Z',
-        fill:'#bff6ff','fill-opacity':'.12',
-        stroke:'#aaf1ff','stroke-opacity':'.35','stroke-width':'1'
-      }),
-      // Inner contour
-      S('path',{
-        d: 'M100 40 C97 38, 90 45, 85 55 C100 70, 120 130, 135 140 C132 120, 115 70, 105 40 Z',
-        fill:'#bff6ff','fill-opacity':'.08',
-        stroke:'#aaf1ff','stroke-opacity':'.25','stroke-width':'1'
-      }),
-      // Tip highlight
-      S('path',{
-        d: 'M100 30 L96 40 L104 40 Z',
-        fill:'#e7fdff', 'fill-opacity':'.8'
-      })
-    ]));
+  // ----- hub (rounded, slightly organic) -----
+  // central mass + subtle lobes to resemble the swelling at the root of each arm
+  const hub = S('g', {});
+  hub.appendChild(S('circle', { cx:100, cy:100, r:28, fill:'#000' }));
+  // small petal bulges (8)
+  for (let i=0;i<8;i++){
+    const rot = i*45;
+    hub.appendChild(S('path', {
+      d: 'M100 76 C 92 84, 92 116, 100 124 C 108 116, 108 84, 100 76 Z',
+      transform:`rotate(${rot} 100 100)`
+    }));
   }
+  g.appendChild(hub);
 
-  // Central mass
-  g.appendChild(S('circle',{
-    cx:100, cy:100, r:32,
-    fill:'#dbffff','fill-opacity':'.08',
-    stroke:'#bdf4ff','stroke-opacity':'.6'
-  }));
+  // ----- arm builders (cardinal + diagonal) -----
+  // Upward-facing major arm; others are rotations.
+  // Shape tuned to match the long, thick profile with a gentle waist and broad shoulder at the hub.
+  const majorArmPath = 'M95 30 C 92 55, 92 145, 95 170 L105 170 C 108 145, 108 55, 105 30 Z';
+
+  // Upward-facing minor (diagonal) arm; slimmer and shorter.
+  const minorArmPath = 'M97 48 C 92 62, 92 138, 97 152 L103 152 C 108 138, 108 62, 103 48 Z';
+
+  // Tip “fork” (white) used on every arm
+  const tipFork = (yTip)=> S('g',{},[
+    S('path',{ d:`M100 ${yTip} l -2 10 l 4 0 Z`, fill:'#fff' }),
+    S('path',{ d:`M98 ${yTip+10} l -1 7 l 1 0 Z`, fill:'#fff' }),
+    S('path',{ d:`M102 ${yTip+10} l 1 7 l -1 0 Z`, fill:'#fff' }),
+  ]);
+
+  // Place 4 major arms at 0/90/180/270 and 4 minor arms at 45/135/225/315
+  const arms = S('g',{});
+  for (let i=0;i<4;i++){
+    const rot = i*90;
+
+    // major
+    const gm = S('g', { transform:`rotate(${rot} 100 100)` });
+    gm.appendChild(S('path', { d:majorArmPath }));
+    gm.appendChild(tipFork(22)); // tip at the very end
+    arms.appendChild(gm);
+
+    // minor (offset by 45°)
+    const gd = S('g', { transform:`rotate(${rot+45} 100 100)` });
+    gd.appendChild(S('path', { d:minorArmPath }));
+    gd.appendChild(tipFork(40));
+    arms.appendChild(gd);
+  }
+  g.appendChild(arms);
 
   svg.appendChild(g);
-  addSweepingRings(svg);
   return svg;
 }
 
