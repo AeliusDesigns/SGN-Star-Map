@@ -509,7 +509,7 @@ function makeSVGFor(type){
   if (t.includes('installation') || t.includes('ark')) return svgLesserArk();
   if (t.includes('shield'))        return svgShieldWorld();
   if (t.includes('ecumen'))        return svgEcumenopolis();
-  if (t.includes('gas')))          return svgGas();
+  if (t.includes('gas'))           return svgGas();
   if (t.includes('ocean'))         return svgOcean();
   if (t.includes('rocky'))         return svgRocky();
   if (t.includes('ice'))           return svgIce();
