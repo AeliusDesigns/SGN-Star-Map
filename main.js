@@ -2,11 +2,13 @@
 const canvas = document.getElementById('gl');
 let gl = canvas.getContext('webgl2', { antialias: true });
 if (!gl) gl = canvas.getContext('webgl', { antialias: true });
-if (!gl) alert('WebGL not supported');
+if (!gl) { alert('WebGL not supported'); throw new Error('WebGL not supported'); }
+
+console.log('[SGN] Booting…');
 
 // Resize
 function resize() {
-  const dpr = 1; // keep lightweight & consistent
+  const dpr = 1;
   canvas.width = Math.floor(innerWidth * dpr);
   canvas.height = Math.floor(innerHeight * dpr);
   canvas.style.width = innerWidth + 'px';
@@ -47,7 +49,6 @@ function mat4RotateX(a) {
   const c = Math.cos(a), s = Math.sin(a);
   return new Float32Array([ 1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1 ]);
 }
-// 4x4 inverse (from gl-matrix pattern, compacted)
 function mat4Invert(m){
   const a = m, out = new Float32Array(16);
   const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
@@ -225,7 +226,7 @@ addEventListener('mousemove', e => {
   const dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
   if (dragging) {
-    if (!addMode) { // don't orbit while adding to keep placement precise
+    if (!addMode) {
       yaw   += dx * 0.005;
       pitch += dy * 0.005;
       pitch = Math.max(-1.55, Math.min(1.55, pitch));
@@ -321,267 +322,6 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// === System details persistence (framework) ===
-const SYSGEN_VERSION = "v1"; // bump when generator changes
-function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
-function getCachedSystem(id){
-  try { const raw = localStorage.getItem(sysKey(id)); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
-function setCachedSystem(id, details){
-  try { localStorage.setItem(sysKey(id), JSON.stringify(details)); } catch {}
-}
-function prngSeed(str){
-  let h = 2166136261 >>> 0;
-  for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  let s = h || 0xdeadbeef;
-  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s>>>0) / 4294967296); };
-}
-function generateDeterministic(id){
-  const rnd = prngSeed(id);
-  const kinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
-  const kind = kinds[Math.floor(rnd()*kinds.length)];
-  const planetCount = 1 + Math.floor(rnd()*10);
-  const planets = Array.from({length: planetCount}, (_,i)=>({
-    name: `P${i+1}`,
-    semi_major_AU: +(0.2 + rnd()*15).toFixed(2),
-    type: rnd()<0.3 ? "Rocky" : (rnd()<0.7 ? "Ice" : "Gas"),
-    notes: rnd()<0.15 ? "In resonance" : ""
-  }));
-  return { version: SYSGEN_VERSION, system_id: id, seeded: true, generated_at: new Date().toISOString(), star: { kind }, planets };
-}
-async function ensureSystemDetails(id){
-  let det = getCachedSystem(id);
-  if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
-  return det;
-}
-function exportSystemDetails(id){
-  const det = getCachedSystem(id);
-  if (!det) return;
-  const blob = new Blob([JSON.stringify(det, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `system_${id}_${SYSGEN_VERSION}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-// --- right-side system panel (with Edit mode) ---
-const panel = document.createElement('div');
-panel.style.cssText = `
-  position:fixed; top:0; right:0; height:100vh; width:360px; background:#0b0f14e6;
-  border-left:1px solid #243143; color:#e8f0ff; font:14px/1.4 system-ui;
-  transform:translateX(100%); transition:transform .18s ease; display:flex; flex-direction:column; z-index:10;
-`;
-panel.innerHTML = `
-  <div style="padding:12px 14px; border-bottom:1px solid #243143; display:flex; justify-content:space-between; align-items:center;">
-    <strong id="sp-title">System</strong>
-    <div style="display:flex; gap:8px;">
-      <button id="sp-gen"  title="Generate/Load" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Generate/Load</button>
-      <button id="sp-edit" title="Edit"          style="background:#1b2a3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Edit</button>
-      <button id="sp-close"                      style="background:#17202b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Close</button>
-    </div>
-  </div>
-  <div id="sp-body" style="padding:12px 14px; overflow:auto; flex:1;">
-    <em>Select a star and press Enter, or double-click the selected star.</em>
-  </div>
-  <div style="padding:10px 14px; border-top:1px solid #243143; display:flex; gap:8px;">
-    <button id="sp-exp"  style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Export</button>
-  </div>
-`;
-document.body.appendChild(panel);
-const spTitle = panel.querySelector('#sp-title');
-const spBody  = panel.querySelector('#sp-body');
-panel.querySelector('#sp-close').onclick = () => hidePanel();
-panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
-panel.querySelector('#sp-edit').onclick  = async ()=>{
-  if(!selectedId) return;
-  if(!requireEditor()) return;
-  const d = await ensureSystemDetails(selectedId);
-  renderPanel(selectedId, d, true);
-};
-panel.querySelector('#sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
-
-function showPanel(){ panel.style.transform = 'translateX(0)'; }
-function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
-
-// --- tiny HUD (top-left) to show modes + Add button ---
-const hud = document.createElement('div');
-hud.style.cssText = `
-  position:fixed; top:72px; left:10px; z-index:9; display:flex; gap:8px; align-items:center;
-  background:#0b0f14cc; border:1px solid #243143; border-radius:10px; padding:8px 10px; color:#e8f0ff; font:12px system-ui;
-`;
-hud.innerHTML = `
-  <span id="hud-lanes" style="opacity:.8;">Lanes: <b>OFF</b> (E)</span>
-  <span style="opacity:.35;">|</span>
-  <span id="hud-add" style="opacity:.8;">Add System: <b>OFF</b> (A)</span>
-  <span style="opacity:.35;">|</span>
-  <span id="hud-auth" style="opacity:.8;">Editor: <b>${editorOK?'ON':'OFF'}</b></span>
-  <button id="btn-add" style="margin-left:6px;background:#17334a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:6px;padding:4px 8px;cursor:pointer;">Add System</button>
-`;
-document.body.appendChild(hud);
-const hudLanes = hud.querySelector('#hud-lanes');
-const hudAdd   = hud.querySelector('#hud-add');
-hud.querySelector('#btn-add').onclick = ()=>{
-  if (!requireEditor()) return;
-  addMode = true; updateHUD();
-};
-
-// Renders read or edit mode
-function renderPanel(id, details, edit=false){
-  const sys = systems.find(s=>s.id===id);
-  spTitle.textContent = sys?.name || id;
-
-  if (!edit){
-    const star = details?.star || {};
-    const planets = details?.planets || [];
-    spBody.innerHTML = `
-      <div style="margin-bottom:10px;">
-        <div><strong>ID:</strong> ${id}</div>
-        <div><strong>Name:</strong> ${sys?.name || '(unnamed)'}</div>
-        <div><strong>Star:</strong> ${star.kind || '—'}</div>
-        <div><strong>Version:</strong> ${details?.version || '—'}</div>
-        ${Array.isArray(sys?.tags) ? `<div><strong>Tags:</strong> ${sys.tags.join(', ')}</div>` : ``}
-      </div>
-      <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        ${planets.map((p,i)=>`
-          <div class="planet-card" data-type="${p.type ?? ''}" data-name="${p.name || ('Planet '+(i+1))}"
-            style="border:1px solid #243143; border-radius:8px; padding:8px; cursor:pointer;">
-            <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
-            <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
-            ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
-          </div>
-        `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
-      </div>
-    `;
-
-    // Enable hologram on planet click
-    spBody.querySelectorAll('.planet-card').forEach(el => {
-      const t = el.dataset.type || 'Rocky';
-      const n = el.dataset.name || 'Object';
-      el.addEventListener('click', () => showHoloVector(t, n));
-    });
-
-  } else {
-    const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
-    const planets = details?.planets || [];
-    const options = starKinds.map(k=>`<option value="${k}" ${details?.star?.kind===k?'selected':''}>${k}</option>`).join('');
-    spBody.innerHTML = `
-      <form id="sys-edit" style="display:flex; flex-direction:column; gap:10px;">
-        <div style="display:grid; grid-template-columns:100px 1fr; gap:8px; align-items:center;">
-          <label><strong>ID</strong></label>
-          <div>${id}</div>
-
-          <label for="sysName"><strong>Name</strong></label>
-          <input id="sysName" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
-
-          <label for="starKind"><strong>Star</strong></label>
-          <select id="starKind" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
-            ${options}
-          </select>
-        </div>
-
-        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-          <strong>Planets (${planets.length})</strong>
-          <button id="addPlanet" type="button" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:6px;padding:6px 10px;cursor:pointer;">+ Add Planet</button>
-        </div>
-
-        <div id="planetList" style="display:flex; flex-direction:column; gap:8px;">
-          ${planets.map((p,i)=>planetEditorRow(p,i)).join('')}
-        </div>
-
-        <div style="display:flex; gap:8px; margin-top:6px;">
-          <button id="saveEdit" type="submit" style="flex:1;background:#1e3b26;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Save</button>
-          <button id="cancelEdit" type="button" style="flex:1;background:#3a1e1e;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Cancel</button>
-        </div>
-      </form>
-    `;
-
-    // (No hologram click binding here; edit mode shows form rows, not planet cards.)
-    const form = spBody.querySelector('#sys-edit');
-    const btnAdd = spBody.querySelector('#addPlanet');
-    const listEl = spBody.querySelector('#planetList');
-    btnAdd.onclick = ()=>{
-      const idx = listEl.children.length;
-      const row = document.createElement('div');
-      row.innerHTML = planetEditorRow({name:`P${idx+1}`, type:'Rocky', semi_major_AU:1.0, notes:''}, idx);
-      listEl.appendChild(row.firstElementChild);
-    };
-    listEl.addEventListener('click', (e)=>{
-      if (e.target && e.target.matches('.delPlanet')) {
-        e.target.closest('.planetRow').remove();
-        Array.from(listEl.querySelectorAll('.planetRow')).forEach((el,i)=>{
-          el.querySelector('.pIndex').textContent = `#${i+1}`;
-        });
-      }
-    });
-    form.onsubmit = (ev)=>{
-      ev.preventDefault();
-      const newName = spBody.querySelector('#sysName').value.trim();
-      const newKind = spBody.querySelector('#starKind').value;
-
-      const rows = Array.from(listEl.querySelectorAll('.planetRow'));
-      const planets = rows.map(row=>{
-        const name = row.querySelector('.pName').value.trim() || 'Planet';
-        const type = row.querySelector('.pType').value;
-        const sma  = parseFloat(row.querySelector('.pSMA').value);
-        const notes= row.querySelector('.pNotes').value.trim();
-        return {
-          name,
-          type,
-          semi_major_AU: isFinite(sma) ? +sma.toFixed(2) : null,
-          notes
-        };
-      });
-
-      const updated = {
-        ...(getCachedSystem(id) || {version: SYSGEN_VERSION, system_id: id, seeded:true}),
-        star: { kind: newKind },
-        planets
-      };
-      setCachedSystem(id, updated);
-
-      if (newName) {
-        const s = systems.find(s=>s.id===id);
-        if (s) s.name = newName;
-        spTitle.textContent = newName;
-      }
-
-      renderPanel(id, updated, false);
-    };
-    spBody.querySelector('#cancelEdit').onclick = ()=>{
-      renderPanel(id, details, false);
-    };
-  }
-  showPanel();
-}
-function planetEditorRow(p,i){
-  const opt = (v,sel)=> `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
-  return `
-  <div class="planetRow" style="border:1px solid #243143; border-radius:8px; padding:8px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <strong class="pIndex">#${i+1}</strong>
-      <button type="button" class="delPlanet" style="background:#3a2424;border:1px solid #503636;color:#ffd9d9;border-radius:6px;padding:4px 8px;cursor:pointer;">Remove</button>
-    </div>
-    <div style="display:grid; grid-template-columns:110px 1fr; gap:8px; align-items:center;">
-      <label><strong>Name</strong></label>
-      <input class="pName" type="text" value="${(p.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
-
-      <label><strong>Type</strong></label>
-      <select class="pType" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
-        ${opt('Rocky', p.type)}${opt('Ice', p.type)}${opt('Gas', p.type)}${opt('Ocean', p.type)}${opt('Desert', p.type)}${opt('Shield World', p.type)}${opt('Ecumenopolis', p.type)}${opt('Installation', p.type)}${opt('Habitat', p.type)}
-      </select>
-
-      <label><strong>Orbit (AU)</strong></label>
-      <input class="pSMA" type="number" step="0.01" value="${p.semi_major_AU ?? 1}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
-
-      <label><strong>Notes</strong></label>
-      <input class="pNotes" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
-    </div>
-  </div>`;
-}
-
-// === HOLOGRAM API + SVGs (Installation uses Lesser Ark; "Artificial world" removed) ===
 const HOLO_COLOR = '#7ff';
 const holoCanvas = document.getElementById('holo-canvas');
 const holoLabel  = holo.querySelector('.holo-label');
@@ -698,10 +438,10 @@ function svgLesserArk(){
   return s;
 }
 
-// selector
+// selector — "Artificial world" removed; "Installation" => Lesser Ark
 function makeSVGFor(type){
   const t=(type||'').toLowerCase();
-  if (t.includes('installation'))  return svgLesserArk(); // ⇦ Installation uses Lesser Ark
+  if (t.includes('installation'))  return svgLesserArk();
   if (t.includes('shield'))        return svgShieldWorld();
   if (t.includes('ecumen'))        return svgEcumenopolis();
   if (t.includes('gas'))           return svgGas();
@@ -738,12 +478,11 @@ function screenToWorldOnZ0(clientX, clientY, mvp){
 
   const p0 = vec4MulMat(inv, new Float32Array([x, y, -1, 1]));
   const p1 = vec4MulMat(inv, new Float32Array([x, y,  1, 1]));
-  // perspective divide
   for (const p of [p0,p1]){ p[0]/=p[3]; p[1]/=p[3]; p[2]/=p[3]; p[3]=1; }
 
   const dir = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
   if (Math.abs(dir[2]) < 1e-6) return null;
-  const t = -p0[2]/dir[2]; // intersect z=0 plane
+  const t = -p0[2]/dir[2];
   return [ p0[0] + dir[0]*t, p0[1] + dir[1]*t, 0 ];
 }
 
@@ -797,14 +536,43 @@ function rebuildLinesVBOFromSet() {
 let editMode = false; // lanes editor
 let addMode  = false; // add system mode
 function updateHUD(){
-  hudLanes.innerHTML = `Lanes: <b>${editMode?'ON':'OFF'}</b> (E)`;
-  hudAdd.innerHTML   = `Add System: <b>${addMode?'ON':'OFF'}</b> (A)`;
-  const hudAuth = document.getElementById('hud-auth');
-  if (hudAuth) hudAuth.innerHTML = `Editor: <b>${editorOK?'ON':'OFF'}</b>`;
+  const hudLanes = document.getElementById('hud-lanes');
+  const hudAdd   = document.getElementById('hud-add');
+  if (hudLanes) hudLanes.innerHTML = `Lanes: <b>${editMode?'ON':'OFF'}</b> (E)`;
+  if (hudAdd)   hudAdd.innerHTML   = `Add System: <b>${addMode?'ON':'OFF'}</b> (A)`;
 }
 
-// Load JSON and boot
-fetch(jsonURL).then(r => r.json()).then(data => {
+// === Boot data (robust) ===
+const DEFAULT_DATA = {
+  image_size: { width: 1090, height: 1494 },
+  systems: [
+    { id:'SYS_1', name:'Vanyamar', coords:{ x_norm:0.52, y_norm:0.41, z:0 } },
+    { id:'SYS_2', name:'Calithen', coords:{ x_norm:0.31, y_norm:0.64, z:0 } },
+    { id:'SYS_3', name:'Elendir',  coords:{ x_norm:0.75, y_norm:0.22, z:0 } }
+  ],
+  lanes: [['SYS_1','SYS_2'], ['SYS_1','SYS_3']]
+};
+
+// Start the render loop ASAP so you never see a blank screen
+requestAnimationFrame(loop);
+console.log('[SGN] Render loop started');
+
+// Load JSON and boot (with fallback)
+(async function boot(){
+  try {
+    console.log('[SGN] Fetching systems.json…');
+    const r = await fetch(jsonURL, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status} for ${jsonURL}`);
+    const data = await r.json();
+    console.log('[SGN] systems.json loaded');
+    initFromData(data);
+  } catch (err) {
+    console.warn('[SGN] Could not load systems.json, using fallback:', err?.message || err);
+    initFromData(DEFAULT_DATA);
+  }
+})();
+
+function initFromData(data){
   // dimensions
   imgW = data?.image_size?.width  ?? 1090;
   imgH = data?.image_size?.height ?? 1494;
@@ -838,219 +606,369 @@ fetch(jsonURL).then(r => r.json()).then(data => {
   lanesSet = new Set(lanes.map(([a,b]) => [a,b].sort().join('::')));
   rebuildLinesVBOFromSet();
 
-  // CLICK handler: lane edit / select / ADD SYSTEM
-  canvas.addEventListener('click', (e) => {
-    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-    const view = mat4Translate(-panX, -panY, -dist);
-    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-
-    if (editMode){
-      // lane mode (already gated by toggling E)
-      const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-      if (!bestId) return;
-      if (!window._lanePickA) window._lanePickA = null;
-      if (!window._lanePickA) {
-        window._lanePickA = bestId;
-      } else {
-        const key = [window._lanePickA, bestId].sort().join('::');
-        if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
-        window._lanePickA = null;
-        rebuildLinesVBOFromSet();
-      }
-      return;
-    }
-
-    if (addMode){
-      // If clicking near an existing system, treat as select instead of add
-      const nearId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-      if (nearId){
-        selectedId = nearId;
-        updateHUD();
-        return;
-      }
-      const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
-      if (!world) return;
-      const [wx, wy] = world;
-
-      // Convert to normalized [0..1]
-      let xn = (wx / worldW) + 0.5;
-      let yn = 0.5 - (wy / worldH);
-      xn = Math.max(0, Math.min(1, xn));
-      yn = Math.max(0, Math.min(1, yn));
-
-      // New ID
-      const base = "SYS_";
-      let n = systems.length + 1;
-      while (systems.some(s=>s.id === base + n)) n++;
-      const newId = base + n;
-
-      const defaultName = prompt('Name for new system:', `New System ${n}`) || `New System ${n}`;
-
-      // Create system entry
-      const sys = {
-        id: newId,
-        name: defaultName,
-        coords: { x_norm: xn, y_norm: yn, z: 0 },
-        tags: ["manmade"]
-      };
-      systems.push(sys);
-      idToWorld.set(newId, [wx, wy, 0]);
-      rebuildStarsVBO();
-
-      // Select and open panel (and precreate cached details)
-      selectedId = newId;
-      ensureSystemDetails(newId).then(det=>{
-        renderPanel(newId, det, true); // jump straight to edit so you can flesh it out
-      });
-
-      return;
-    }
-
-    // normal selection
-    const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-    if (id) selectedId = id;
-  });
-
-  // Middle-click: delete nearest lane (in edit mode)
-  function mouseToCanvas(e){
-    const mx = e.clientX * (canvas.width  / canvas.clientWidth);
-    const my = e.clientY * (canvas.height / canvas.clientHeight);
-    return [mx, my];
+  // build the HUD content now (after DOM existing)
+  const hud = document.querySelector('#hud');
+  if (hud && !document.getElementById('hud-lanes')) {
+    hud.insertAdjacentHTML('beforeend', `
+      <span id="hud-sep1" style="margin:0 8px;opacity:.35;">|</span>
+      <span id="hud-lanes" style="opacity:.8;">Lanes: <b>OFF</b> (E)</span>
+      <span id="hud-sep2" style="margin:0 8px;opacity:.35;">|</span>
+      <span id="hud-add" style="opacity:.8;">Add System: <b>OFF</b> (A)</span>
+    `);
   }
-  function distPointToSeg(px,py, ax,ay, bx,by){
-    const abx = bx - ax, aby = by - ay;
-    const apx = px - ax, apy = py - ay;
-    const len2 = abx*abx + aby*aby || 1;
-    let t = (apx*abx + apy*aby) / len2;
-    t = Math.max(0, Math.min(1, t));
-    const cx = ax + t*abx, cy = ay + t*aby;
-    const dx = px - cx, dy = py - cy;
-    return Math.hypot(dx, dy);
-  }
-  function deleteNearestLane(mx, my, mvp){
-    let bestKey = null, bestD = 1e9;
-    for (const key of lanesSet){
-      const [a,b] = key.split('::');
-      const pa = idToWorld.get(a), pb = idToWorld.get(b);
-      if (!pa || !pb) continue;
-      const sa = projectToScreen(pa[0], pa[1], pa[2], mvp);
-      const sb = projectToScreen(pb[0], pb[1], pb[2], mvp);
-      if (!sa || !sb) continue;
-      const d = distPointToSeg(mx, my, sa[0], sa[1], sb[0], sb[1]);
-      if (d < bestD) { bestD = d; bestKey = key; }
-    }
-    if (bestKey && bestD < 20){
-      lanesSet.delete(bestKey);
-      rebuildLinesVBOFromSet();
-      console.log('Deleted lane:', bestKey);
-    } else {
-      console.log('No lane near cursor to delete.');
-    }
-  }
-  canvas.addEventListener('auxclick', (e)=>{
-    if (!editMode || e.button !== 1) return;  // middle mouse
-    if (!editorOK) return; // extra guard
-    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-    const view = mat4Translate(-panX, -panY, -dist);
-    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-    const [mx,my] = mouseToCanvas(e);
-    deleteNearestLane(mx, my, mvp);
-  });
-
-  // Double-click to rename OR open panel if already selected
-  canvas.addEventListener('dblclick', async (e)=>{
-    const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-    const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-    const view = mat4Translate(-panX, -panY, -dist);
-    const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-    const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-    if (!id) return;
-
-    if (selectedId === id){
-      const details = await ensureSystemDetails(id);
-      renderPanel(id, details, false);
-      return;
-    }
-    if (!requireEditor()) return; // guard rename
-    const sys = systems.find(s => s.id === id);
-    const curr = sys?.name || id;
-    const nn = prompt('Rename system:', curr);
-    if (nn && nn.trim()){
-      sys.name = nn.trim();
-      console.log(`Renamed ${id} -> ${sys.name}`);
-    }
-  });
-
-  // Keyboard controls
-  window.addEventListener('keydown', async (e) => {
-    const k = e.key.toLowerCase();
-    if (k === 'e') {
-      if (!requireEditor()) return;
-      editMode = !editMode;
-      if (editMode) addMode = false;
-      updateHUD();
-      console.log(`Edit Mode (lanes): ${editMode ? 'ON' : 'OFF'}`);
-      return;
-    }
-    if (k === 'a') {
-      if (!requireEditor()) return;
-      addMode = !addMode;
-      if (addMode) editMode = false;
-      updateHUD();
-      console.log(`Add System Mode: ${addMode ? 'ON' : 'OFF'}`);
-      return;
-    }
-    if (k === 'enter' && selectedId){
-      const details = await ensureSystemDetails(selectedId);
-      renderPanel(selectedId, details, false);
-      return;
-    }
-
-    if (!editMode) return;
-
-    if (k === 'c') { // clear all lanes
-      if (!editorOK) return;
-      lanesSet.clear();
-      rebuildLinesVBOFromSet();
-      console.log('Cleared all lanes.');
-    }
-    if (k === 'r') { // restore original JSON lanes
-      if (!editorOK) return;
-      lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
-      rebuildLinesVBOFromSet();
-      console.log('Restored lanes from JSON.');
-    }
-    if (k === 'x') { // export (keeps names; z if present already)
-      if (!editorOK) { alert('Editor lock: enter password first.'); return; }
-      const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
-      const out = {
-        image_size: data.image_size,
-        systems: systems,
-        lanes: lanesOut
-      };
-      const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'systems.json';
-      a.click();
-      URL.revokeObjectURL(a.href);
-      console.log(`Exported ${lanesOut.length} lanes, ${systems.length} systems`);
-    }
-  });
-
-  // Single-vertex buffer for halos
-  haloVBO = gl.createBuffer();
   updateHUD();
 
-  // Start render
-  requestAnimationFrame(loop);
+  console.log(`[SGN] Initialized: ${systems.length} systems, ${lanesSet.size} lanes`);
+}
+
+// CLICK handler: lane edit / select / ADD SYSTEM
+canvas.addEventListener('click', (e) => {
+  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+  const view = mat4Translate(-panX, -panY, -dist);
+  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+
+  if (editMode){
+    const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+    if (!bestId) return;
+    if (!window._lanePickA) window._lanePickA = null;
+    if (!window._lanePickA) {
+      window._lanePickA = bestId;
+    } else {
+      const key = [window._lanePickA, bestId].sort().join('::');
+      if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
+      window._lanePickA = null;
+      rebuildLinesVBOFromSet();
+    }
+    return;
+  }
+
+  if (addMode){
+    const nearId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+    if (nearId){
+      selectedId = nearId;
+      updateHUD();
+      return;
+    }
+    const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
+    if (!world) return;
+    const [wx, wy] = world;
+
+    let xn = (wx / worldW) + 0.5;
+    let yn = 0.5 - (wy / worldH);
+    xn = Math.max(0, Math.min(1, xn));
+    yn = Math.max(0, Math.min(1, yn));
+
+    const base = "SYS_";
+    let n = systems.length + 1;
+    while (systems.some(s=>s.id === base + n)) n++;
+    const newId = base + n;
+
+    const defaultName = prompt('Name for new system:', `New System ${n}`) || `New System ${n}`;
+
+    const sys = {
+      id: newId,
+      name: defaultName,
+      coords: { x_norm: xn, y_norm: yn, z: 0 },
+      tags: ["manmade"]
+    };
+    systems.push(sys);
+    idToWorld.set(newId, [wx, wy, 0]);
+    rebuildStarsVBO();
+
+    selectedId = newId;
+    ensureSystemDetails(newId).then(det=>{
+      renderPanel(newId, det, true);
+    });
+
+    return;
+  }
+
+  const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+  if (id) selectedId = id;
 });
+
+// Middle-click to delete nearest lane (edit mode)
+function mouseToCanvas(e){
+  const mx = e.clientX * (canvas.width  / canvas.clientWidth);
+  const my = e.clientY * (canvas.height / canvas.clientHeight);
+  return [mx, my];
+}
+function distPointToSeg(px,py, ax,ay, bx,by){
+  const abx = bx - ax, aby = by - ay;
+  const apx = px - ax, apy = py - ay;
+  const len2 = abx*abx + aby*aby || 1;
+  let t = (apx*abx + apy*aby) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t*abx, cy = ay + t*aby;
+  const dx = px - cx, dy = py - cy;
+  return Math.hypot(dx, dy);
+}
+function deleteNearestLane(mx, my, mvp){
+  let bestKey = null, bestD = 1e9;
+  for (const key of lanesSet){
+    const [a,b] = key.split('::');
+    const pa = idToWorld.get(a), pb = idToWorld.get(b);
+    if (!pa || !pb) continue;
+    const sa = projectToScreen(pa[0], pa[1], pa[2], mvp);
+    const sb = projectToScreen(pb[0], pb[1], pb[2], mvp);
+    if (!sa || !sb) continue;
+    const d = distPointToSeg(mx, my, sa[0], sa[1], sb[0], sb[1]);
+    if (d < bestD) { bestD = d; bestKey = key; }
+  }
+  if (bestKey && bestD < 20){
+    lanesSet.delete(bestKey);
+    rebuildLinesVBOFromSet();
+    console.log('Deleted lane:', bestKey);
+  } else {
+    console.log('No lane near cursor to delete.');
+  }
+}
+canvas.addEventListener('auxclick', (e)=>{
+  if (!editMode || e.button !== 1) return;
+  if (!editorOK) return;
+  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+  const view = mat4Translate(-panX, -panY, -dist);
+  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+  const [mx,my] = mouseToCanvas(e);
+  deleteNearestLane(mx, my, mvp);
+});
+
+// Panel
+const panel = document.createElement('div');
+panel.style.cssText = `
+  position:fixed; top:0; right:0; height:100vh; width:360px; background:#0b0f14e6;
+  border-left:1px solid #243143; color:#e8f0ff; font:14px/1.4 system-ui;
+  transform:translateX(100%); transition:transform .18s ease; display:flex; flex-direction:column; z-index:10;
+`;
+panel.innerHTML = `
+  <div style="padding:12px 14px; border-bottom:1px solid #243143; display:flex; justify-content:space-between; align-items:center;">
+    <strong id="sp-title">System</strong>
+    <div style="display:flex; gap:8px;">
+      <button id="sp-gen"  title="Generate/Load" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Generate/Load</button>
+      <button id="sp-edit" title="Edit"          style="background:#1b2a3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Edit</button>
+      <button id="sp-close"                      style="background:#17202b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Close</button>
+    </div>
+  </div>
+  <div id="sp-body" style="padding:12px 14px; overflow:auto; flex:1;">
+    <em>Select a star and press Enter, or double-click the selected star.</em>
+  </div>
+  <div style="padding:10px 14px; border-top:1px solid #243143; display:flex; gap:8px;">
+    <button id="sp-exp"  style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Export</button>
+  </div>
+`;
+document.body.appendChild(panel);
+const spTitle = panel.querySelector('#sp-title');
+const spBody  = panel.querySelector('#sp-body');
+panel.querySelector('#sp-close').onclick = () => hidePanel();
+panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
+panel.querySelector('#sp-edit').onclick  = async ()=>{
+  if(!selectedId) return;
+  if(!requireEditor()) return;
+  const d = await ensureSystemDetails(selectedId);
+  renderPanel(selectedId, d, true);
+};
+panel.querySelector('#sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
+function showPanel(){ panel.style.transform = 'translateX(0)'; }
+function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
+
+// system details cache/generator
+const SYSGEN_VERSION = "v1";
+function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
+function getCachedSystem(id){ try { const raw = localStorage.getItem(sysKey(id)); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+function setCachedSystem(id, details){ try { localStorage.setItem(sysKey(id), JSON.stringify(details)); } catch {} }
+function prngSeed(str){
+  let h = 2166136261 >>> 0;
+  for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let s = h || 0xdeadbeef;
+  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s>>>0) / 4294967296); };
+}
+function generateDeterministic(id){
+  const rnd = prngSeed(id);
+  const kinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
+  const kind = kinds[Math.floor(rnd()*kinds.length)];
+  const planetCount = 1 + Math.floor(rnd()*10);
+  const planets = Array.from({length: planetCount}, (_,i)=>({
+    name: `P${i+1}`,
+    semi_major_AU: +(0.2 + rnd()*15).toFixed(2),
+    type: rnd()<0.3 ? "Rocky" : (rnd()<0.7 ? "Ice" : "Gas"),
+    notes: rnd()<0.15 ? "In resonance" : ""
+  }));
+  return { version: SYSGEN_VERSION, system_id: id, seeded: true, generated_at: new Date().toISOString(), star: { kind }, planets };
+}
+async function ensureSystemDetails(id){
+  let det = getCachedSystem(id);
+  if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
+  return det;
+}
+function exportSystemDetails(id){
+  const det = getCachedSystem(id);
+  if (!det) return;
+  const blob = new Blob([JSON.stringify(det, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `system_${id}_${SYSGEN_VERSION}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Renders read or edit mode
+function renderPanel(id, details, edit=false){
+  const sys = systems.find(s=>s.id===id);
+  spTitle.textContent = sys?.name || id;
+
+  if (!edit){
+    const star = details?.star || {};
+    const planets = details?.planets || [];
+    spBody.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div><strong>ID:</strong> ${id}</div>
+        <div><strong>Name:</strong> ${sys?.name || '(unnamed)'}</div>
+        <div><strong>Star:</strong> ${star.kind || '—'}</div>
+        <div><strong>Version:</strong> ${details?.version || '—'}</div>
+        ${Array.isArray(sys?.tags) ? `<div><strong>Tags:</strong> ${sys.tags.join(', ')}</div>` : ``}
+      </div>
+      <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${planets.map((p,i)=>`
+          <div class="planet-card" data-type="${p.type ?? ''}" data-name="${p.name || ('Planet '+(i+1))}"
+            style="border:1px solid #243143; border-radius:8px; padding:8px; cursor:pointer;">
+            <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
+            <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
+            ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
+          </div>
+        `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
+      </div>
+    `;
+
+    // hologram clicks here
+    spBody.querySelectorAll('.planet-card').forEach(el => {
+      const t = el.dataset.type || 'Rocky';
+      const n = el.dataset.name || 'Object';
+      el.addEventListener('click', () => showHoloVector(t, n));
+    });
+
+  } else {
+    const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
+    const planets = details?.planets || [];
+    const options = starKinds.map(k=>`<option value="${k}" ${details?.star?.kind===k?'selected':''}>${k}</option>`).join('');
+    spBody.innerHTML = `
+      <form id="sys-edit" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:grid; grid-template-columns:100px 1fr; gap:8px; align-items:center;">
+          <label><strong>ID</strong></label>
+          <div>${id}</div>
+
+          <label for="sysName"><strong>Name</strong></label>
+          <input id="sysName" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+
+          <label for="starKind"><strong>Star</strong></label>
+          <select id="starKind" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
+            ${options}
+          </select>
+        </div>
+
+        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+          <strong>Planets (${planets.length})</strong>
+          <button id="addPlanet" type="button" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:6px;padding:6px 10px;cursor:pointer;">+ Add Planet</button>
+        </div>
+
+        <div id="planetList" style="display:flex; flex-direction:column; gap:8px;">
+          ${planets.map((p,i)=>planetEditorRow(p,i)).join('')}
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button id="saveEdit" type="submit" style="flex:1;background:#1e3b26;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Save</button>
+          <button id="cancelEdit" type="button" style="flex:1;background:#3a1e1e;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Cancel</button>
+        </div>
+      </form>
+    `;
+
+    const form = spBody.querySelector('#sys-edit');
+    const btnAdd = spBody.querySelector('#addPlanet');
+    const listEl = spBody.querySelector('#planetList');
+    btnAdd.onclick = ()=>{
+      const idx = listEl.children.length;
+      const row = document.createElement('div');
+      row.innerHTML = planetEditorRow({name:`P${idx+1}`, type:'Rocky', semi_major_AU:1.0, notes:''}, idx);
+      listEl.appendChild(row.firstElementChild);
+    };
+    listEl.addEventListener('click', (e)=>{
+      if (e.target && e.target.matches('.delPlanet')) {
+        e.target.closest('.planetRow').remove();
+        Array.from(listEl.querySelectorAll('.planetRow')).forEach((el,i)=>{
+          el.querySelector('.pIndex').textContent = `#${i+1}`;
+        });
+      }
+    });
+    form.onsubmit = (ev)=>{
+      ev.preventDefault();
+      const newName = spBody.querySelector('#sysName').value.trim();
+      const newKind = spBody.querySelector('#starKind').value;
+
+      const rows = Array.from(listEl.querySelectorAll('.planetRow'));
+      const planets = rows.map(row=>{
+        const name = row.querySelector('.pName').value.trim() || 'Planet';
+        const type = row.querySelector('.pType').value;
+        const sma  = parseFloat(row.querySelector('.pSMA').value);
+        const notes= row.querySelector('.pNotes').value.trim();
+        return {
+          name,
+          type,
+          semi_major_AU: isFinite(sma) ? +sma.toFixed(2) : null,
+          notes
+        };
+      });
+
+      const updated = {
+        ...(getCachedSystem(id) || {version: SYSGEN_VERSION, system_id: id, seeded:true}),
+        star: { kind: newKind },
+        planets
+      };
+      setCachedSystem(id, updated);
+
+      if (newName) {
+        const s = systems.find(s=>s.id===id);
+        if (s) s.name = newName;
+        spTitle.textContent = newName;
+      }
+
+      renderPanel(id, updated, false);
+    };
+    spBody.querySelector('#cancelEdit').onclick = ()=>{
+      renderPanel(id, details, false);
+    };
+  }
+  showPanel();
+}
+function planetEditorRow(p,i){
+  const opt = (v,sel)=> `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
+  return `
+  <div class="planetRow" style="border:1px solid #243143; border-radius:8px; padding:8px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <strong class="pIndex">#${i+1}</strong>
+      <button type="button" class="delPlanet" style="background:#3a2424;border:1px solid #503636;color:#ffd9d9;border-radius:6px;padding:4px 8px;cursor:pointer;">Remove</button>
+    </div>
+    <div style="display:grid; grid-template-columns:110px 1fr; gap:8px; align-items:center;">
+      <label><strong>Name</strong></label>
+      <input class="pName" type="text" value="${(p.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+
+      <label><strong>Type</strong></label>
+      <select class="pType" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
+        ${opt('Rocky', p.type)}${opt('Ice', p.type)}${opt('Gas', p.type)}${opt('Ocean', p.type)}${opt('Desert', p.type)}${opt('Shield World', p.type)}${opt('Ecumenopolis', p.type)}${opt('Installation', p.type)}${opt('Habitat', p.type)}
+      </select>
+
+      <label><strong>Orbit (AU)</strong></label>
+      <input class="pSMA" type="number" step="0.01" value="${p.semi_major_AU ?? 1}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+
+      <label><strong>Notes</strong></label>
+      <input class="pNotes" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+    </div>
+  </div>`;
+}
 
 // --- render loop ---
 function loop() {
-  const t = (performance.now() - t0) * 0.001; // seconds
   gl.clearColor(0.043, 0.055, 0.075, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -1084,12 +1002,23 @@ function loop() {
     gl.drawArrays(gl.POINTS, 0, starCount);
   }
 
-  // Determine hovered system (within 18px)
-  hoveredId = null;
+  // hover tooltip
+  let hoveredNow = null;
   if (systems.length){
-    hoveredId = findNearestSystemId(mouseX, mouseY, mvp, 18);
-    if (hoveredId){
-      const sys = systems.find(s => s.id === hoveredId);
+    hoveredNow = (function(){
+      const mx = mouseX * (canvas.width  / canvas.clientWidth);
+      const my = mouseY * (canvas.height / canvas.clientHeight);
+      let best=null,bestId=null,r2=18*18;
+      for (const sys of systems){
+        const p = idToWorld.get(sys.id); if(!p) continue;
+        const s = projectToScreen(p[0], p[1], p[2], mvp); if(!s) continue;
+        const dx = s[0]-mx, dy = s[1]-my; const d2=dx*dx+dy*dy;
+        if (d2<r2 && (best===null || d2<best)){best=d2;bestId=sys.id;}
+      }
+      return bestId;
+    })();
+    if (hoveredNow){
+      const sys = systems.find(s => s.id === hoveredNow);
       tip.innerHTML = `<strong>${sys.name || sys.id}</strong><br/><small>${sys.id}</small>`;
       tip.style.left = (mouseX + 12) + 'px';
       tip.style.top  = (mouseY + 12) + 'px';
@@ -1099,51 +1028,110 @@ function loop() {
     }
   }
 
-  // Hover HALO (cyan)
-  if (hoveredId && haloVBO){
-    const p = idToWorld.get(hoveredId);
-    if (p){
-      gl.useProgram(progHalo);
-      gl.uniformMatrix4fv(uMVP_halo, false, mvp);
-      gl.uniform1f(uPix_halo, 34.0);
-      gl.uniform1f(uTime_halo, t);
-      gl.uniform3f(uColGlow, 0.35, 0.95, 1.0);
-      gl.uniform3f(uColCore, 1.0, 0.95, 0.50);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(aPos_halo);
-      gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
-
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      gl.drawArrays(gl.POINTS, 0, 1);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    }
+  // halos
+  if (!haloVBO) haloVBO = gl.createBuffer();
+  function drawHalo(id, pix, t, glow, core){
+    const p = idToWorld.get(id); if(!p) return;
+    gl.useProgram(progHalo);
+    gl.uniformMatrix4fv(uMVP_halo, false, mvp);
+    gl.uniform1f(uPix_halo, pix);
+    gl.uniform1f(uTime_halo, t);
+    gl.uniform3f(uColGlow, glow[0], glow[1], glow[2]);
+    gl.uniform3f(uColCore, core[0], core[1], core[2]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(aPos_halo);
+    gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.drawArrays(gl.POINTS, 0, 1);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
-
-  // Selected HALO (gold)
-  if (selectedId && haloVBO){
-    const p = idToWorld.get(selectedId);
-    if (p){
-      gl.useProgram(progHalo);
-      gl.uniformMatrix4fv(uMVP_halo, false, mvp);
-      gl.uniform1f(uPix_halo, 42.0);
-      gl.uniform1f(uTime_halo, t * 0.7);
-      gl.uniform3f(uColGlow, 1.0, 0.85, 0.35);
-      gl.uniform3f(uColCore, 1.0, 0.98, 0.7);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(aPos_halo);
-      gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
-
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      gl.drawArrays(gl.POINTS, 0, 1);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    }
-  }
+  if (hoveredNow) drawHalo(hoveredNow, 34.0, (performance.now()-t0)*0.001, [0.35,0.95,1.0], [1.0,0.95,0.50]);
+  if (selectedId) drawHalo(selectedId, 42.0, (performance.now()-t0)*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.7]);
 
   requestAnimationFrame(loop);
 }
+
+// === Double-click to open panel / rename ===
+canvas.addEventListener('dblclick', async (e)=>{
+  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+  const view = mat4Translate(-panX, -panY, -dist);
+  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+  const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
+  if (!id) return;
+
+  if (selectedId === id){
+    const details = await ensureSystemDetails(id);
+    renderPanel(id, details, false);
+    return;
+  }
+  if (!requireEditor()) return; // guard rename
+  const sys = systems.find(s => s.id === id);
+  const curr = sys?.name || id;
+  const nn = prompt('Rename system:', curr);
+  if (nn && nn.trim()){
+    sys.name = nn.trim();
+    console.log(`Renamed ${id} -> ${sys.name}`);
+  }
+});
+
+// Keyboard controls
+window.addEventListener('keydown', async (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'e') {
+    if (!requireEditor()) return;
+    editMode = !editMode;
+    if (editMode) addMode = false;
+    updateHUD();
+    console.log(`Edit Mode (lanes): ${editMode ? 'ON' : 'OFF'}`);
+    return;
+  }
+  if (k === 'a') {
+    if (!requireEditor()) return;
+    addMode = !addMode;
+    if (addMode) editMode = false;
+    updateHUD();
+    console.log(`Add System Mode: ${addMode ? 'ON' : 'OFF'}`);
+    return;
+  }
+  if (k === 'enter' && selectedId){
+    const details = await ensureSystemDetails(selectedId);
+    renderPanel(selectedId, details, false);
+    return;
+  }
+
+  if (!editMode) return;
+
+  if (k === 'c') { // clear all lanes
+    if (!editorOK) return;
+    lanesSet.clear();
+    rebuildLinesVBOFromSet();
+    console.log('Cleared all lanes.');
+  }
+  if (k === 'r') { // restore original JSON lanes
+    if (!editorOK) return;
+    // NOTE: this just restores based on DEFAULT_DATA if systems.json wasn't loaded
+    lanesSet.clear();
+    (DEFAULT_DATA.lanes || []).forEach(([a,b]) => lanesSet.add([a,b].sort().join('::')));
+    rebuildLinesVBOFromSet();
+    console.log('Restored lanes (default).');
+  }
+  if (k === 'x') { // export
+    if (!editorOK) { alert('Editor lock: enter password first.'); return; }
+    const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
+    const out = {
+      image_size: { width: imgW, height: imgH },
+      systems: systems,
+      lanes: lanesOut
+    };
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'systems.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    console.log(`Exported ${lanesOut.length} lanes, ${systems.length} systems`);
+  }
+});
