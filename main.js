@@ -105,7 +105,7 @@ function compile(type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
   gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+  if (!gl.getShaderParameter(s, gl.Compile_STATUS))
     throw gl.getShaderInfoLog(s);
   return s;
 }
@@ -266,6 +266,21 @@ let selectedId = null;        // sticky selection
 let haloVBO = null;           // single-vertex buffer for halos
 let t0 = performance.now();   // time base for animation
 
+// === simple editor auth ===
+let editorOK = sessionStorage.getItem('starmap_editor_ok') === '1';
+function requireEditor() {
+  if (editorOK) return true;
+  const pw = prompt('Enter editor password:');
+  if (pw === '1776') {
+    editorOK = true;
+    sessionStorage.setItem('starmap_editor_ok', '1');
+    updateHUD?.();
+    return true;
+  }
+  alert('Incorrect password.');
+  return false;
+}
+
 // === System details persistence (framework) ===
 const SYSGEN_VERSION = "v1"; // bump when generator changes
 function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
@@ -338,7 +353,12 @@ const spTitle = panel.querySelector('#sp-title');
 const spBody  = panel.querySelector('#sp-body');
 panel.querySelector('#sp-close').onclick = () => hidePanel();
 panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
-panel.querySelector('#sp-edit').onclick  = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, true); } };
+panel.querySelector('#sp-edit').onclick  = async ()=>{
+  if(!selectedId) return;
+  if(!requireEditor()) return;
+  const d = await ensureSystemDetails(selectedId);
+  renderPanel(selectedId, d, true);
+};
 panel.querySelector('#sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
 
 function showPanel(){ panel.style.transform = 'translateX(0)'; }
@@ -354,12 +374,17 @@ hud.innerHTML = `
   <span id="hud-lanes" style="opacity:.8;">Lanes: <b>OFF</b> (E)</span>
   <span style="opacity:.35;">|</span>
   <span id="hud-add" style="opacity:.8;">Add System: <b>OFF</b> (A)</span>
+  <span style="opacity:.35;">|</span>
+  <span id="hud-auth" style="opacity:.8;">Editor: <b>${editorOK?'ON':'OFF'}</b></span>
   <button id="btn-add" style="margin-left:6px;background:#17334a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:6px;padding:4px 8px;cursor:pointer;">Add System</button>
 `;
 document.body.appendChild(hud);
 const hudLanes = hud.querySelector('#hud-lanes');
 const hudAdd   = hud.querySelector('#hud-add');
-hud.querySelector('#btn-add').onclick = ()=>{ addMode = true; updateHUD(); };
+hud.querySelector('#btn-add').onclick = ()=>{
+  if (!requireEditor()) return;
+  addMode = true; updateHUD();
+};
 
 // Renders read or edit mode
 function renderPanel(id, details, edit=false){
@@ -594,6 +619,8 @@ let addMode  = false; // add system mode
 function updateHUD(){
   hudLanes.innerHTML = `Lanes: <b>${editMode?'ON':'OFF'}</b> (E)`;
   hudAdd.innerHTML   = `Add System: <b>${addMode?'ON':'OFF'}</b> (A)`;
+  const hudAuth = document.getElementById('hud-auth');
+  if (hudAuth) hudAuth.innerHTML = `Editor: <b>${editorOK?'ON':'OFF'}</b>`;
 }
 
 // Load JSON and boot
@@ -639,7 +666,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     const mvp  = mat4Mul(rot, mat4Mul(view, proj));
 
     if (editMode){
-      // lane mode
+      // lane mode (already gated by toggling E)
       const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
       if (!bestId) return;
       if (!window._lanePickA) window._lanePickA = null;
@@ -697,8 +724,6 @@ fetch(jsonURL).then(r => r.json()).then(data => {
         renderPanel(newId, det, true); // jump straight to edit so you can flesh it out
       });
 
-      // stay in add mode for multiple placements, or toggle off—your call:
-      // addMode = false; updateHUD();
       return;
     }
 
@@ -745,6 +770,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
   }
   canvas.addEventListener('auxclick', (e)=>{
     if (!editMode || e.button !== 1) return;  // middle mouse
+    if (!editorOK) return; // extra guard
     const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
     const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
     const view = mat4Translate(-panX, -panY, -dist);
@@ -767,6 +793,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       renderPanel(id, details, false);
       return;
     }
+    if (!requireEditor()) return; // guard rename
     const sys = systems.find(s => s.id === id);
     const curr = sys?.name || id;
     const nn = prompt('Rename system:', curr);
@@ -780,6 +807,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
   window.addEventListener('keydown', async (e) => {
     const k = e.key.toLowerCase();
     if (k === 'e') {
+      if (!requireEditor()) return;
       editMode = !editMode;
       if (editMode) addMode = false;
       updateHUD();
@@ -787,6 +815,7 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       return;
     }
     if (k === 'a') {
+      if (!requireEditor()) return;
       addMode = !addMode;
       if (addMode) editMode = false;
       updateHUD();
@@ -802,16 +831,19 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     if (!editMode) return;
 
     if (k === 'c') { // clear all lanes
+      if (!editorOK) return;
       lanesSet.clear();
       rebuildLinesVBOFromSet();
       console.log('Cleared all lanes.');
     }
     if (k === 'r') { // restore original JSON lanes
+      if (!editorOK) return;
       lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
       rebuildLinesVBOFromSet();
       console.log('Restored lanes from JSON.');
     }
     if (k === 'x') { // export (keeps names; z if present already)
+      if (!editorOK) { alert('Editor lock: enter password first.'); return; }
       const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
       const out = {
         image_size: data.image_size,
