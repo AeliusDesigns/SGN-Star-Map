@@ -1,4 +1,4 @@
-// === Vanilla WebGL star map with LANES + Hover Highlight + Rename + Select + System Panel Framework ===
+// === Vanilla WebGL star map with LANES + Hover Highlight + Rename + Select + System Panel (Edit Mode) ===
 const canvas = document.getElementById('gl');
 let gl = canvas.getContext('webgl2', { antialias: true });
 if (!gl) gl = canvas.getContext('webgl', { antialias: true });
@@ -128,19 +128,16 @@ void main(){
   vec2 uv = gl_PointCoord * 2.0 - 1.0;
   float r = length(uv);
 
-  // Ring band
   float inner = 0.55;
   float outer = 0.85;
   float ring = smoothstep(inner, inner+0.02, r) * (1.0 - smoothstep(outer-0.02, outer, r));
 
-  // Rotating arc
   float ang = atan(uv.y, uv.x);
   float turns = 3.0;
   float speed = 1.8;
   float phase = fract((ang / 6.2831853) * turns + uTime * speed);
   float scanner = smoothstep(0.05, 0.0, abs(phase - 0.5) - 0.25);
 
-  // Soft core glow
   float glow = exp(-6.0 * (r*r));
 
   vec3 col = mix(uColGlow, uColCore, 0.35);
@@ -223,16 +220,12 @@ function setCachedSystem(id, details){
   try { localStorage.setItem(sysKey(id), JSON.stringify(details)); } catch {}
 }
 function prngSeed(str){
-  // Simple xorshift32 from string
   let h = 2166136261 >>> 0;
   for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   let s = h || 0xdeadbeef;
-  return () => { // [0,1)
-    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
-    return ((s>>>0) / 4294967296);
-  };
+  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s>>>0) / 4294967296); };
 }
-// Placeholder deterministic generator (swap in your RealisticGen here)
+// Placeholder deterministic generator (swap in RealisticGen later)
 function generateDeterministic(id){
   const rnd = prngSeed(id);
   const kinds = ["Main Sequence", "K-Dwarf", "G-Dwarf", "F-Dwarf", "M-Dwarf", "Subgiant", "Giant", "Neutron", "Black Hole"];
@@ -242,7 +235,7 @@ function generateDeterministic(id){
     name: `P${i+1}`,
     semi_major_AU: +(0.2 + rnd()*15).toFixed(2),
     type: rnd()<0.3 ? "Rocky" : (rnd()<0.7 ? "Ice" : "Gas"),
-    notes: rnd()<0.15 ? "In resonance" : undefined
+    notes: rnd()<0.15 ? "In resonance" : ""
   }));
   return {
     version: SYSGEN_VERSION,
@@ -258,11 +251,6 @@ async function ensureSystemDetails(id){
   if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
   return det;
 }
-function regenerateSystemDetails(id){
-  const det = generateDeterministic(id);
-  setCachedSystem(id, det);
-  return det;
-}
 function exportSystemDetails(id){
   const det = getCachedSystem(id);
   if (!det) return;
@@ -274,24 +262,26 @@ function exportSystemDetails(id){
   URL.revokeObjectURL(a.href);
 }
 
-// --- right-side system panel (framework UI) ---
+// --- right-side system panel (with Edit mode) ---
 const panel = document.createElement('div');
 panel.style.cssText = `
-  position:fixed; top:0; right:0; height:100vh; width:340px; background:#0b0f14e6;
+  position:fixed; top:0; right:0; height:100vh; width:360px; background:#0b0f14e6;
   border-left:1px solid #243143; color:#e8f0ff; font:14px/1.4 system-ui;
   transform:translateX(100%); transition:transform .18s ease; display:flex; flex-direction:column; z-index:10;
 `;
 panel.innerHTML = `
   <div style="padding:12px 14px; border-bottom:1px solid #243143; display:flex; justify-content:space-between; align-items:center;">
     <strong id="sp-title">System</strong>
-    <button id="sp-close" style="background:#17202b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Close</button>
+    <div style="display:flex; gap:8px;">
+      <button id="sp-gen"  title="Generate/Load" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Generate/Load</button>
+      <button id="sp-edit" title="Edit"          style="background:#1b2a3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Edit</button>
+      <button id="sp-close"                      style="background:#17202b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Close</button>
+    </div>
   </div>
   <div id="sp-body" style="padding:12px 14px; overflow:auto; flex:1;">
-    <em>Select a star and press Enter, or double-click a star.</em>
+    <em>Select a star and press Enter, or double-click the selected star.</em>
   </div>
   <div style="padding:10px 14px; border-top:1px solid #243143; display:flex; gap:8px;">
-    <button id="sp-gen"  style="flex:1;background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Generate/Load</button>
-    <button id="sp-re"   style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Regenerate</button>
     <button id="sp-exp"  style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Export</button>
   </div>
 `;
@@ -299,36 +289,160 @@ document.body.appendChild(panel);
 const spTitle = panel.querySelector('#sp-title');
 const spBody  = panel.querySelector('#sp-body');
 panel.querySelector('#sp-close').onclick = () => hidePanel();
-panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d); } };
-panel.querySelector('#sp-re').onclick    = ()=>{ if(selectedId){ const d = regenerateSystemDetails(selectedId); renderPanel(selectedId, d); } };
+panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
+panel.querySelector('#sp-edit').onclick  = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, true); } };
 panel.querySelector('#sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
 
 function showPanel(){ panel.style.transform = 'translateX(0)'; }
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
-function renderPanel(id, details){
+
+// Renders read or edit mode
+function renderPanel(id, details, edit=false){
   const sys = systems.find(s=>s.id===id);
   spTitle.textContent = sys?.name || id;
-  const star = details?.star || {};
-  const planets = details?.planets || [];
-  spBody.innerHTML = `
-    <div style="margin-bottom:10px;">
-      <div><strong>ID:</strong> ${id}</div>
-      <div><strong>Name:</strong> ${sys?.name || '(unnamed)'}</div>
-      <div><strong>Star:</strong> ${star.kind || '—'}</div>
-      <div><strong>Version:</strong> ${details?.version || '—'}</div>
-    </div>
-    <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
-    <div style="display:flex; flex-direction:column; gap:6px;">
-      ${planets.map(p=>`
-        <div style="border:1px solid #243143; border-radius:8px; padding:8px;">
-          <div><strong>${p.name}</strong> — ${p.type ?? 'Unknown'}</div>
-          <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
-          ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
+
+  if (!edit){
+    const star = details?.star || {};
+    const planets = details?.planets || [];
+    spBody.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div><strong>ID:</strong> ${id}</div>
+        <div><strong>Name:</strong> ${sys?.name || '(unnamed)'}</div>
+        <div><strong>Star:</strong> ${star.kind || '—'}</div>
+        <div><strong>Version:</strong> ${details?.version || '—'}</div>
+      </div>
+      <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${planets.map((p,i)=>`
+          <div style="border:1px solid #243143; border-radius:8px; padding:8px;">
+            <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
+            <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
+            ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
+          </div>
+        `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
+      </div>
+    `;
+  } else {
+    const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
+    const planets = details?.planets || [];
+    const options = starKinds.map(k=>`<option value="${k}" ${details?.star?.kind===k?'selected':''}>${k}</option>`).join('');
+    spBody.innerHTML = `
+      <form id="sys-edit" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:grid; grid-template-columns:100px 1fr; gap:8px; align-items:center;">
+          <label><strong>ID</strong></label>
+          <div>${id}</div>
+
+          <label for="sysName"><strong>Name</strong></label>
+          <input id="sysName" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+
+          <label for="starKind"><strong>Star</strong></label>
+          <select id="starKind" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
+            ${options}
+          </select>
         </div>
-      `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
-    </div>
-  `;
+
+        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+          <strong>Planets (${planets.length})</strong>
+          <button id="addPlanet" type="button" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:6px;padding:6px 10px;cursor:pointer;">+ Add Planet</button>
+        </div>
+
+        <div id="planetList" style="display:flex; flex-direction:column; gap:8px;">
+          ${planets.map((p,i)=>planetEditorRow(p,i)).join('')}
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button id="saveEdit" type="submit" style="flex:1;background:#1e3b26;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Save</button>
+          <button id="cancelEdit" type="button" style="flex:1;background:#3a1e1e;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Cancel</button>
+        </div>
+      </form>
+    `;
+
+    // wire up editor actions
+    const form = spBody.querySelector('#sys-edit');
+    const btnAdd = spBody.querySelector('#addPlanet');
+    const listEl = spBody.querySelector('#planetList');
+    btnAdd.onclick = ()=>{
+      const idx = listEl.children.length;
+      const row = document.createElement('div');
+      row.innerHTML = planetEditorRow({name:`P${idx+1}`, type:'Rocky', semi_major_AU:1.0, notes:''}, idx);
+      listEl.appendChild(row.firstElementChild);
+    };
+    listEl.addEventListener('click', (e)=>{
+      if (e.target && e.target.matches('.delPlanet')) {
+        e.target.closest('.planetRow').remove();
+        // reindex labels
+        Array.from(listEl.querySelectorAll('.planetRow')).forEach((el,i)=>{
+          el.querySelector('.pIndex').textContent = `#${i+1}`;
+        });
+      }
+    });
+    form.onsubmit = (ev)=>{
+      ev.preventDefault();
+      const newName = spBody.querySelector('#sysName').value.trim();
+      const newKind = spBody.querySelector('#starKind').value;
+
+      // collect planets
+      const rows = Array.from(listEl.querySelectorAll('.planetRow'));
+      const planets = rows.map(row=>{
+        const name = row.querySelector('.pName').value.trim() || 'Planet';
+        const type = row.querySelector('.pType').value;
+        const sma  = parseFloat(row.querySelector('.pSMA').value);
+        const notes= row.querySelector('.pNotes').value.trim();
+        return {
+          name,
+          type,
+          semi_major_AU: isFinite(sma) ? +sma.toFixed(2) : null,
+          notes
+        };
+      });
+
+      // update cached details
+      const updated = {
+        ...(getCachedSystem(id) || {version: SYSGEN_VERSION, system_id: id, seeded:true}),
+        star: { kind: newKind },
+        planets
+      };
+      setCachedSystem(id, updated);
+
+      // update visible system name too
+      if (newName) {
+        const s = systems.find(s=>s.id===id);
+        if (s) s.name = newName;
+        spTitle.textContent = newName;
+      }
+
+      renderPanel(id, updated, false);
+    };
+    spBody.querySelector('#cancelEdit').onclick = ()=>{
+      renderPanel(id, details, false);
+    };
+  }
   showPanel();
+}
+function planetEditorRow(p,i){
+  const opt = (v,sel)=> `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
+  return `
+  <div class="planetRow" style="border:1px solid #243143; border-radius:8px; padding:8px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <strong class="pIndex">#${i+1}</strong>
+      <button type="button" class="delPlanet" style="background:#3a2424;border:1px solid #503636;color:#ffd9d9;border-radius:6px;padding:4px 8px;cursor:pointer;">Remove</button>
+    </div>
+    <div style="display:grid; grid-template-columns:110px 1fr; gap:8px; align-items:center;">
+      <label><strong>Name</strong></label>
+      <input class="pName" type="text" value="${(p.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+
+      <label><strong>Type</strong></label>
+      <select class="pType" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
+        ${opt('Rocky', p.type)}${opt('Ice', p.type)}${opt('Gas', p.type)}${opt('Ocean', p.type)}${opt('Desert', p.type)}
+      </select>
+
+      <label><strong>Orbit (AU)</strong></label>
+      <input class="pSMA" type="number" step="0.01" value="${p.semi_major_AU ?? 1}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+
+      <label><strong>Notes</strong></label>
+      <input class="pNotes" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+    </div>
+  </div>`;
 }
 
 // Projection helper reused for hover/picking
@@ -512,13 +626,12 @@ fetch(jsonURL).then(r => r.json()).then(data => {
     const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
     if (!id) return;
 
-    // If the double-clicked star is currently selected, open the panel.
     if (selectedId === id){
       const details = await ensureSystemDetails(id);
-      renderPanel(id, details);
+      renderPanel(id, details, false);
       return;
     }
-    // Else: perform rename as before
+    // Else: rename as before
     const sys = systems.find(s => s.id === id);
     const curr = sys?.name || id;
     const nn = prompt('Rename system:', curr);
@@ -536,14 +649,12 @@ fetch(jsonURL).then(r => r.json()).then(data => {
       console.log(`Edit Mode: ${editMode ? 'ON' : 'OFF'}`);
       return;
     }
-    // Open details panel for selected star
     if (k === 'enter' && selectedId){
       const details = await ensureSystemDetails(selectedId);
-      renderPanel(selectedId, details);
+      renderPanel(selectedId, details, false);
       return;
     }
 
-    // Lane editor-only keys
     if (!editMode) return;
 
     if (k === 'c') { // clear all lanes
@@ -660,8 +771,8 @@ function loop() {
     if (p){
       gl.useProgram(progHalo);
       gl.uniformMatrix4fv(uMVP_halo, false, mvp);
-      gl.uniform1f(uPix_halo, 42.0); // slightly bigger
-      gl.uniform1f(uTime_halo, t * 0.7); // slower spin
+      gl.uniform1f(uPix_halo, 42.0);
+      gl.uniform1f(uTime_halo, t * 0.7);
       gl.uniform3f(uColGlow, 1.0, 0.85, 0.35);
       gl.uniform3f(uColCore, 1.0, 0.98, 0.7);
 
