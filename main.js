@@ -455,7 +455,7 @@ function renderPanel(id, details, edit=false){
       </div>
     `;
 
-    // ✅ Enable hologram on planet click (attached in READ mode where .planet-card exists)
+    // Enable hologram on planet click
     spBody.querySelectorAll('.planet-card').forEach(el => {
       const t = el.dataset.type || 'Rocky';
       const n = el.dataset.name || 'Object';
