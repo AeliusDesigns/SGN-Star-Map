@@ -267,6 +267,101 @@ let selectedId = null;        // sticky selection
 let haloVBO = null;           // single-vertex buffer for halos
 let t0 = performance.now();   // time base for animation
 
+// === HOLOGRAM UI (bottom-left mini-scanner) ===
+// Put this block right after the tooltip setup.
+let _holoRoot = null;
+
+function ensureHoloUI(){
+  if (_holoRoot) return _holoRoot;
+
+  _holoRoot = document.createElement('div');
+  _holoRoot.id = 'holo-root';
+  _holoRoot.style.cssText = `
+    position: fixed;
+    left: 14px;
+    bottom: 14px;
+    width: 260px;
+    height: 260px;
+    padding: 10px;
+    background: radial-gradient(120% 120% at 0% 100%, #07202a 0%, #071017 60%, #05090f 100%);
+    border: 1px solid #1d2c3a;
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px #0b1a26 inset, 0 6px 24px rgba(0,0,0,.45);
+    color: #bfeaff;
+    z-index: 50;
+    display: none;
+    overflow: hidden;
+  `;
+
+  // chrome + scan lines
+  const chrome = document.createElement('div');
+  chrome.style.cssText = `
+    position:absolute; inset:0; pointer-events:none;
+    background:
+      linear-gradient(180deg, rgba(0,255,255,.08), rgba(0,255,255,0) 18%) top/100% 2px no-repeat,
+      repeating-linear-gradient(180deg, rgba(0,255,255,.04) 0 2px, rgba(0,0,0,0) 2px 4px);
+    mix-blend-mode: screen;
+  `;
+  _holoRoot.appendChild(chrome);
+
+  // text area
+  const info = document.createElement('div');
+  info.id = 'holo-info';
+  info.style.cssText = `position:absolute; left:10px; bottom:10px; right:10px; font:12px/1.2 system-ui; opacity:.85;`;
+  info.innerHTML = `
+    <div id="holo-title" style="font-weight:600; letter-spacing:.04em; color:#d6fbff">Scan</div>
+    <div id="holo-sub"   style="font-size:11px; opacity:.8; margin-top:2px;">—</div>
+  `;
+  _holoRoot.appendChild(info);
+
+  // svg container
+  const svgWrap = document.createElement('div');
+  svgWrap.id = 'holo-svg';
+  svgWrap.style.cssText = `
+    position:absolute; inset:10px 10px 48px 10px; display:grid; place-items:center;
+    filter: drop-shadow(0 0 6px rgba(0,255,255,.3)) drop-shadow(0 0 14px rgba(0,255,255,.25));
+  `;
+  _holoRoot.appendChild(svgWrap);
+
+  // close on right-click
+  _holoRoot.addEventListener('contextmenu', (e)=>{ e.preventDefault(); hideHolo(); });
+
+  document.body.appendChild(_holoRoot);
+  return _holoRoot;
+}
+
+function showHoloVector(svgMarkup, title='Scan', subtitle=''){
+  const root = ensureHoloUI();
+  const box  = root.querySelector('#holo-svg');
+  const tEl  = root.querySelector('#holo-title');
+  const sEl  = root.querySelector('#holo-sub');
+
+  // swap SVG
+  box.innerHTML = svgMarkup;
+
+  // animate a slow rotation if the SVG has a group with id="spin"
+  const spin = box.querySelector('#spin');
+  if (spin){
+    spin.style.transformOrigin = '50% 50%';
+    spin.animate(
+      [{ transform:'rotate(0deg)' }, { transform:'rotate(360deg)' }],
+      { duration: 10000, iterations: Infinity, easing: 'linear' }
+    );
+  }
+
+  tEl.textContent = title;
+  sEl.textContent = subtitle || 'press RMB to hide';
+  root.style.display = 'block';
+}
+
+function hideHolo(){
+  if (_holoRoot) _holoRoot.style.display = 'none';
+}
+
+// expose for handlers added elsewhere
+window.showHoloVector = showHoloVector;
+window.hideHolo = hideHolo;
+
 // === simple editor auth ===
 let editorOK = sessionStorage.getItem('starmap_editor_ok') === '1';
 function requireEditor() {
