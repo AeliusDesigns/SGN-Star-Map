@@ -454,6 +454,14 @@ function renderPanel(id, details, edit=false){
         `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
       </div>
     `;
+
+    // ✅ Enable hologram on planet click (attached in READ mode where .planet-card exists)
+    spBody.querySelectorAll('.planet-card').forEach(el => {
+      const t = el.dataset.type || 'Rocky';
+      const n = el.dataset.name || 'Object';
+      el.addEventListener('click', () => showHoloVector(t, n));
+    });
+
   } else {
     const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
     const planets = details?.planets || [];
@@ -489,14 +497,7 @@ function renderPanel(id, details, edit=false){
       </form>
     `;
 
-    // Enable hologram on planet click
-    spBody.querySelectorAll('.planet-card').forEach(el => {
-      const t = el.dataset.type || 'Rocky';
-      const n = el.dataset.name || 'Object';
-      el.addEventListener('click', () => showHoloVector(t, n));
-    });
-
-    // wire up editor actions
+    // (No hologram click binding here; edit mode shows form rows, not planet cards.)
     const form = spBody.querySelector('#sys-edit');
     const btnAdd = spBody.querySelector('#addPlanet');
     const listEl = spBody.querySelector('#planetList');
@@ -700,7 +701,7 @@ function svgLesserArk(){
 // selector
 function makeSVGFor(type){
   const t=(type||'').toLowerCase();
-  if (t.includes('installation'))  return svgLesserArk();
+  if (t.includes('installation'))  return svgLesserArk(); // ⇦ Installation uses Lesser Ark
   if (t.includes('shield'))        return svgShieldWorld();
   if (t.includes('ecumen'))        return svgEcumenopolis();
   if (t.includes('gas'))           return svgGas();
