@@ -347,7 +347,7 @@ function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 // --- tiny HUD (top-left) to show modes + Add button ---
 const hud = document.createElement('div');
 hud.style.cssText = `
-  position:fixed; top:10px; left:10px; z-index:9; display:flex; gap:8px; align-items:center;
+  position:fixed; top:72px; left:10px; z-index:9; display:flex; gap:8px; align-items:center;
   background:#0b0f14cc; border:1px solid #243143; border-radius:10px; padding:8px 10px; color:#e8f0ff; font:12px system-ui;
 `;
 hud.innerHTML = `
