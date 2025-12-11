@@ -282,218 +282,126 @@ function requireEditor() {
   return false;
 }
 
-// ===== 3D Planet Toolkit (shared lighting + materials) =====
-const LIGHT_AZIMUTH_DEG = -35;  // where the light comes from (left/right)
-const LIGHT_ELEV_DEG    =  25;  // and slightly above the camera
+/* =========================================================
+   HOLOGRAM DOCK + HIGH-FIDELITY SVG PLANET BUILDERS
+   ========================================================= */
 
+// UTIL: create SVG/HTML nodes quickly
+function S(tag, attrs={}, children=[]){
+  const el = (tag === 'svg' || tag === 'defs' || tag === 'g' || tag === 'path' || tag === 'circle' || tag === 'ellipse' || tag === 'linearGradient' || tag === 'radialGradient' || tag === 'stop' || tag === 'clipPath' || tag === 'polygon')
+    ? document.createElementNS('http://www.w3.org/2000/svg', tag)
+    : document.createElement(tag);
+  for (const k in attrs) {
+    if (attrs[k] == null) continue;
+    if (k === 'style' && typeof attrs[k] === 'object') {
+      Object.assign(el.style, attrs[k]);
+    } else {
+      el.setAttribute(k, String(attrs[k]));
+    }
+  }
+  if (!Array.isArray(children)) children = [children];
+  children.forEach(ch => { if (ch) el.appendChild(ch); });
+  return el;
+}
+
+const HOLO_DETAIL = 'high';
+
+// Global lighting
+const LIGHT_AZIMUTH_DEG = -35;
+const LIGHT_ELEV_DEG    =  25;
 function deg2rad(a){ return a * Math.PI / 180; }
 function lightVec(){
   const a = deg2rad(LIGHT_AZIMUTH_DEG), e = deg2rad(LIGHT_ELEV_DEG);
-  // simple unit vector from angles
   return { x: Math.cos(e)*Math.cos(a), y: Math.cos(e)*Math.sin(a), z: Math.sin(e) };
 }
 
-// Base sphere group: lambert-ish shading + rim atmosphere
+// Base <svg> with filters/defs
+function baseSVG(){
+  const svg = S('svg',{ viewBox:'0 0 200 200', width:'190', height:'190', xmlns:'http://www.w3.org/2000/svg' });
+
+  const defs = S('defs',{},[
+    // soft glow
+    S('filter',{id:'glow', x:'-30%', y:'-30%', width:'160%', height:'160%'},[
+      S('feGaussianBlur',{ stdDeviation:'1.8', result:'b' }),
+      S('feMerge',{},[ S('feMergeNode',{ in:'b' }), S('feMergeNode',{ in:'SourceGraphic' }) ])
+    ]),
+    // chromatic slight spread
+    S('filter',{id:'chromatic', x:'-40%', y:'-40%', width:'180%', height:'180%'},[
+      S('feColorMatrix',{ type:'matrix', values:'1 0 0 0 0  0 1 0 0 0.05  0 0 1 0 0.12  0 0 0 1 0' })
+    ]),
+    // subtle grain
+    S('filter',{id:'grain', x:'-30%', y:'-30%', width:'160%', height:'160%'},[
+      S('feTurbulence',{type:'fractalNoise', baseFrequency:'0.9', numOctaves:'2', result:'n'}),
+      S('feColorMatrix',{type:'saturate', values:'0', result:'m'}),
+      S('feBlend',{in:'SourceGraphic', in2:'m', mode:'overlay'})
+    ]),
+    // hot spot gradient for gas vortex
+    S('radialGradient',{id:'hot', cx:'50%', cy:'50%', r:'50%'},[
+      S('stop',{offset:'0%','stop-color':'#fff','stop-opacity':'0.8'}),
+      S('stop',{offset:'100%','stop-color':'#acf2ff','stop-opacity':'0.0'})
+    ])
+  ]);
+
+  svg.appendChild(defs);
+  // Base scan rings
+  svg.appendChild(S('circle',{cx:100,cy:100,r:92,fill:'none',stroke:'#6be3ff','stroke-opacity':'.18','stroke-width':'1.2',filter:'url(#glow)'}));
+  svg.appendChild(S('circle',{cx:100,cy:100,r:78,fill:'none',stroke:'#6be3ff','stroke-opacity':'.10','stroke-width':'1',filter:'url(#glow)'}));
+
+  return svg;
+}
+
+// Polar grid overlay
+function addPolarGrid(svg){
+  const g = S('g',{opacity:0.13});
+  [20,40,60,80].forEach(r=>{
+    g.appendChild(S('circle',{cx:100,cy:100,r,fill:'none',stroke:'#9deaff','stroke-width':'0.6'}));
+  });
+  for (let a=0; a<180; a+=15){
+    const rad = deg2rad(a);
+    const x = 100 + Math.cos(rad)*90;
+    const y = 100 + Math.sin(rad)*90;
+    g.appendChild(S('path',{d:`M 100,100 L ${x},${y}`, stroke:'#9deaff','stroke-width':'0.5'}));
+  }
+  svg.appendChild(g);
+}
+
+// sweeping outer rings (holo flair)
+function addSweepingRings(svg){
+  const g = S('g',{opacity:0.18});
+  [0, 35, 70].forEach((off,i)=>{
+    const ry = 28 + i*6;
+    g.appendChild(S('ellipse',{cx:100,cy:100,rx:90,ry,fill:'none',stroke:'#6be3ff','stroke-width':'1'}));
+  });
+  svg.appendChild(g);
+}
+
+// Sphere shell with shading + rim
 function sphereBase({r=58, cx=100, cy=100, color='#90faff', tint=0.8, atm=0.35}={}){
-  const defs = [];
-  const id = (p)=>`p_${p}_${Math.random().toString(36).slice(2,8)}`;
-  const gidShade = id('shade');
-  const gidRim   = id('rim');
   const lv = lightVec();
+  const gidShade = `shade_${Math.random().toString(36).slice(2,8)}`;
+  const gidRim   = `rim_${Math.random().toString(36).slice(2,8)}`;
 
-  // Shading via radial gradient, shifted toward light direction
-  const shade = S('radialGradient',{ id:gidShade, cx:String(50 + lv.x*25)+'%', cy:String(50 - lv.y*25)+'%', r:'60%' },[
-    S('stop',{offset:'0%','stop-color':'#eaffff','stop-opacity':Math.min(0.95,0.65 + tint*0.3)}),
-    S('stop',{offset:'60%','stop-color':color,'stop-opacity':tint}),
-    S('stop',{offset:'100%','stop-color':'#002a33','stop-opacity':0.9})
+  const defs = S('defs',{},[
+    S('radialGradient',{ id:gidShade, cx:`${50 + lv.x*25}%`, cy:`${50 - lv.y*25}%`, r:'60%' },[
+      S('stop',{offset:'0%','stop-color':'#eaffff','stop-opacity':Math.min(0.95,0.65 + tint*0.3)}),
+      S('stop',{offset:'60%','stop-color':color,'stop-opacity':tint}),
+      S('stop',{offset:'100%','stop-color':'#002a33','stop-opacity':0.9})
+    ]),
+    S('radialGradient',{ id:gidRim, cx:'50%', cy:'50%', r:'50%' },[
+      S('stop',{offset:'80%','stop-color':color,'stop-opacity':'0'}),
+      S('stop',{offset:'98%','stop-color':color,'stop-opacity':atm}),
+      S('stop',{offset:'100%','stop-color':color,'stop-opacity':'0'})
+    ])
   ]);
-  defs.push(shade);
 
-  // Atmosphere rim (subtractive outer fade)
-  const rim = S('radialGradient',{ id:gidRim, cx:'50%', cy:'50%', r:'50%' },[
-    S('stop',{offset:'80%','stop-color':color,'stop-opacity':'0'}),
-    S('stop',{offset:'98%','stop-color':color,'stop-opacity':atm}),
-    S('stop',{offset:'100%','stop-color':color,'stop-opacity':'0'})
-  ]);
-  defs.push(rim);
-
-  const g = S('g', { filter:'url(#chromatic)' });
-  g.appendChild(S('defs',{},defs));
-  // sphere body
-  g.appendChild(S('circle',{ cx, cy, r, fill:`url(#${gidShade})`, stroke:color, 'stroke-opacity':0.45, 'stroke-width':HOLO_DETAIL==='high'?1.4:1.1, filter:'url(#glow)'}));
-  // rim glow (atmosphere)
+  const g = S('g',{ filter:'url(#chromatic)'});
+  g.appendChild(defs);
+  g.appendChild(S('circle',{ cx, cy, r, fill:`url(#${gidShade})`, stroke:color, 'stroke-opacity':0.45, 'stroke-width': HOLO_DETAIL==='high' ? 1.4 : 1.1, filter:'url(#glow)'}));
   g.appendChild(S('circle',{ cx, cy, r:r+1.3, fill:`url(#${gidRim})`, stroke:'none', filter:'url(#glow)', opacity:0.9 }));
-
   return g;
 }
 
-// Add specular highlight (small hot ellipse near light) — best for water/ice
-function addSpecular(svgGroup, {r=58, cx=100, cy=100, color='#cfffff'}={}){
-  const lv = lightVec();
-  const px = cx + lv.x * (r*0.55);
-  const py = cy - lv.y * (r*0.55);
-  const spec = S('ellipse',{
-    cx:px, cy:py, rx:r*0.16, ry:r*0.08, fill:'white', 'fill-opacity':0.35, stroke:'none', filter:'url(#glow)'
-  });
-  svgGroup.appendChild(spec);
-  // tiny sparkle
-  svgGroup.appendChild(S('circle',{cx:px, cy:py, r:1.6, fill:'white', 'fill-opacity':0.85, filter:'url(#glow)'}));
-}
-
-// Add band mask (curving with sphere) for gas giants; bands are animated
-function addGasBands(svg, {r=58, cx=100, cy=100, color='#90faff'}={}){
-  const id = (p)=>`gb_${p}_${Math.random().toString(36).slice(2,8)}`;
-  const clipId = id('clip');
-  const bandGrad = id('band');
-  const drift = id('drift');
-
-  // Clip to sphere
-  svg.appendChild(S('clipPath',{id:clipId}, [ S('circle',{cx,cy,r}) ]));
-
-  // Gradient for bands
-  svg.appendChild(S('linearGradient',{id:bandGrad, x1:'0%',y1:'0%',x2:'0%',y2:'100%'},[
-    S('stop',{offset:'0%','stop-color':color,'stop-opacity':0.05}),
-    S('stop',{offset:'50%','stop-color':color,'stop-opacity':0.75}),
-    S('stop',{offset:'100%','stop-color':color,'stop-opacity':0.05}),
-  ]));
-
-  // A long group that will translate slowly (band drift)
-  const g = S('g',{clipPath:`url(#${clipId})`, opacity:0.95});
-  const bands = S('g',{id:drift});
-  // Create many curved bands (elliptical arcs)
-  for (let i=-6;i<=6;i++){
-    const lat = i * 7;                        // latitude spacing
-    const rr  = r * Math.cos(deg2rad(lat));   // apparent radius at this latitude
-    const y   = cy + r * Math.sin(deg2rad(lat)) * 0.6;
-    const sw  = (i % 2 === 0) ? 1.6 : 1.0;
-    bands.appendChild(S('ellipse',{cx, cy:y, rx:rr, ry:rr*0.28, fill:'none', stroke:`url(#${bandGrad})`, 'stroke-width':sw}));
-  }
-  // Big storm/vortex
-  const vortexY = cy + r*0.28, vortexX = cx + r*0.62;
-  bands.appendChild(S('ellipse',{cx:vortexX, cy:vortexY, rx:r*0.12, ry:r*0.07, fill:'url(#hot)', stroke:'none', filter:'url(#glow)', opacity:0.9}));
-
-  // animate slow longitudinal drift
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes bandDrift { 0% { transform: translateX(0px) } 100% { transform: translateX(-24px) } }
-  `;
-  svg.appendChild(style);
-  bands.style.animation = 'bandDrift 18s linear infinite';
-
-  g.appendChild(bands);
-  svg.appendChild(g);
-}
-
-// Add continental/rough features for rocky (thin contour lines + craters)
-function addRockyDetail(svg, {r=58, cx=100, cy=100, color='#90faff'}={}){
-  const g = S('g',{opacity:0.9, filter:'url(#grain)'});
-  // continent strokes (no fill) – projected arcs suggest 3D wrap
-  const arcs = [
-    {R: r*0.78, a0:210, a1:310, offY:-r*0.10},
-    {R: r*0.65, a0: 40, a1:120, offY: r*0.05},
-    {R: r*0.60, a0:130, a1:190, offY: r*0.02},
-  ];
-  arcs.forEach(({R,a0,a1,offY})=>{
-    const p = arcPath(cx, cy+offY, R, a0, a1);
-    g.appendChild(S('path',{d:p, opacity:0.7}));
-  });
-  // crater rings with secondary rim
-  [[-0.15,-0.08,6],[0.18,0.12,8],[0.05,0.23,4]].forEach(([dx,dy,rr])=>{
-    const x = cx + dx*r*1.2, y = cy + dy*r*0.9;
-    g.appendChild(S('circle',{cx:x, cy:y, r:rr, opacity:0.9}));
-    g.appendChild(S('circle',{cx:x, cy:y, r:rr*1.6, opacity:0.25, 'stroke-dasharray':'2 2'}));
-  });
-  svg.appendChild(g);
-}
-
-// Add specular belts and glints for ocean world; thin cloud arcs that rotate
-function addOceanDetail(svg, {r=58, cx=100, cy=100, color='#90faff'}={}){
-  // Cloud ring arcs
-  const clouds = S('g',{opacity:0.85});
-  [0.15,0.0,-0.18].forEach((off,i)=>{
-    const d = arcPath(cx, cy+off*r*0.6, r*0.88 - i*4, 200, 340);
-    clouds.appendChild(S('path',{d, 'stroke-width': (i===1?1.6:1.2), opacity:(i===1?0.8:0.55)}));
-  });
-  // rotate clouds slowly
-  const style = document.createElement('style');
-  style.textContent = `@keyframes cloudSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`;
-  svg.appendChild(style);
-  clouds.style.transformOrigin = '100px 100px';
-  clouds.style.animation = 'cloudSpin 40s linear infinite';
-  svg.appendChild(clouds);
-
-  // Specular gleam for water
-  addSpecular(svg, {r, cx, cy});
-}
-
-// Add bright snow ridges & crevasses for ice world
-function addIceDetail(svg, {r=58, cx=100, cy=100}={}){
-  const g = S('g',{opacity:0.95});
-  // longitudinal bright ridges
-  [20, 36, 52].forEach((lat,i)=>{
-    const rr = r*Math.cos(deg2rad(lat));
-    const y  = cy + r*Math.sin(deg2rad(lat))*0.55;
-    g.appendChild(S('ellipse',{cx, cy:y, rx:rr, ry:rr*0.22, fill:'none', stroke:'#eaffff', 'stroke-opacity':0.55}));
-  });
-  // crevasse strokes
-  const cracks = [
-    `M ${cx-r*0.6},${cy-r*0.15} C ${cx-r*0.2},${cy-r*0.25} ${cx+r*0.1},${cy-r*0.1} ${cx+r*0.55},${cy-r*0.05}`,
-    `M ${cx-r*0.5},${cy+r*0.1} C ${cx-r*0.2},${cy} ${cx+r*0.25},${cy+r*0.05} ${cx+r*0.5},${cy+r*0.12}`
-  ];
-  cracks.forEach(d=> g.appendChild(S('path',{d, opacity:0.75})));
-  svg.appendChild(g);
-
-  // crisp highlight
-  addSpecular(svg,{r, cx, cy});
-}
-
-// ===== 3D Planet Builders =====
-
-// GAS GIANT — 3D sphere + animated bands + storm
-function svgGas(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
-  const body = sphereBase({});
-  svg.appendChild(body);
-  addGasBands(svg, {});
-  addSweepingRings(svg);
-  return svg;
-}
-
-// ROCKY — 3D sphere + rough features
-function svgRocky(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
-  const body = sphereBase({ tint:0.75 });
-  svg.appendChild(body);
-  addRockyDetail(svg, {});
-  addSweepingRings(svg);
-  return svg;
-}
-
-// OCEAN — 3D sphere + cloud belts + strong specular
-function svgOcean(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
-  const body = sphereBase({ tint:0.85, atm:0.45 });
-  svg.appendChild(body);
-  addOceanDetail(svg,{});
-  addSweepingRings(svg);
-  return svg;
-}
-
-// ICE — 3D sphere + crevasses + cold specular
-function svgIce(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
-  const body = sphereBase({ tint:0.8, atm:0.4 });
-  svg.appendChild(body);
-  addIceDetail(svg,{});
-  addSweepingRings(svg);
-  return svg;
-}
-
-// --- helpers for spherical arcs ---
+// Helpers for arcs
 function arcPath(cx,cy,r, a0deg,a1deg){
   const a0 = a0deg*Math.PI/180, a1 = a1deg*Math.PI/180;
   const x0 = cx + Math.cos(a0)*r, y0 = cy + Math.sin(a0)*r;
@@ -502,8 +410,151 @@ function arcPath(cx,cy,r, a0deg,a1deg){
   return `M ${x0},${y0} A ${r} ${r} 0 ${large} 1 ${x1},${y1}`;
 }
 
-// ——— Router (unchanged types except our improved planet looks) ———
-// NOTE: “Artificial world” remains removed; “Installation” => Lesser Ark.
+// Details
+function addSpecular(svgGroup, {r=58, cx=100, cy=100}={}){
+  const lv = lightVec();
+  const px = cx + lv.x * (r*0.55);
+  const py = cy - lv.y * (r*0.55);
+  svgGroup.appendChild(S('ellipse',{cx:px, cy:py, rx:r*0.16, ry:r*0.08, fill:'white', 'fill-opacity':0.35, stroke:'none', filter:'url(#glow)'}));
+  svgGroup.appendChild(S('circle',{cx:px, cy:py, r:1.6, fill:'white', 'fill-opacity':0.85, filter:'url(#glow)'}));
+}
+
+function addGasBands(svg, {r=58, cx=100, cy=100, color='#90faff'}={}){
+  const clipId = `clip_${Math.random().toString(36).slice(2,8)}`;
+  const bandGrad = `band_${Math.random().toString(36).slice(2,8)}`;
+  svg.appendChild(S('clipPath',{id:clipId}, [ S('circle',{cx,cy,r}) ]));
+  svg.appendChild(S('linearGradient',{id:bandGrad, x1:'0%',y1:'0%',x2:'0%',y2:'100%'},[
+    S('stop',{offset:'0%','stop-color':color,'stop-opacity':0.05}),
+    S('stop',{offset:'50%','stop-color':color,'stop-opacity':0.75}),
+    S('stop',{offset:'100%','stop-color':color,'stop-opacity':0.05}),
+  ]));
+  const g = S('g',{clipPath:`url(#${clipId})`, opacity:0.95});
+  const bands = S('g');
+  for (let i=-6;i<=6;i++){
+    const lat = i * 7;
+    const rr  = r * Math.cos(deg2rad(lat));
+    const y   = cy + r * Math.sin(deg2rad(lat)) * 0.6;
+    const sw  = (i % 2 === 0) ? 1.6 : 1.0;
+    bands.appendChild(S('ellipse',{cx, cy:y, rx:rr, ry:rr*0.28, fill:'none', stroke:`url(#${bandGrad})`, 'stroke-width':sw}));
+  }
+  const vortexY = cy + r*0.28, vortexX = cx + r*0.62;
+  bands.appendChild(S('ellipse',{cx:vortexX, cy:vortexY, rx:r*0.12, ry:r*0.07, fill:'url(#hot)', stroke:'none', filter:'url(#glow)', opacity:0.9}));
+  const style = document.createElement('style');
+  style.textContent = `@keyframes bandDrift { 0% { transform: translateX(0px) } 100% { transform: translateX(-24px) } }`;
+  svg.appendChild(style);
+  bands.style.animation = 'bandDrift 18s linear infinite';
+  g.appendChild(bands);
+  svg.appendChild(g);
+}
+
+function addRockyDetail(svg, {r=58, cx=100, cy=100}={}){
+  const g = S('g',{opacity:0.9, filter:'url(#grain)'});
+  const arcs = [
+    {R: r*0.78, a0:210, a1:310, offY:-r*0.10},
+    {R: r*0.65, a0: 40, a1:120, offY: r*0.05},
+    {R: r*0.60, a0:130, a1:190, offY: r*0.02},
+  ];
+  arcs.forEach(({R,a0,a1,offY})=>{
+    const p = arcPath(cx, cy+offY, R, a0, a1);
+    g.appendChild(S('path',{d:p, opacity:0.7, stroke:'#c7fbff','stroke-width':'0.8', fill:'none'}));
+  });
+  [[-0.15,-0.08,6],[0.18,0.12,8],[0.05,0.23,4]].forEach(([dx,dy,rr])=>{
+    const x = cx + dx*r*1.2, y = cy + dy*r*0.9;
+    g.appendChild(S('circle',{cx:x, cy:y, r:rr, opacity:0.9, stroke:'#c7fbff','stroke-width':'0.8', fill:'none'}));
+    g.appendChild(S('circle',{cx:x, cy:y, r:rr*1.6, opacity:0.25, 'stroke-dasharray':'2 2', stroke:'#c7fbff','stroke-width':'0.6', fill:'none'}));
+  });
+  svg.appendChild(g);
+}
+
+function addOceanDetail(svg, {r=58, cx=100, cy=100}={}){
+  const clouds = S('g',{opacity:0.85});
+  [0.15,0.0,-0.18].forEach((off,i)=>{
+    const d = arcPath(cx, cy+off*r*0.6, r*0.88 - i*4, 200, 340);
+    clouds.appendChild(S('path',{d, 'stroke-width': (i===1?1.6:1.2), opacity:(i===1?0.8:0.55), stroke:'#dffcff', fill:'none'}));
+  });
+  const style = document.createElement('style');
+  style.textContent = `@keyframes cloudSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`;
+  svg.appendChild(style);
+  clouds.style.transformOrigin = '100px 100px';
+  clouds.style.animation = 'cloudSpin 40s linear infinite';
+  svg.appendChild(clouds);
+  addSpecular(svg,{r, cx, cy});
+}
+
+function addIceDetail(svg, {r=58, cx=100, cy=100}={}){
+  const g = S('g',{opacity:0.95});
+  [20, 36, 52].forEach((lat,i)=>{
+    const rr = r*Math.cos(deg2rad(lat));
+    const y  = cy + r*Math.sin(deg2rad(lat))*0.55;
+    g.appendChild(S('ellipse',{cx, cy:y, rx:rr, ry:rr*0.22, fill:'none', stroke:'#eaffff', 'stroke-opacity':0.55}));
+  });
+  const cracks = [
+    `M ${cx-r*0.6},${cy-r*0.15} C ${cx-r*0.2},${cy-r*0.25} ${cx+r*0.1},${cy-r*0.1} ${cx+r*0.55},${cy-r*0.05}`,
+    `M ${cx-r*0.5},${cy+r*0.1} C ${cx-r*0.2},${cy} ${cx+r*0.25},${cy+r*0.05} ${cx+r*0.5},${cy+r*0.12}`
+  ];
+  cracks.forEach(d=> g.appendChild(S('path',{d, opacity:0.75, stroke:'#eaffff', fill:'none'})));
+  svg.appendChild(g);
+  addSpecular(svg,{r, cx, cy});
+}
+
+// Builders
+function svgGas(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({}); svg.appendChild(body); addGasBands(svg, {}); addSweepingRings(svg); return svg; }
+function svgRocky(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.75 }); svg.appendChild(body); addRockyDetail(svg, {}); addSweepingRings(svg); return svg; }
+function svgOcean(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.85, atm:0.45 }); svg.appendChild(body); addOceanDetail(svg,{}); addSweepingRings(svg); return svg; }
+function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.8, atm:0.4 }); svg.appendChild(body); addIceDetail(svg,{}); addSweepingRings(svg); return svg; }
+
+// SPECIALS
+function svgLesserArk(){
+  const svg = baseSVG();
+  addPolarGrid(svg);
+  const g = S('g',{filter:'url(#chromatic)'});
+  const arms = 8;
+  for (let i=0;i<arms;i++){
+    const rot = (i/arms)*360;
+    g.appendChild(S('g',{transform:`rotate(${rot} 100 100)`},[
+      S('path',{d:'M95 35 C92 60, 92 140, 95 165 L105 165 C108 140, 108 60, 105 35 Z', fill:'#bff6ff','fill-opacity':'.12', stroke:'#aaf1ff','stroke-opacity':'.35','stroke-width':'1'}),
+      S('path',{d:'M95 35 C85 32, 60 40, 45 55 C70 70, 130 130, 155 145 C152 118, 122 62, 105 35 Z', fill:'#bff6ff','fill-opacity':'.08', stroke:'#aaf1ff','stroke-opacity':'.25','stroke-width':'1'}),
+      S('path',{d:'M100 25 L96 35 L104 35 Z', fill:'#e7fdff', 'fill-opacity':'.8'})
+    ]));
+  }
+  g.appendChild(S('circle',{cx:100,cy:100,r:30,fill:'#dbffff','fill-opacity':'.08',stroke:'#bdf4ff','stroke-opacity':'.6'}));
+  svg.appendChild(g);
+  addSweepingRings(svg);
+  return svg;
+}
+
+function svgShieldWorld(){
+  const svg = baseSVG();
+  addPolarGrid(svg);
+  const body = sphereBase({ tint:0.9, atm:0.5 });
+  svg.appendChild(body);
+  // hex shield mesh
+  const mesh = S('g',{opacity:0.35});
+  for (let y=30; y<=170; y+=12){
+    for (let x=30; x<=170; x+=14){
+      mesh.appendChild(S('polygon',{points:`${x},${y-6} ${x+6},${y-3} ${x+6},${y+3} ${x},${y+6} ${x-6},${y+3} ${x-6},${y-3}`, fill:'none', stroke:'#bff6ff','stroke-width':'0.5'}));
+    }
+  }
+  svg.appendChild(mesh);
+  addSweepingRings(svg);
+  return svg;
+}
+
+function svgEcumenopolis(){
+  const svg = baseSVG();
+  addPolarGrid(svg);
+  const body = sphereBase({ tint:0.8, atm:0.35 });
+  svg.appendChild(body);
+  const rings = S('g',{opacity:0.25});
+  for (let r=20; r<=85; r+=6){
+    rings.appendChild(S('circle',{cx:100,cy:100,r,fill:'none',stroke:'#bff6ff','stroke-width':'0.6'}));
+  }
+  svg.appendChild(rings);
+  addSweepingRings(svg);
+  return svg;
+}
+
+// Router (Installation == Lesser Ark)
 function makeSVGFor(type){
   const t=(type||'').toLowerCase();
   if (t.includes('installation') || t.includes('ark')) return svgLesserArk();
@@ -516,85 +567,79 @@ function makeSVGFor(type){
   return svgRocky();
 }
 
-// Projection helper reused for hover/picking
-function projectToScreen(x, y, z, mvp){
-  const v = new Float32Array([x,y,z,1]);
-  const m = mvp;
-  const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
-  const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
-  const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
-  const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
-  if (!cw) return null;
-  const ndcX = cx/cw, ndcY = cy/cw;
-  return [
-    Math.round((ndcX*0.5+0.5)*canvas.width),
-    Math.round((-ndcY*0.5+0.5)*canvas.height),
-    cz/cw
-  ];
-}
+// Holo dock UI
+(function mountHolo(){
+  const style = document.createElement('style');
+  style.textContent = `
+    #holoDock {
+      position: fixed; left: 16px; bottom: 16px; width: 260px; height: 260px;
+      border: 1px solid #27404f; border-radius: 14px; background: rgba(6,12,18,.75);
+      box-shadow: 0 0 24px rgba(0,255,255,.08) inset, 0 0 24px rgba(0,0,0,.5);
+      backdrop-filter: blur(2px);
+      display: none; z-index: 20; overflow: hidden;
+    }
+    #holoDock .hdr {
+      height: 32px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 10px; font: 12px/1 system-ui; color: #cfe9ff; letter-spacing:.3px;
+      background: linear-gradient(180deg, rgba(20,30,42,.6), rgba(8,14,22,.2));
+      border-bottom: 1px solid #1e3142;
+    }
+    #holoDock .hdr .close { cursor:pointer; color:#9fdcff; opacity:.8; padding:2px 6px; border-radius:6px; }
+    #holoDock .hdr .close:hover { background:#0e1a24; opacity:1 }
+    #holoStage { position:absolute; inset:32px 0 0 0; display:flex; align-items:center; justify-content:center; }
+    #holoStage .svgWrap { width: 190px; height: 190px; display:flex; align-items:center; justify-content:center;
+      filter: drop-shadow(0 0 8px rgba(120,220,255,.35)) drop-shadow(0 0 16px rgba(120,220,255,.2));
+      transform-origin: 50% 50%;
+    }
+    #holoDock .foot {
+      position:absolute; left:0; right:0; bottom:0; height:26px; display:flex;
+      align-items:center; justify-content:center; color:#86d4ff; font:10px system-ui;
+      opacity:.7; border-top:1px solid #173243;
+      background: linear-gradient(180deg, rgba(10,18,26,.0), rgba(10,18,26,.3));
+    }`;
+  document.head.appendChild(style);
 
-// Unproject: screen (client) -> world on z=0 plane
-function screenToWorldOnZ0(clientX, clientY, mvp){
-  const inv = mat4Invert(mvp);
-  if (!inv) return null;
-  const x = (clientX / canvas.clientWidth) * 2 - 1;
-  const y = -((clientY / canvas.clientHeight) * 2 - 1);
+  const dock = document.createElement('div');
+  dock.id='holoDock';
+  dock.innerHTML = `
+    <div class="hdr">
+      <div class="name">Holographic Scan</div>
+      <div class="close">✕</div>
+    </div>
+    <div id="holoStage"><div class="svgWrap"></div></div>
+    <div class="foot">interactive scan</div>`;
+  document.body.appendChild(dock);
 
-  const p0 = vec4MulMat(inv, new Float32Array([x, y, -1, 1]));
-  const p1 = vec4MulMat(inv, new Float32Array([x, y,  1, 1]));
-  for (const p of [p0,p1]){ p[0]/=p[3]; p[1]/=p[3]; p[2]/=p[3]; p[3]=1; }
-
-  const dir = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
-  if (Math.abs(dir[2]) < 1e-6) return null;
-  const t = -p0[2]/dir[2];
-  return [ p0[0] + dir[0]*t, p0[1] + dir[1]*t, 0 ];
-}
-
-// Find nearest system id to given client coords (within r pixels)
-function findNearestSystemId(clientX, clientY, mvp, r=18){
-  const mx = clientX * (canvas.width  / canvas.clientWidth);
-  const my = clientY * (canvas.height / canvas.clientHeight);
-  let best = null, bestId = null, r2 = r*r;
-  for (const sys of systems){
-    const p = idToWorld.get(sys.id);
-    if (!p) continue;
-    const s = projectToScreen(p[0], p[1], p[2], mvp);
-    if (!s) continue;
-    const dx = s[0] - mx, dy = s[1] - my;
-    const d2 = dx*dx + dy*dy;
-    if (d2 < r2 && (best===null || d2 < best)){ best = d2; bestId = sys.id; }
+  const wrap = dock.querySelector('.svgWrap');
+  let rafId=null, tStart=0;
+  function anim(ts){
+    if (!tStart) tStart = ts;
+    const t = (ts - tStart)/1000;
+    const rot = (t*22)%360;
+    const osc = 1 + Math.sin(t*1.6)*0.02;
+    wrap.style.transform = `scale(${osc}) rotate(${rot}deg)`;
+    rafId = requestAnimationFrame(anim);
   }
-  return bestId;
-}
+  function startAnim(){ cancelAnimationFrame(rafId); tStart=0; rafId=requestAnimationFrame(anim); }
+  function stopAnim(){ cancelAnimationFrame(rafId); rafId=null; tStart=0; }
 
-// Rebuild star buffer from current systems/idToWorld
-function rebuildStarsVBO(){
-  const stars = [];
-  for (const sys of systems){
-    const p = idToWorld.get(sys.id);
-    if (!p) continue;
-    stars.push(p[0], p[1], p[2]);
-  }
-  starCount = stars.length/3;
-  if (!starsVBO) starsVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
-}
+  window.showHologram = function({type, name}){
+    const svg = makeSVGFor(type);
+    wrap.innerHTML = '';
+    wrap.appendChild(svg);
+    dock.querySelector('.name').textContent = name ? `${name} — ${type}` : (type||'scan');
+    dock.style.display = 'block';
+    startAnim();
+  };
+  window.hideHologram = function(){
+    stopAnim();
+    dock.style.display = 'none';
+    wrap.innerHTML = '';
+  };
+  dock.querySelector('.close').onclick = ()=>hideHologram();
+})();
 
-// Rebuild line buffer from lanesSet/idToWorld
-function rebuildLinesVBOFromSet() {
-  const lanesArr = Array.from(lanesSet).map(s => s.split('::'));
-  const verts = [];
-  for (const [a, b] of lanesArr) {
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    verts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
-  }
-  lineVertCount = verts.length / 3;
-  if (!linesVBO) linesVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-}
+/* ===================== END HOLOGRAM BLOCK ===================== */
 
 // Helpers for ID + HUD
 let editMode = false; // lanes editor
@@ -734,7 +779,8 @@ canvas.addEventListener('click', (e) => {
       id: newId,
       name: defaultName,
       coords: { x_norm: xn, y_norm: yn, z: 0 },
-      tags: ["manmade"]
+      // NOTE: original used ["manmade"]; not using "Artificial World" anywhere
+      tags: ["installation"]
     };
     systems.push(sys);
     idToWorld.set(newId, [wx, wy, 0]);
@@ -877,25 +923,6 @@ function exportSystemDetails(id){
   URL.revokeObjectURL(a.href);
 }
 
-function openBodyDetails(type, name) {
-  // You already have an info panel area used by renderPanel()
-  const infoPanel = document.querySelector('#info-panel');
-  if (!infoPanel) return;
-
-  // Set up the details section dynamically
-  infoPanel.innerHTML = `
-    <div class="body-header">${name}</div>
-    <div class="body-type">${type}</div>
-    <div class="body-desc">Click edit to rename or change properties.</div>
-  `;
-
-  // Optional: visually indicate the selected body
-  document.querySelectorAll('.planet-card').forEach(c => c.classList.remove('active'));
-  const match = Array.from(document.querySelectorAll('.planet-card'))
-                     .find(c => c.textContent.includes(name));
-  if (match) match.classList.add('active');
-}
-
 // Renders read or edit mode
 function renderPanel(id, details, edit=false){
   const sys = systems.find(s=>s.id===id);
@@ -913,24 +940,33 @@ function renderPanel(id, details, edit=false){
         ${Array.isArray(sys?.tags) ? `<div><strong>Tags:</strong> ${sys.tags.join(', ')}</div>` : ``}
       </div>
       <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        ${planets.map((p,i)=>`
-          <div class="planet-card" data-type="${p.type ?? ''}" data-name="${p.name || ('Planet '+(i+1))}"
-            style="border:1px solid #243143; border-radius:8px; padding:8px; cursor:pointer;">
-            <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
-            <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
-            ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
-          </div>
-        `).join('') || '<em>No planets generated yet. Click Generate/Load.</em>'}
+      <div id="planetListRead" style="display:flex; flex-direction:column; gap:6px;">
+        ${
+          planets.length
+          ? planets.map((p,i)=>`
+            <div class="planet-card" data-type="${(p.type||'').replace(/"/g,'&quot;')}" data-name="${(p.name||('Planet '+(i+1))).replace(/"/g,'&quot;')}"
+                 style="border:1px solid #243143; border-radius:8px; padding:8px; cursor:pointer;">
+              <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
+              <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
+              ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
+            </div>
+          `).join('')
+          : '<em>No planets generated yet. Click Generate/Load.</em>'
+        }
       </div>
     `;
 
-    // hologram clicks here
-    spBody.querySelectorAll('.planet-card').forEach(el => {
-      const t = el.dataset.type || 'Rocky';
-      const n = el.dataset.name || 'Object';
-      el.addEventListener('click', () => openBodyDetails(t, n));
-    });
+    // click → hologram
+    const listRead = spBody.querySelector('#planetListRead');
+    if (listRead) {
+      listRead.addEventListener('click', (e)=>{
+        const card = e.target.closest('.planet-card');
+        if (!card) return;
+        const type = card.getAttribute('data-type') || 'Rocky';
+        const name = card.getAttribute('data-name') || 'Body';
+        showHologram({ type, name });
+      });
+    }
 
   } else {
     const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
@@ -1048,6 +1084,86 @@ function planetEditorRow(p,i){
       <input class="pNotes" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
     </div>
   </div>`;
+}
+
+// Projection helper reused for hover/picking
+function projectToScreen(x, y, z, mvp){
+  const v = new Float32Array([x,y,z,1]);
+  const m = mvp;
+  const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
+  const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
+  const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
+  const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
+  if (!cw) return null;
+  const ndcX = cx/cw, ndcY = cy/cw;
+  return [
+    Math.round((ndcX*0.5+0.5)*canvas.width),
+    Math.round((-ndcY*0.5+0.5)*canvas.height),
+    cz/cw
+  ];
+}
+
+// Unproject: screen (client) -> world on z=0 plane
+function screenToWorldOnZ0(clientX, clientY, mvp){
+  const inv = mat4Invert(mvp);
+  if (!inv) return null;
+  const x = (clientX / canvas.clientWidth) * 2 - 1;
+  const y = -((clientY / canvas.clientHeight) * 2 - 1);
+
+  const p0 = vec4MulMat(inv, new Float32Array([x, y, -1, 1]));
+  const p1 = vec4MulMat(inv, new Float32Array([x, y,  1, 1]));
+  for (const p of [p0,p1]){ p[0]/=p[3]; p[1]/=p[3]; p[2]/=p[3]; p[3]=1; }
+
+  const dir = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
+  if (Math.abs(dir[2]) < 1e-6) return null;
+  const t = -p0[2]/dir[2];
+  return [ p0[0] + dir[0]*t, p0[1] + dir[1]*t, 0 ];
+}
+
+// Find nearest system id to given client coords (within r pixels)
+function findNearestSystemId(clientX, clientY, mvp, r=18){
+  const mx = clientX * (canvas.width  / canvas.clientWidth);
+  const my = clientY * (canvas.height / canvas.clientHeight);
+  let best = null, bestId = null, r2 = r*r;
+  for (const sys of systems){
+    const p = idToWorld.get(sys.id);
+    if (!p) continue;
+    const s = projectToScreen(p[0], p[1], p[2], mvp);
+    if (!s) continue;
+    const dx = s[0] - mx, dy = s[1] - my;
+    const d2 = dx*dx + dy*dy;
+    if (d2 < r2 && (best===null || d2 < best)){ best = d2; bestId = sys.id; }
+  }
+  return bestId;
+}
+
+// Rebuild star buffer from current systems/idToWorld
+function rebuildStarsVBO(){
+  const stars = [];
+  for (const sys of systems){
+    const p = idToWorld.get(sys.id);
+    if (!p) continue;
+    stars.push(p[0], p[1], p[2]);
+  }
+  starCount = stars.length/3;
+  if (!starsVBO) starsVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
+}
+
+// Rebuild line buffer from lanesSet/idToWorld
+function rebuildLinesVBOFromSet() {
+  const lanesArr = Array.from(lanesSet).map(s => s.split('::'));
+  const verts = [];
+  for (const [a, b] of lanesArr) {
+    const pa = idToWorld.get(a), pb = idToWorld.get(b);
+    if (!pa || !pb) continue;
+    verts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
+  }
+  lineVertCount = verts.length / 3;
+  if (!linesVBO) linesVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
 }
 
 // --- render loop ---
@@ -1195,7 +1311,6 @@ window.addEventListener('keydown', async (e) => {
   }
   if (k === 'r') { // restore original JSON lanes
     if (!editorOK) return;
-    // NOTE: this just restores based on DEFAULT_DATA if systems.json wasn't loaded
     lanesSet.clear();
     (DEFAULT_DATA.lanes || []).forEach(([a,b]) => lanesSet.add([a,b].sort().join('::')));
     rebuildLinesVBOFromSet();
