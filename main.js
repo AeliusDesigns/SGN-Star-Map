@@ -282,47 +282,54 @@ function requireEditor() {
   return false;
 }
 
-// === HOLOGRAM: widget container (DOM) ===
+// === HOLOGRAM: widget container (DOM) — HIGH DETAIL VERSION ===
+const HOLO_DETAIL = 'high'; // 'high' | 'medium' (stroke thickness scales)
+const HOLO_COLOR  = '#90faff';
+
 const holo = document.createElement('div');
 holo.id = 'holo';
 holo.className = 'off';
 holo.innerHTML = `
   <div class="holo-wrap">
-    <div id="holo-canvas"></div>
-    <div class="holo-scanlines"></div>
+    <div id="holo-canvas" aria-label="Holographic object"></div>
+    <div class="holo-overlay"></div>
     <button class="holo-close" title="Close">✕</button>
     <div class="holo-label">Hologram</div>
   </div>
 `;
 document.body.appendChild(holo);
 
-const style = document.createElement('style');
-style.textContent = `
-  #holo{position:fixed;left:14px;bottom:14px;z-index:12;width:240px;height:240px;
-        pointer-events:none;opacity:0;transform:translateY(8px);
+(function mountHoloStyles(){
+  const style = document.createElement('style');
+  style.textContent = `
+  #holo{position:fixed;left:14px;bottom:14px;z-index:12;width:300px;height:300px;
+        pointer-events:none;opacity:0;transform:translateY(8px) scale(.98);
         transition:opacity .18s,transform .18s}
-  #holo.on{opacity:1;transform:translateY(0);pointer-events:auto}
+  #holo.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
   #holo .holo-wrap{position:relative;width:100%;height:100%;
-        background:radial-gradient(140px 140px at 60% 60%,#0af3,transparent 70%);
-        border:1px solid #29c; border-radius:12px; padding:10px;
-        box-shadow:0 0 20px #0ff3,inset 0 0 12px #0ff2; backdrop-filter:blur(2px)}
+        background:radial-gradient(180px 180px at 60% 60%,#0af2,transparent 70%),
+                   radial-gradient(70px 70px at 30% 30%,#08f2,transparent 60%);
+        border:1px solid #2ad; border-radius:14px; padding:10px;
+        box-shadow:0 0 28px #0ff4,inset 0 0 16px #0ff2; backdrop-filter:blur(3px)}
   #holo #holo-canvas{position:absolute;inset:10px}
-  #holo svg{width:100%;height:100%;filter:drop-shadow(0 0 4px #7ff);
-        animation:spin 36s linear infinite, breathe 2.6s ease-in-out infinite}
-  #holo .holo-scanlines{position:absolute;inset:10px;
-        background:repeating-linear-gradient(to bottom,#0ff2 0 1px,transparent 2px 4px);
-        mix-blend-mode:screen;opacity:.08;border-radius:8px;pointer-events:none}
-  #holo .holo-label{position:absolute;left:10px;bottom:8px;color:#bff;
+  #holo .holo-overlay{
+        position:absolute;inset:10px;border-radius:10px;pointer-events:none;
+        background:
+          repeating-linear-gradient(transparent 0 2px,#0ff1 2px 4px),
+          radial-gradient(120px 120px at 60% 60%,#0ff1,transparent 70%);
+        mix-blend-mode:screen;opacity:.1}
+  #holo .holo-label{position:absolute;left:12px;bottom:8px;color:#cfffff;
         font:12px/1.2 system-ui;text-shadow:0 0 6px #0ff;letter-spacing:.3px}
-  #holo .holo-close{position:absolute;right:8px;top:6px;width:22px;height:22px;
-        border-radius:6px;border:1px solid #3bd;background:#083247cc;color:#cff;
+  #holo .holo-close{position:absolute;right:8px;top:6px;width:24px;height:24px;
+        border-radius:7px;border:1px solid #3bd;background:#083247cc;color:#cff;
         cursor:pointer;font-weight:700;box-shadow:0 0 6px #0ff4}
-  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  @keyframes breathe{0%,100%{opacity:.88}50%{opacity:1}}
-`;
-document.head.appendChild(style);
+  /* Subtle vibration */
+  #holo.on .holo-wrap{animation:holo-breathe 2.6s ease-in-out infinite}
+  @keyframes holo-breathe{0%,100%{filter:saturate(1)}50%{filter:saturate(1.2)}}
+  `;
+  document.head.appendChild(style);
+})();
 
-const HOLO_COLOR = '#7ff';
 const holoCanvas = document.getElementById('holo-canvas');
 const holoLabel  = holo.querySelector('.holo-label');
 holo.querySelector('.holo-close').onclick = () => hideHolo();
@@ -330,13 +337,14 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape') hideHolo(); })
 
 function showHoloVector(type='Shield world', label='Object'){
   holoCanvas.innerHTML = '';
-  holoCanvas.appendChild(makeSVGFor(type));
+  const svg = makeSVGFor(type);
+  holoCanvas.appendChild(svg);
   holoLabel.textContent = label || (type || 'Hologram');
   holo.classList.add('on');
 }
 function hideHolo(){ holo.classList.remove('on'); }
 
-// --- SVG helpers ---
+// ====== High-detail SVG builder ======
 const NS = 'http://www.w3.org/2000/svg';
 function S(tag, attrs={}, children=[]){
   const el = document.createElementNS(NS, tag);
@@ -344,111 +352,311 @@ function S(tag, attrs={}, children=[]){
   (Array.isArray(children)?children:[children]).forEach(c=> c && el.appendChild(c));
   return el;
 }
-function defsGlow(){
+
+// Shared defs: multi-glow, grain, chromatic bleed, and scan ring gradient
+function buildDefs() {
   return S('defs',{},[
-    S('filter',{id:'g',x:'-50%',y:'-50%',width:'200%',height:'200%'},
-      S('feGaussianBlur',{stdDeviation:'2',result:'b'})
+    // Gaussian multi-glow
+    S('filter',{id:'glow',x:'-40%',y:'-40%',width:'180%',height:'180%'},
+      [
+        S('feGaussianBlur',{in:'SourceGraphic',stdDeviation:'1.2',result:'b1'}),
+        S('feGaussianBlur',{in:'SourceGraphic',stdDeviation:'2.4',result:'b2'}),
+        S('feMerge',{},[
+          S('feMergeNode',{in:'b2'}),
+          S('feMergeNode',{in:'b1'}),
+          S('feMergeNode',{in:'SourceGraphic'}),
+        ])
+      ]
     ),
-    S('radialGradient',{id:'grad',cx:'50%',cy:'50%',r:'60%'},
-      [S('stop',{offset:'0%','stop-color':'#bff'}),
-       S('stop',{offset:'100%','stop-color':'#0ff'})])
+    // Subtle static/grain via turbulence
+    S('filter',{id:'grain',x:'-20%',y:'-20%',width:'140%',height:'140%'},
+      [
+        S('feTurbulence',{type:'fractalNoise', baseFrequency:'0.9', numOctaves:'1', seed:'7', result:'n'}),
+        S('feColorMatrix',{in:'n', type:'saturate', values:'0'}),
+        S('feBlend',{in:'SourceGraphic', in2:'n', mode:'screen', result:'blend'})
+      ]
+    ),
+    // Chromatic outline (faux aberration)
+    S('filter',{id:'chromatic',x:'-30%',y:'-30%',width:'160%',height:'160%'},
+      [
+        S('feOffset',{dx:'0.35', dy:'0.35', result:'off1'}),
+        S('feColorMatrix',{in:'off1', type:'matrix',
+          values:'1 0 0 0 0  0 .5 0 0 0  0 0 .9 0 0  0 0 0 1 0', result:'c1'}),
+        S('feMerge',{},[
+          S('feMergeNode',{in:'c1'}),
+          S('feMergeNode',{in:'SourceGraphic'})
+        ])
+      ]
+    ),
+    // Gradient used for hotspots
+    S('radialGradient',{id:'hot',cx:'50%',cy:'50%',r:'50%'},
+      [S('stop',{offset:'0%','stop-color':'#e7ffff'}),
+       S('stop',{offset:'100%','stop-color':HOLO_COLOR, 'stop-opacity':'0.1'})]
+    ),
+    // Ring sweep gradient
+    S('linearGradient',{id:'sweep',x1:'0%',y1:'0%',x2:'100%',y2:'0%'},
+      [S('stop',{offset:'0%','stop-color':HOLO_COLOR,'stop-opacity':'.05'}),
+       S('stop',{offset:'50%','stop-color':HOLO_COLOR,'stop-opacity':'1'}),
+       S('stop',{offset:'100%','stop-color':HOLO_COLOR,'stop-opacity':'.05'})]
+    )
   ]);
 }
-function baseSVG(){
-  const svg = S('svg',{viewBox:'0 0 100 100',fill:'none',stroke:HOLO_COLOR,'stroke-width':'1.3'});
-  svg.appendChild(defsGlow());
+
+function baseSVG() {
+  // Larger viewBox for precision; strokes adapt by HOLO_DETAIL
+  const stroke = HOLO_DETAIL === 'high' ? 1.35 : 1.0;
+  const svg = S('svg',{
+    viewBox:'0 0 200 200', width:'100%', height:'100%',
+    fill:'none', stroke:HOLO_COLOR, 'stroke-width':String(stroke),
+    'shape-rendering':'geometricPrecision'
+  });
+  svg.appendChild(buildDefs());
   return svg;
 }
-function ring(svg, r, w, dash){
-  svg.appendChild(S('circle',{
-    cx:50, cy:50, r:r, stroke:HOLO_COLOR, 'stroke-width':w,
-    'stroke-dasharray':dash||'0', 'stroke-linecap':'round'
-  }));
-}
 
-// --- planet-type silhouettes ---
-function svgShieldWorld(){
-  const s = baseSVG();
-  ring(s, 34, 1.6, '6 3'); ring(s, 24, 0.8, '2 2');
-  for (let i=0;i<8;i++){
-    const a=(i/8)*Math.PI*2, x1=50+Math.cos(a)*18, y1=50+Math.sin(a)*18;
-    const x2=50+Math.cos(a)*34, y2=50+Math.sin(a)*34;
-    s.appendChild(S('path',{d:`M${x1},${y1} L${x2},${y2}`,opacity:.9}));
-    const x3=50+Math.cos(a)*38, y3=50+Math.sin(a)*38;
-    s.appendChild(S('circle',{cx:x3,cy:y3,r:1.2,fill:'url(#grad)',stroke:'none',filter:'url(#g)'}));
-  }
-  return s;
-}
-function svgEcumenopolis(){
-  const s=baseSVG();
-  s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
-  for (let i=-3;i<=3;i++){ const r=30*Math.cos((i/6)*Math.PI/2); s.appendChild(S('circle',{cx:50,cy:50,r:Math.abs(r),opacity:.35})); }
-  for (let i=0;i<6;i++){ const a=(i/6)*Math.PI, x=50+Math.cos(a)*30, y=50+Math.sin(a)*30;
-    s.appendChild(S('path',{d:`M${50-x+50},${50-y+50} A30 30 0 0 1 ${x},${y}`,opacity:.35}));
-  }
+function addPolarGrid(svg) {
+  // Fine sci-fi polar grid + angle ticks (under the model)
+  const grid = S('g',{opacity:'.35', filter:'url(#grain)'});
+  const circles = [20,35,50,65,80].map(r => S('circle',{cx:100, cy:100, r}));
+  circles.forEach(c=>grid.appendChild(c));
   for (let i=0;i<36;i++){
-    const a=(i/36)*Math.PI*2, r1=28, r2=30+(i%3===0?4:2);
-    const x1=50+Math.cos(a)*r1, y1=50+Math.sin(a)*r1;
-    const x2=50+Math.cos(a)*r2, y2=50+Math.sin(a)*r2;
-    s.appendChild(S('line',{x1,y1,x2,y2,opacity:.9}));
+    const a = (i/36)*Math.PI*2, r1 = 18, r2 = 82;
+    const x1=100+Math.cos(a)*r1, y1=100+Math.sin(a)*r1;
+    const x2=100+Math.cos(a)*r2, y2=100+Math.sin(a)*r2;
+    grid.appendChild(S('line',{x1,y1,x2,y2,opacity:(i%3===0)?'.5':'.25'}));
   }
-  return s;
-}
-function svgGas(){
-  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:32,opacity:.3}));
-  for (let i=0;i<6;i++){ const y=25+i*9, w=i%2?4:2; s.appendChild(S('path',{d:`M18,${y} C35,${y-w} 65,${y+w} 82,${y}`,opacity:.9}));}
-  return s;
-}
-function svgRocky(){
-  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
-  [[62,44,3.4],[40,60,2.8],[53,66,1.8],[38,40,1.6]].forEach(([x,y,r])=>{
-    s.appendChild(S('circle',{cx:x,cy:y,r,opacity:.9}));
-    s.appendChild(S('circle',{cx:x,cy:y,r:r*1.6,opacity:.25,'stroke-dasharray':'2 2'}));
-  }); return s;
-}
-function svgOcean(){
-  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
-  for(let i=0;i<4;i++){ const r=18+i*4; s.appendChild(S('path',{d:`M20,50 A${r} ${r} 0 0 1 80,50`,opacity:.6})); }
-  return s;
-}
-function svgIce(){
-  const s=baseSVG(); s.appendChild(S('circle',{cx:50,cy:50,r:30,opacity:.9}));
-  [[20,40,80,60],[30,30,70,70],[50,20,50,80]].forEach(([x1,y1,x2,y2])=>{
-    s.appendChild(S('line',{x1,y1,x2,y2,opacity:.9}));
-  }); return s;
+  svg.appendChild(grid);
 }
 
-// Lesser Ark (used for "Installation")
+function addSweepingRings(svg) {
+  // Slow sweeping rings for a scanning feel
+  const stroke = HOLO_DETAIL === 'high' ? 1.1 : 0.9;
+  const g = S('g',{opacity:'.9','stroke-width':String(stroke)});
+  const ring1 = S('circle',{cx:100,cy:100,r:87,stroke:'url(#sweep)'});
+  const ring2 = S('circle',{cx:100,cy:100,r:92,stroke:'url(#sweep)'});
+  g.appendChild(ring1); g.appendChild(ring2);
+  g.style.animation = 'sweep1 8s linear infinite';
+  svg.appendChild(g);
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes sweep1 { 0%{transform:rotate(0deg);transform-origin:100px 100px}
+                        100%{transform:rotate(360deg);transform-origin:100px 100px} }
+  `;
+  svg.appendChild(style);
+}
+
+// ——— High-detail silhouette builders ———
+
+// INSTALLATION (Lesser Ark) — star-like arms with panel ribs + hotspots
 function svgLesserArk(){
-  const s=baseSVG();
-  s.appendChild(S('circle',{cx:50,cy:50,r:10,fill:'url(#grad)',stroke:'none',filter:'url(#g)'}));
-  for(let i=0;i<8;i++){
-    const a=(i/8)*Math.PI*2, r1=12, r2=44, w1=3.6, w2=1.2;
-    const x1=50+Math.cos(a)*r1, y1=50+Math.sin(a)*r1;
-    const x2=50+Math.cos(a)*r2, y2=50+Math.sin(a)*r2;
-    const nx=Math.cos(a+Math.PI/2), ny=Math.sin(a+Math.PI/2);
-    const p=`M ${x1-nx*w1},${y1-ny*w1}
-             L ${x2-nx*w2},${y2-ny*w2}
-             L ${x2+nx*w2},${y2+ny*w2}
-             L ${x1+nx*w1},${y1+ny*w1} Z`;
-    s.appendChild(S('path',{d:p,fill:'none'}));
-    const x3=50+Math.cos(a)*(r2+4), y3=50+Math.sin(a)*(r2+4);
-    s.appendChild(S('circle',{cx:x3,cy:y3,r:1.3,fill:'url(#grad)',stroke:'none',filter:'url(#g)'}));
+  const svg = baseSVG();
+  addPolarGrid(svg);
+  addSweepingRings(svg);
+
+  const body = S('g',{filter:'url(#chromatic)'});
+  // Core glow
+  body.appendChild(S('circle',{cx:100, cy:100, r:10, fill:'url(#hot)', stroke:'none', filter:'url(#glow)'}));
+
+  // Eight curved arms shaped by bezier arcs
+  const arms = S('g', {opacity:'.95'});
+  for (let i=0;i<8;i++){
+    const a = (i/8)*Math.PI*2;
+    const r1 = 20, r2 = 78;
+    const w  = 8;
+    const x1 = 100 + Math.cos(a)*r1, y1 = 100 + Math.sin(a)*r1;
+    const x2 = 100 + Math.cos(a)*r2, y2 = 100 + Math.sin(a)*r2;
+    // slightly bowed arm using quadratic control halfway, offset orthogonal
+    const nx = Math.cos(a+Math.PI/2), ny = Math.sin(a+Math.PI/2);
+    const cx = 100 + Math.cos(a)*((r1+r2)/2) + nx*10;
+    const cy = 100 + Math.sin(a)*((r1+r2)/2) + ny*10;
+
+    const pathOuter = `M ${x1 - nx*w},${y1 - ny*w} Q ${cx},${cy} ${x2 - nx*2},${y2 - ny*2}`;
+    const pathInner = `M ${x1 + nx*w},${y1 + ny*w} Q ${cx},${cy} ${x2 + nx*2},${y2 + ny*2}`;
+    arms.appendChild(S('path',{d:pathOuter}));
+    arms.appendChild(S('path',{d:pathInner, opacity:'.7'}));
+
+    // arm ribs
+    for (let t=0.18;t<=0.82;t+=0.16){
+      const rx = (1-t)*x1 + t*x2, ry = (1-t)*y1 + t*y2;
+      const rxO = rx - nx*(w*0.6), ryO = ry - ny*(w*0.6);
+      const rxI = rx + nx*(w*0.6), ryI = ry + ny*(w*0.6);
+      arms.appendChild(S('line',{x1:rxO,y1:ryO,x2:rxI,y2:ryI,opacity:'.5'}));
+    }
+
+    // tip beacons
+    const tx = 100 + Math.cos(a)*(r2+4), ty = 100 + Math.sin(a)*(r2+4);
+    arms.appendChild(S('circle',{cx:tx, cy:ty, r:1.6, fill:'url(#hot)', stroke:'none', filter:'url(#glow)'}));
   }
-  return s;
+  body.appendChild(arms);
+
+  // Foundry ring with small docking nodes
+  const foundry = S('g',{opacity:'.9'});
+  foundry.appendChild(S('circle',{cx:100,cy:100,r:55}));
+  for (let i=0;i<24;i++){
+    const a = (i/24)*Math.PI*2, r=55;
+    const x=100+Math.cos(a)*r, y=100+Math.sin(a)*r;
+    const nx=Math.cos(a+Math.PI/2), ny=Math.sin(a+Math.PI/2);
+    foundry.appendChild(S('line',{x1:x-nx*3,y1:y-ny*3,x2:x+nx*3,y2:y+ny*3,opacity:'.55'}));
+  }
+  body.appendChild(foundry);
+
+  // slow rotation to sell “3D” parallax
+  body.style.transformOrigin = '100px 100px';
+  body.style.animation = 'spinArk 36s linear infinite';
+  const style = document.createElement('style');
+  style.textContent = `@keyframes spinArk { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`;
+  svg.appendChild(style);
+
+  svg.appendChild(body);
+  return svg;
 }
 
-// selector — "Artificial world" removed; "Installation" => Lesser Ark
+// SHIELD WORLD — ring + equatorial trench + pole nodes
+function svgShieldWorld(){
+  const svg = baseSVG();
+  addPolarGrid(svg); addSweepingRings(svg);
+
+  const g = S('g',{filter:'url(#chromatic)'});
+  // Outer defense ring
+  g.appendChild(S('circle',{cx:100,cy:100,r:70}));
+  // Equatorial trench (thickened)
+  g.appendChild(S('circle',{cx:100,cy:100,r:40,'stroke-width':HOLO_DETAIL==='high'?'2.2':'1.8'}));
+  // Meridians
+  for (let i=0;i<12;i++){
+    const a=(i/12)*Math.PI*2; const r1=25,r2=70;
+    const x1=100+Math.cos(a)*r1, y1=100+Math.sin(a)*r1;
+    const x2=100+Math.cos(a)*r2, y2=100+Math.sin(a)*r2;
+    g.appendChild(S('line',{x1,y1,x2,y2,opacity:'.55'}));
+  }
+  // Poles
+  g.appendChild(S('circle',{cx:100,cy:60,r:3,fill:'url(#hot)',stroke:'none',filter:'url(#glow)'}));
+  g.appendChild(S('circle',{cx:100,cy:140,r:3,fill:'url(#hot)',stroke:'none',filter:'url(#glow)'}));
+  svg.appendChild(g);
+  return svg;
+}
+
+// ECUMENOPOLIS — dense arcology rings + “highways”
+function svgEcumenopolis(){
+  const svg = baseSVG();
+  addPolarGrid(svg); addSweepingRings(svg);
+  const g = S('g',{filter:'url(#chromatic)'});
+
+  // city shell
+  g.appendChild(S('circle',{cx:100,cy:100,r:58,opacity:'.95'}));
+  // layered ring roads
+  [50,42,34,26].forEach(r => g.appendChild(S('circle',{cx:100,cy:100,r,opacity:'.65'})));
+  // radial highways
+  for (let i=0;i<24;i++){
+    const a=(i/24)*Math.PI*2; const r1=18,r2=58;
+    const x1=100+Math.cos(a)*r1, y1=100+Math.sin(a)*r1;
+    const x2=100+Math.cos(a)*r2, y2=100+Math.sin(a)*r2;
+    g.appendChild(S('line',{x1,y1,x2,y2,opacity:(i%3===0)?'.85':'.35'}));
+  }
+  // districts (short arcs)
+  for (let i=0;i<12;i++){
+    const a0=(i/12)*360, a1=a0+18;
+    g.appendChild(S('path',{d:arcPath(100,100,50, a0,a1), opacity:'.9'}));
+    g.appendChild(S('path',{d:arcPath(100,100,42, a0+8,a1+12), opacity:'.6'}));
+  }
+
+  svg.appendChild(g);
+  return svg;
+}
+
+// GAS GIANT — banding + vortex
+function svgGas(){
+  const svg = baseSVG();
+  addPolarGrid(svg);
+  const g = S('g',{filter:'url(#chromatic)'});
+  g.appendChild(S('circle',{cx:100,cy:100,r:62, opacity:'.25'}));
+  const bands = [ -28,-18,-9,0,9,18,27 ];
+  bands.forEach((y,i)=>{
+    const amp = i%2?6:4;
+    g.appendChild(S('path',{d:wave(30,y,140,amp,3), opacity:'.95'}));
+  });
+  // vortex eye
+  g.appendChild(S('circle',{cx:148,cy:120,r:5,fill:'url(#hot)',stroke:'none',filter:'url(#glow)'}));
+  svg.appendChild(g);
+  addSweepingRings(svg);
+  return svg;
+}
+
+// ROCKY — terrain cracks + crater field
+function svgRocky(){
+  const svg = baseSVG();
+  addPolarGrid(svg); addSweepingRings(svg);
+  const g = S('g',{filter:'url(#chromatic)'});
+  g.appendChild(S('circle',{cx:100,cy:100,r:55,opacity:'.95'}));
+  // cracks
+  [['M72,110 L120,84','M86,132 L128,106','M70,90 L92,70']].forEach(d=>g.appendChild(S('path',{d:d[0],opacity:'.6'})));
+  // craters
+  [[122,88,4],[86,116,6],[104,128,3],[80,86,2]].forEach(([x,y,r])=>{
+    g.appendChild(S('circle',{cx:x,cy:y,r,opacity:'.9'}));
+    g.appendChild(S('circle',{cx:x,cy:y,r:r*1.6,opacity:'.25','stroke-dasharray':'2 2'}));
+  });
+  svg.appendChild(g);
+  return svg;
+}
+
+// OCEAN — layered swells
+function svgOcean(){
+  const svg = baseSVG();
+  addPolarGrid(svg); addSweepingRings(svg);
+  const g = S('g',{filter:'url(#chromatic)'});
+  g.appendChild(S('circle',{cx:100,cy:100,r:56,opacity:'.95'}));
+  [24,34,44,54].forEach((r,i)=>{
+    const y=100;
+    g.appendChild(S('path',{d:`M ${100-r},${y} A ${r} ${r} 0 0 1 ${100+r},${y}`, opacity:String(.45 + i*0.1)}));
+  });
+  svg.appendChild(g);
+  return svg;
+}
+
+// ICE — fault lines + meridional arcs
+function svgIce(){
+  const svg = baseSVG();
+  addPolarGrid(svg); addSweepingRings(svg);
+  const g = S('g',{filter:'url(#chromatic)'});
+  g.appendChild(S('circle',{cx:100,cy:100,r:56,opacity:'.95'}));
+  [['M60,70 L140,130'],['M52,110 L148,90'],['M90,60 L110,140']].forEach(d=>g.appendChild(S('path',{d:d[0],opacity:'.75'})));
+  [20,32,44].forEach(r=> g.appendChild(S('circle',{cx:100,cy:100,r,opacity:'.35'})));
+  svg.appendChild(g);
+  return svg;
+}
+
+// --- helpers for shapes ---
+function arcPath(cx,cy,r, a0deg,a1deg){
+  const a0 = a0deg*Math.PI/180, a1 = a1deg*Math.PI/180;
+  const x0 = cx + Math.cos(a0)*r, y0 = cy + Math.sin(a0)*r;
+  const x1 = cx + Math.cos(a1)*r, y1 = cy + Math.sin(a1)*r;
+  const large = (a1-a0) % (Math.PI*2) > Math.PI ? 1 : 0;
+  return `M ${x0},${y0} A ${r} ${r} 0 ${large} 1 ${x1},${y1}`;
+}
+function wave(x0,y0,width,amp,cycles){
+  // smooth parametric band
+  const segs = 60, k = cycles*2*Math.PI/width;
+  let d = `M ${x0},${100+y0}`;
+  for (let i=1;i<=segs;i++){
+    const x = x0 + (i/segs)*width;
+    const y = 100 + y0 + Math.sin(k*x)*amp;
+    d += ` L ${x},${y}`;
+  }
+  return d;
+}
+
+// ——— Router ———
+// NOTE: “Artificial world” remains removed; “Installation” maps to Lesser Ark.
 function makeSVGFor(type){
   const t=(type||'').toLowerCase();
-  if (t.includes('installation'))  return svgLesserArk();
+  if (t.includes('installation') || t.includes('ark')) return svgLesserArk();
   if (t.includes('shield'))        return svgShieldWorld();
   if (t.includes('ecumen'))        return svgEcumenopolis();
   if (t.includes('gas'))           return svgGas();
   if (t.includes('ocean'))         return svgOcean();
   if (t.includes('rocky'))         return svgRocky();
   if (t.includes('ice'))           return svgIce();
-  if (t.includes('ark'))           return svgLesserArk();
+  // default fallback
   return svgRocky();
 }
 
