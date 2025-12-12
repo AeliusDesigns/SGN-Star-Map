@@ -505,58 +505,134 @@ function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphere
 
 // SPECIALS
 function svgLesserArk(){
-  const svg = baseSVG();               // 200x200 viewBox, matches your other SVGs
-  const g   = S('g', { fill:'#000', stroke:'none' }); // pure black silhouette
+  const svg = baseSVG();                         // 200x200 viewBox (0..200)
+  const root = S('g', { fill:'#000', stroke:'none' });
 
-  // ----- hub (rounded, slightly organic) -----
-  // central mass + subtle lobes to resemble the swelling at the root of each arm
+  // --- central hub: round with 8 small petal bulges like the real thing ---
   const hub = S('g', {});
-  hub.appendChild(S('circle', { cx:100, cy:100, r:28, fill:'#000' }));
-  // small petal bulges (8)
+  hub.appendChild(S('circle', { cx:100, cy:100, r:29, fill:'#000' }));
   for (let i=0;i<8;i++){
-    const rot = i*45;
-    hub.appendChild(S('path', {
-      d: 'M100 76 C 92 84, 92 116, 100 124 C 108 116, 108 84, 100 76 Z',
-      transform:`rotate(${rot} 100 100)`
-    }));
+    hub.appendChild(
+      S('path',{
+        // teardrop bulge that “leans” into each arm root
+        d:'M100 78 C 94 86, 94 114, 100 122 C 106 114, 106 86, 100 78 Z',
+        transform:`rotate(${i*45} 100 100)`
+      })
+    );
   }
-  g.appendChild(hub);
+  root.appendChild(hub);
 
-  // ----- arm builders (cardinal + diagonal) -----
-  // Upward-facing major arm; others are rotations.
-  // Shape tuned to match the long, thick profile with a gentle waist and broad shoulder at the hub.
-  const majorArmPath = 'M95 30 C 92 55, 92 145, 95 170 L105 170 C 108 145, 108 55, 105 30 Z';
+  // --- white 3-prong fork tip used by both arm types ---
+  function forkTip(yTop){
+    // center spear + two short outer prongs; tiny split notch
+    return S('g',{},[
+      S('path',{ d:`M100 ${yTop} L99 ${yTop+10} L101 ${yTop+10} Z`, fill:'#fff' }),
+      S('rect',{ x:98.4, y:yTop+10, width:1.2, height:8, fill:'#fff' }),
+      S('rect',{ x:100.4, y:yTop+10, width:1.2, height:8, fill:'#fff' }),
+      // notch
+      S('rect',{ x:99.6, y:yTop+10, width:0.8, height:2.3, fill:'#000' })
+    ]);
+  }
 
-  // Upward-facing minor (diagonal) arm; slimmer and shorter.
-  const minorArmPath = 'M97 48 C 92 62, 92 138, 97 152 L103 152 C 108 138, 108 62, 103 48 Z';
+  // --- major arm (cardinals) profile: shoulder bulge, long waist, plate, taper ---
+  // We draw the right half and mirror to get a crisp, symmetric silhouette.
+  const majorHalf = S('path',{
+    d: [
+      // start at hub rim
+      'M100 100',
+      // shoulder bulge leaving the hub
+      'C 128 100, 138 95, 142 88',
+      // slow outward flare (the "belly" seen on the photo)
+      'C 154 70, 154 60, 140 56',
+      // long waist toward the end cap (nearly parallel)
+      'C 132 54, 128 52, 126 45',
+      // subtle “plate/band” where the real arm shows a darker block
+      'C 125 42, 125 40, 130 40',
+      'C 132 39, 132 38, 126 36',
+      // final taper to the tip root
+      'C 120 34, 112 30, 108 26',
+      // connect to imaginary tip base
+      'C 106 24, 104 22, 103 20',
+      // end
+      'L 103 20'
+    ].join(' ')
+  });
 
-  // Tip “fork” (white) used on every arm
-  const tipFork = (yTip)=> S('g',{},[
-    S('path',{ d:`M100 ${yTip} l -2 10 l 4 0 Z`, fill:'#fff' }),
-    S('path',{ d:`M98 ${yTip+10} l -1 7 l 1 0 Z`, fill:'#fff' }),
-    S('path',{ d:`M102 ${yTip+10} l 1 7 l -1 0 Z`, fill:'#fff' }),
-  ]);
+  function mirrored(group, el){
+    // mirror across x=100
+    const g = S('g',{});
+    g.appendChild(el);
+    g.appendChild(S('use',{ href:'#mh', transform:'translate(100 0) scale(-1 1) translate(-100 0)'}));
+    group.appendChild(g);
+  }
 
-  // Place 4 major arms at 0/90/180/270 and 4 minor arms at 45/135/225/315
-  const arms = S('g',{});
+  // define the half once, then <use> it
+  majorHalf.setAttribute('id','mh');
+
+  // major arm assembly (one up, then rotate)
+  function makeMajorArm(){
+    const g = S('g', { transform:'rotate(0 100 100)' });
+
+    // half profile + mirrored
+    const shell = S('g',{});
+    shell.appendChild(majorHalf.cloneNode(false));
+    shell.appendChild(
+      S('use',{ href:'#mh', transform:'translate(100 0) scale(-1 1) translate(-100 0)' })
+    );
+    g.appendChild(shell);
+
+    // end fork
+    g.appendChild(forkTip(14));
+
+    // tiny waist block where the “plate” sits (gives the squared edge you see in ref)
+    g.appendChild(S('rect',{ x:92, y:38, width:16, height:4, rx:1.2, fill:'#000' }));
+
+    return g;
+  }
+
+  // --- minor arm (diagonals): slimmer, shorter, crisper end ---
+  const minorHalf = S('path',{
+    id:'dh',
+    d: [
+      'M100 100',
+      'C 120 99, 128 96, 132 90',
+      'C 140 78, 140 70, 130 66',
+      'C 124 64, 120 60, 118 54',
+      'C 117 51, 117 49, 120 48',
+      'C 121 47, 121 46, 118 45',
+      'C 114 43, 110 40, 107 36',
+      'C 105 34, 103 32, 102 30',
+      'L 102 30'
+    ].join(' ')
+  });
+
+  function makeMinorArm(){
+    const g = S('g', {});
+    const shell = S('g',{});
+    shell.appendChild(minorHalf.cloneNode(false));
+    shell.appendChild(
+      S('use',{ href:'#dh', transform:'translate(100 0) scale(-1 1) translate(-100 0)' })
+    );
+    g.appendChild(shell);
+    g.appendChild(forkTip(26));
+    return g;
+  }
+
+  // place 4 majors at 0/90/180/270
   for (let i=0;i<4;i++){
-    const rot = i*90;
-
-    // major
-    const gm = S('g', { transform:`rotate(${rot} 100 100)` });
-    gm.appendChild(S('path', { d:majorArmPath }));
-    gm.appendChild(tipFork(22)); // tip at the very end
-    arms.appendChild(gm);
-
-    // minor (offset by 45°)
-    const gd = S('g', { transform:`rotate(${rot+45} 100 100)` });
-    gd.appendChild(S('path', { d:minorArmPath }));
-    gd.appendChild(tipFork(40));
-    arms.appendChild(gd);
+    const m = makeMajorArm();
+    m.setAttribute('transform', `rotate(${i*90} 100 100)`);
+    root.appendChild(m);
   }
-  g.appendChild(arms);
 
-  svg.appendChild(g);
+  // place 4 minors at 45/135/225/315
+  for (let i=0;i<4;i++){
+    const d = makeMinorArm();
+    d.setAttribute('transform', `rotate(${45 + i*90} 100 100)`);
+    root.appendChild(d);
+  }
+
+  svg.appendChild(root);
   return svg;
 }
 
