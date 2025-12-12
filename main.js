@@ -505,132 +505,96 @@ function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphere
 
 // SPECIALS
 function svgLesserArk(){
-  const svg = baseSVG();                         // 200x200 viewBox (0..200)
+  // viewBox 0..200 like your other holograms
+  const svg = baseSVG();
   const root = S('g', { fill:'#000', stroke:'none' });
 
-  // --- central hub: round with 8 small petal bulges like the real thing ---
+  // ---- fork used on every arm (three-prong white tip) ----
+  function forkTip(cx, cy, rotDeg){
+    const g = S('g', { transform:`rotate(${rotDeg} ${cx} ${cy})` });
+    // center spear
+    g.appendChild(S('polygon', { points:`${cx},${cy-8} ${cx-1.2},${cy+6} ${cx+1.2},${cy+6}`, fill:'#fff' }));
+    // side prongs
+    g.appendChild(S('rect', { x:cx-3.2, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
+    g.appendChild(S('rect', { x:cx+1.8, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
+    // center notch
+    g.appendChild(S('rect', { x:cx-0.6, y:cy+3.5, width:1.2, height:2.2, fill:'#000' }));
+    return g;
+  }
+
+  // ---- MAJOR arm (cardinals) – shoulder bulge, long waist, subtle plate, taper ----
+  function majorArmGroup(rotDeg){
+    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
+
+    // One full closed profile built around x=100 (so rotation is clean)
+    // widths at key stations (half-widths): base=12, shoulder=22, waist=10, near-tip=6
+    const p = [
+      // start at left base
+      `M ${100-12} 100`,
+      // shoulder bulge (smooth, near hub)
+      `C ${100-16} 96, ${100-22} 92, ${100-22} 88`,
+      // tighten to waist
+      `C ${100-22} 78, ${100-10} 64, ${100-10} 56`,
+      // slight plate/band (square-ish feel)
+      `C ${100-10} 50, ${100-9} 46, ${100-6} 44`,
+      // taper to near-tip
+      `C ${100-6} 38, ${100-6} 34, ${100-6} 28`,
+      // straight across the nose
+      `L ${100+6} 28`,
+      // mirror back (right side)
+      `C ${100+6} 34, ${100+6} 38, ${100+6} 44`,
+      `C ${100+9} 46, ${100+10} 50, ${100+10} 56`,
+      `C ${100+10} 64, ${100+22} 78, ${100+22} 88`,
+      `C ${100+22} 92, ${100+16} 96, ${100+12} 100`,
+      'Z'
+    ].join(' ');
+    g.appendChild(S('path', { d:p, fill:'#000' }));
+
+    // small mid-arm plate (gives the blocky segment seen on refs)
+    g.appendChild(S('rect', { x:100-8, y:40, width:16, height:4, rx:1.2, fill:'#000' }));
+
+    // three-prong fork pointing outward (rotated with the group)
+    g.appendChild(forkTip(100, 20, 0));
+    return g;
+  }
+
+  // ---- MINOR arm (diagonals) – slimmer, shorter, crisp end ----
+  function minorArmGroup(rotDeg){
+    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
+    // half-widths: base=8, shoulder=14, waist=7, near-tip=4  (shorter length)
+    const p = [
+      `M ${100-8} 100`,
+      `C ${100-11} 98, ${100-14} 94, ${100-14} 90`,
+      `C ${100-14} 82, ${100-7} 70, ${100-7} 62`,
+      `C ${100-7} 56, ${100-6} 52, ${100-4} 50`,
+      `C ${100-4} 44, ${100-4} 40, ${100-4} 34`,
+      `L ${100+4} 34`,
+      `C ${100+4} 40, ${100+4} 44, ${100+4} 50`,
+      `C ${100+6} 52, ${100+7} 56, ${100+7} 62`,
+      `C ${100+7} 70, ${100+14} 82, ${100+14} 90`,
+      `C ${100+14} 94, ${100+11} 98, ${100+8} 100`,
+      'Z'
+    ].join(' ');
+    g.appendChild(S('path', { d:p, fill:'#000' }));
+    g.appendChild(forkTip(100, 28, 0));
+    return g;
+  }
+
+  // ---- central hub with 8 subtle petals that blend into arms ----
   const hub = S('g', {});
-  hub.appendChild(S('circle', { cx:100, cy:100, r:29, fill:'#000' }));
+  hub.appendChild(S('circle', { cx:100, cy:100, r:30, fill:'#000' }));
   for (let i=0;i<8;i++){
-    hub.appendChild(
-      S('path',{
-        // teardrop bulge that “leans” into each arm root
-        d:'M100 78 C 94 86, 94 114, 100 122 C 106 114, 106 86, 100 78 Z',
-        transform:`rotate(${i*45} 100 100)`
-      })
-    );
+    hub.appendChild(S('path', {
+      d:'M100 80 C 95 88, 95 112, 100 120 C 105 112, 105 88, 100 80 Z',
+      transform:`rotate(${i*45} 100 100)`, fill:'#000'
+    }));
   }
   root.appendChild(hub);
 
-  // --- white 3-prong fork tip used by both arm types ---
-  function forkTip(yTop){
-    // center spear + two short outer prongs; tiny split notch
-    return S('g',{},[
-      S('path',{ d:`M100 ${yTop} L99 ${yTop+10} L101 ${yTop+10} Z`, fill:'#fff' }),
-      S('rect',{ x:98.4, y:yTop+10, width:1.2, height:8, fill:'#fff' }),
-      S('rect',{ x:100.4, y:yTop+10, width:1.2, height:8, fill:'#fff' }),
-      // notch
-      S('rect',{ x:99.6, y:yTop+10, width:0.8, height:2.3, fill:'#000' })
-    ]);
-  }
-
-  // --- major arm (cardinals) profile: shoulder bulge, long waist, plate, taper ---
-  // We draw the right half and mirror to get a crisp, symmetric silhouette.
-  const majorHalf = S('path',{
-    d: [
-      // start at hub rim
-      'M100 100',
-      // shoulder bulge leaving the hub
-      'C 128 100, 138 95, 142 88',
-      // slow outward flare (the "belly" seen on the photo)
-      'C 154 70, 154 60, 140 56',
-      // long waist toward the end cap (nearly parallel)
-      'C 132 54, 128 52, 126 45',
-      // subtle “plate/band” where the real arm shows a darker block
-      'C 125 42, 125 40, 130 40',
-      'C 132 39, 132 38, 126 36',
-      // final taper to the tip root
-      'C 120 34, 112 30, 108 26',
-      // connect to imaginary tip base
-      'C 106 24, 104 22, 103 20',
-      // end
-      'L 103 20'
-    ].join(' ')
-  });
-
-  function mirrored(group, el){
-    // mirror across x=100
-    const g = S('g',{});
-    g.appendChild(el);
-    g.appendChild(S('use',{ href:'#mh', transform:'translate(100 0) scale(-1 1) translate(-100 0)'}));
-    group.appendChild(g);
-  }
-
-  // define the half once, then <use> it
-  majorHalf.setAttribute('id','mh');
-
-  // major arm assembly (one up, then rotate)
-  function makeMajorArm(){
-    const g = S('g', { transform:'rotate(0 100 100)' });
-
-    // half profile + mirrored
-    const shell = S('g',{});
-    shell.appendChild(majorHalf.cloneNode(false));
-    shell.appendChild(
-      S('use',{ href:'#mh', transform:'translate(100 0) scale(-1 1) translate(-100 0)' })
-    );
-    g.appendChild(shell);
-
-    // end fork
-    g.appendChild(forkTip(14));
-
-    // tiny waist block where the “plate” sits (gives the squared edge you see in ref)
-    g.appendChild(S('rect',{ x:92, y:38, width:16, height:4, rx:1.2, fill:'#000' }));
-
-    return g;
-  }
-
-  // --- minor arm (diagonals): slimmer, shorter, crisper end ---
-  const minorHalf = S('path',{
-    id:'dh',
-    d: [
-      'M100 100',
-      'C 120 99, 128 96, 132 90',
-      'C 140 78, 140 70, 130 66',
-      'C 124 64, 120 60, 118 54',
-      'C 117 51, 117 49, 120 48',
-      'C 121 47, 121 46, 118 45',
-      'C 114 43, 110 40, 107 36',
-      'C 105 34, 103 32, 102 30',
-      'L 102 30'
-    ].join(' ')
-  });
-
-  function makeMinorArm(){
-    const g = S('g', {});
-    const shell = S('g',{});
-    shell.appendChild(minorHalf.cloneNode(false));
-    shell.appendChild(
-      S('use',{ href:'#dh', transform:'translate(100 0) scale(-1 1) translate(-100 0)' })
-    );
-    g.appendChild(shell);
-    g.appendChild(forkTip(26));
-    return g;
-  }
-
-  // place 4 majors at 0/90/180/270
-  for (let i=0;i<4;i++){
-    const m = makeMajorArm();
-    m.setAttribute('transform', `rotate(${i*90} 100 100)`);
-    root.appendChild(m);
-  }
-
-  // place 4 minors at 45/135/225/315
-  for (let i=0;i<4;i++){
-    const d = makeMinorArm();
-    d.setAttribute('transform', `rotate(${45 + i*90} 100 100)`);
-    root.appendChild(d);
-  }
+  // place 4 major arms at 0/90/180/270 (up/right/down/left)
+  [0,90,180,270].forEach(a => root.appendChild(majorArmGroup(a)));
+  // place 4 minor arms at 45/135/225/315
+  [45,135,225,315].forEach(a => root.appendChild(minorArmGroup(a)));
 
   svg.appendChild(root);
   return svg;
