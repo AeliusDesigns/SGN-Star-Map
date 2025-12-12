@@ -504,99 +504,98 @@ function svgOcean(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphe
 function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.8, atm:0.4 }); svg.appendChild(body); addIceDetail(svg,{}); addSweepingRings(svg); return svg; }
 
 // SPECIALS
+// === Replace your existing svgLesserArk with this one ===
 function svgLesserArk(){
-  // viewBox 0..200 like your other holograms
   const svg = baseSVG();
-  const root = S('g', { fill:'#000', stroke:'none' });
+  addPolarGrid(svg);
 
-  // ---- fork used on every arm (three-prong white tip) ----
-  function forkTip(cx, cy, rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} ${cx} ${cy})` });
-    // center spear
-    g.appendChild(S('polygon', { points:`${cx},${cy-8} ${cx-1.2},${cy+6} ${cx+1.2},${cy+6}`, fill:'#fff' }));
-    // side prongs
-    g.appendChild(S('rect', { x:cx-3.2, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
-    g.appendChild(S('rect', { x:cx+1.8, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
-    // center notch
-    g.appendChild(S('rect', { x:cx-0.6, y:cy+3.5, width:1.2, height:2.2, fill:'#000' }));
-    return g;
+  // subtle inner glow so the black silhouette doesn't look flat
+  const defs = S('defs',{},[
+    S('filter',{id:'arkGlow', x:'-30%', y:'-30%', width:'160%', height:'160%'},[
+      S('feGaussianBlur',{'in':'SourceGraphic', stdDeviation:'0.9', result:'b'}),
+      S('feBlend',{'in':'SourceGraphic', in2:'b', mode:'screen'})
+    ])
+  ]);
+  svg.appendChild(defs);
+
+  const g = S('g',{filter:'url(#chromatic)'});
+
+  // --- hub: rounded “bulged” core (a rosette over a disk) ---
+  g.appendChild(S('circle',{cx:100, cy:100, r:23, fill:'#000'}));
+  const lobes = [
+    'M100 77 C 94 78, 90 84, 90 90 C 90 88, 95 84, 100 84 C 105 84, 110 88, 110 90 C 110 84, 106 78, 100 77 Z',
+    'M100 123 C 94 122, 90 116, 90 110 C 90 112, 95 116, 100 116 C 105 116, 110 112, 110 110 C 110 116, 106 122, 100 123 Z',
+    'M77 100 C 78 94, 84 90, 90 90 C 88 90, 84 95, 84 100 C 84 105, 88 110, 90 110 C 84 110, 78 106, 77 100 Z',
+    'M123 100 C 122 94, 116 90, 110 90 C 112 90, 116 95, 116 100 C 116 105, 112 110, 110 110 C 116 110, 122 106, 123 100 Z'
+  ];
+  lobes.forEach(d=> g.appendChild(S('path',{d, fill:'#000'})));
+
+  // -------- arm blueprints (pointing UP by default) --------
+  // Long N/S arms (tall, slightly waisted, squared section, double-prong tip)
+  const LONG_SHAFT =
+    'M96 100 C96 92, 96 78, 97 66 C98 54, 99 46, 100 46 C101 46, 102 54, 103 66 C104 78, 104 92, 104 100 '+
+    'C104 112, 104 126, 103 138 C102 148, 101 154, 100 154 C99 154, 98 148, 97 138 C96 126, 96 112, 96 100 Z';
+  // squared “barrel” segment before the tip
+  const LONG_BARREL = 'M92 46 L108 46 L108 34 L92 34 Z';
+  // double-prong nib (white slit and prongs)
+  const LONG_NIB   =
+    'M96 20 L96 34 L104 34 L104 20 ' +          // black neck
+    'M98 18 L98 20 L102 20 L102 18 Z ' +        // white cuff
+    'M99 16 L101 16 L101 10 L100 8 L99 10 Z';   // twin prong
+
+  // East/West arms (fatter, flatter with squared nose and small white insert)
+  const FAT_SHAFT =
+    'M96 100 C96 94, 95 88, 94 84 C92 78, 90 76, 90 76 L90 64 L110 64 L110 76 C110 76, 108 78, 106 84 C105 88, 104 94, 104 100 '+
+    'C104 106, 105 112, 106 116 C108 122, 110 124, 110 124 L110 136 L90 136 L90 124 C90 124, 92 122, 94 116 C95 112, 96 106, 96 100 Z';
+  const FAT_NOSE  = 'M88 64 L112 64 L112 58 L88 58 Z';      // squared front
+  const FAT_INSERT= 'M98 58 L102 58 L102 54 L98 54 Z';       // white slit
+
+  // Diagonal arms (slender, long taper to a fine double-prong)
+  const SLIM_SHAFT =
+    'M98 100 C98 90, 97 78, 96 70 C94 60, 93 56, 100 52 C107 56, 106 60, 104 70 C103 78, 102 90, 102 100 '+
+    'C102 110, 103 122, 104 130 C106 140, 107 144, 100 148 C93 144, 94 140, 96 130 C97 122, 98 110, 98 100 Z';
+  const SLIM_NIB =
+    'M100 50 L98 40 L100 34 L102 40 Z ' +       // black needle base
+    'M99.2 32 L100 28 L100.8 32 Z';             // tiny white point (rendered by glow)
+
+  // helper to stamp an arm with rotation and an array of path segments
+  function addArm(rotationDeg, segments){
+    const arm = S('g',{transform:`rotate(${rotationDeg} 100 100)`, filter:'url(#arkGlow)'});
+    segments.forEach(seg=>{
+      // seg = { d, fill?, stroke?, sw? }
+      const attrs = { d: seg.d, fill: seg.fill ?? '#000' };
+      if (seg.stroke){ attrs.stroke = seg.stroke; attrs['stroke-width'] = seg.sw ?? 1; attrs['stroke-linecap']='round'; }
+      arm.appendChild(S('path', attrs));
+    });
+    g.appendChild(arm);
   }
 
-  // ---- MAJOR arm (cardinals) – shoulder bulge, long waist, subtle plate, taper ----
-  function majorArmGroup(rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
+  // Stamp the 8 arms with the correct silhouette families
+  // N (0°) and S (180°): LONG with double-prong nib
+  addArm(0,   [{d:LONG_SHAFT},{d:LONG_BARREL},{d:LONG_NIB, fill:'#fff'}]);
+  addArm(180, [{d:LONG_SHAFT},{d:LONG_BARREL},{d:LONG_NIB, fill:'#fff'}]);
 
-    // One full closed profile built around x=100 (so rotation is clean)
-    // widths at key stations (half-widths): base=12, shoulder=22, waist=10, near-tip=6
-    const p = [
-      // start at left base
-      `M ${100-12} 100`,
-      // shoulder bulge (smooth, near hub)
-      `C ${100-16} 96, ${100-22} 92, ${100-22} 88`,
-      // tighten to waist
-      `C ${100-22} 78, ${100-10} 64, ${100-10} 56`,
-      // slight plate/band (square-ish feel)
-      `C ${100-10} 50, ${100-9} 46, ${100-6} 44`,
-      // taper to near-tip
-      `C ${100-6} 38, ${100-6} 34, ${100-6} 28`,
-      // straight across the nose
-      `L ${100+6} 28`,
-      // mirror back (right side)
-      `C ${100+6} 34, ${100+6} 38, ${100+6} 44`,
-      `C ${100+9} 46, ${100+10} 50, ${100+10} 56`,
-      `C ${100+10} 64, ${100+22} 78, ${100+22} 88`,
-      `C ${100+22} 92, ${100+16} 96, ${100+12} 100`,
-      'Z'
-    ].join(' ');
-    g.appendChild(S('path', { d:p, fill:'#000' }));
+  // E (90°) and W (270°): FAT with squared nose + white insert
+  addArm(90,  [{d:FAT_SHAFT},{d:FAT_NOSE},{d:FAT_INSERT, fill:'#fff'}]);
+  addArm(270, [{d:FAT_SHAFT},{d:FAT_NOSE},{d:FAT_INSERT, fill:'#fff'}]);
 
-    // small mid-arm plate (gives the blocky segment seen on refs)
-    g.appendChild(S('rect', { x:100-8, y:40, width:16, height:4, rx:1.2, fill:'#000' }));
+  // Diagonals: SLIM taper + fine prong
+  [45,135,225,315].forEach(rot=>{
+    addArm(rot,[{d:SLIM_SHAFT},{d:SLIM_NIB, fill:'#fff'}]);
+  });
 
-    // three-prong fork pointing outward (rotated with the group)
-    g.appendChild(forkTip(100, 20, 0));
-    return g;
-  }
-
-  // ---- MINOR arm (diagonals) – slimmer, shorter, crisp end ----
-  function minorArmGroup(rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
-    // half-widths: base=8, shoulder=14, waist=7, near-tip=4  (shorter length)
-    const p = [
-      `M ${100-8} 100`,
-      `C ${100-11} 98, ${100-14} 94, ${100-14} 90`,
-      `C ${100-14} 82, ${100-7} 70, ${100-7} 62`,
-      `C ${100-7} 56, ${100-6} 52, ${100-4} 50`,
-      `C ${100-4} 44, ${100-4} 40, ${100-4} 34`,
-      `L ${100+4} 34`,
-      `C ${100+4} 40, ${100+4} 44, ${100+4} 50`,
-      `C ${100+6} 52, ${100+7} 56, ${100+7} 62`,
-      `C ${100+7} 70, ${100+14} 82, ${100+14} 90`,
-      `C ${100+14} 94, ${100+11} 98, ${100+8} 100`,
-      'Z'
-    ].join(' ');
-    g.appendChild(S('path', { d:p, fill:'#000' }));
-    g.appendChild(forkTip(100, 28, 0));
-    return g;
-  }
-
-  // ---- central hub with 8 subtle petals that blend into arms ----
-  const hub = S('g', {});
-  hub.appendChild(S('circle', { cx:100, cy:100, r:30, fill:'#000' }));
+  // small dark wedges to imply the “shoulder” swell around the hub
   for (let i=0;i<8;i++){
-    hub.appendChild(S('path', {
-      d:'M100 80 C 95 88, 95 112, 100 120 C 105 112, 105 88, 100 80 Z',
-      transform:`rotate(${i*45} 100 100)`, fill:'#000'
-    }));
+    const rot = i*45;
+    const shoulder = S('path',{
+      d:'M100 100 C 104 98, 110 96, 116 96 C 112 102, 104 106, 100 108 C 96 106, 88 102, 84 96 C 90 96, 96 98, 100 100 Z',
+      fill:'#000', opacity:.95, transform:`rotate(${rot} 100 100)`
+    });
+    g.appendChild(shoulder);
   }
-  root.appendChild(hub);
 
-  // place 4 major arms at 0/90/180/270 (up/right/down/left)
-  [0,90,180,270].forEach(a => root.appendChild(majorArmGroup(a)));
-  // place 4 minor arms at 45/135/225/315
-  [45,135,225,315].forEach(a => root.appendChild(minorArmGroup(a)));
-
-  svg.appendChild(root);
+  svg.appendChild(g);
+  addSweepingRings(svg);
   return svg;
 }
 
