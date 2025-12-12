@@ -504,101 +504,279 @@ function svgOcean(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphe
 function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.8, atm:0.4 }); svg.appendChild(body); addIceDetail(svg,{}); addSweepingRings(svg); return svg; }
 
 // SPECIALS
-function svgLesserArk(){
-  // viewBox 0..200 like your other holograms
-  const svg = baseSVG();
-  const root = S('g', { fill:'#000', stroke:'none' });
+// ===== Lesser Ark Hologram
+(function(){
+  const cvs = document.getElementById('arkHolo');
+  if (!cvs) return;
+  const ctx = cvs.getContext('2d');
 
-  // ---- fork used on every arm (three-prong white tip) ----
-  function forkTip(cx, cy, rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} ${cx} ${cy})` });
-    // center spear
-    g.appendChild(S('polygon', { points:`${cx},${cy-8} ${cx-1.2},${cy+6} ${cx+1.2},${cy+6}`, fill:'#fff' }));
-    // side prongs
-    g.appendChild(S('rect', { x:cx-3.2, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
-    g.appendChild(S('rect', { x:cx+1.8, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
-    // center notch
-    g.appendChild(S('rect', { x:cx-0.6, y:cy+3.5, width:1.2, height:2.2, fill:'#000' }));
-    return g;
+  // HiDPI sizing
+  function fit(){
+    const dpr = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+    const cssW = parseFloat(getComputedStyle(cvs).width);
+    const cssH = parseFloat(getComputedStyle(cvs).height);
+    cvs.width = Math.round(cssW * dpr);
+    cvs.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  fit(); addEventListener('resize', fit);
+
+  // ---------- Tunables ----------
+  const CFG = {
+    arms: 8,                 // number of arms
+    spin: 0.35,              // radians/sec
+    baseHue: 190,            // hologram color base
+    wireOpacity: 0.75,
+    dotOpacity: 0.85,
+    dotDensity: 0.72,        // 0..1 amount of dots along wires
+    glow: 0.6,               // global bloom intensity (0..1)
+    pulseAmp: 0.2,           // glow pulsing
+    ringCount: 3,
+    sparkCount: 85,          // floating sparkle particles
+    tipFlash: true
+  };
+
+  // Arm control (Bézier profile for ONE arm, mirrored+rotated).
+  // Edit these to sculpt the silhouette precisely.
+  const ARM_CTRL = {
+    // trunk curve (near hub → mid → near tip)
+    trunk: [
+      {x:  0.00, y:  0.24},  // start near hub
+      {x:  0.06, y:  0.38},  // c1
+      {x:  0.07, y:  0.64},  // c2
+      {x:  0.02, y:  0.88}   // end pre-tip (slender)
+    ],
+    // outer shoulder blob (subtle bulge like your ref)
+    shoulder: [
+      {x:  0.00, y:  0.26},
+      {x:  0.18, y:  0.32},
+      {x:  0.34, y:  0.31},
+      {x:  0.42, y:  0.28}
+    ],
+    // inner fillet from hub to arm (thin spur)
+    innerSpur: [
+      {x:  0.00, y:  0.22},
+      {x: -0.12, y:  0.36},
+      {x: -0.17, y:  0.52},
+      {x: -0.12, y:  0.60}
+    ],
+    // tip prongs (small trident)
+    tip: [
+      {x:  0.00, y:  0.90},
+      {x:  0.00, y:  1.02},   // center prong
+      {x:  0.03, y:  0.98},   // right prong
+      {x: -0.03, y:  0.98}    // left prong
+    ]
+  };
+
+  // Utility: cubic Bézier point
+  function bez(p0,p1,p2,p3,t){
+    const mt=1-t, mt2=mt*mt, t2=t*t;
+    const x = mt2*mt*p0.x + 3*mt2*t*p1.x + 3*mt*t2*p2.x + t*t2*p3.x;
+    const y = mt2*mt*p0.y + 3*mt2*t*p1.y + 3*mt*t2*p2.y + t*t2*p3.y;
+    return {x,y};
   }
 
-  // ---- MAJOR arm (cardinals) – shoulder bulge, long waist, subtle plate, taper ----
-  function majorArmGroup(rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
-
-    // One full closed profile built around x=100 (so rotation is clean)
-    // widths at key stations (half-widths): base=12, shoulder=22, waist=10, near-tip=6
-    const p = [
-      // start at left base
-      `M ${100-12} 100`,
-      // shoulder bulge (smooth, near hub)
-      `C ${100-16} 96, ${100-22} 92, ${100-22} 88`,
-      // tighten to waist
-      `C ${100-22} 78, ${100-10} 64, ${100-10} 56`,
-      // slight plate/band (square-ish feel)
-      `C ${100-10} 50, ${100-9} 46, ${100-6} 44`,
-      // taper to near-tip
-      `C ${100-6} 38, ${100-6} 34, ${100-6} 28`,
-      // straight across the nose
-      `L ${100+6} 28`,
-      // mirror back (right side)
-      `C ${100+6} 34, ${100+6} 38, ${100+6} 44`,
-      `C ${100+9} 46, ${100+10} 50, ${100+10} 56`,
-      `C ${100+10} 64, ${100+22} 78, ${100+22} 88`,
-      `C ${100+22} 92, ${100+16} 96, ${100+12} 100`,
-      'Z'
-    ].join(' ');
-    g.appendChild(S('path', { d:p, fill:'#000' }));
-
-    // small mid-arm plate (gives the blocky segment seen on refs)
-    g.appendChild(S('rect', { x:100-8, y:40, width:16, height:4, rx:1.2, fill:'#000' }));
-
-    // three-prong fork pointing outward (rotated with the group)
-    g.appendChild(forkTip(100, 20, 0));
-    return g;
+  // Sample a Bézier into points
+  function sampleCurve(pts, n=120){
+    const [p0,p1,p2,p3]=pts;
+    const out=[]; for(let i=0;i<=n;i++){ out.push(bez(p0,p1,p2,p3,i/n)); }
+    return out;
   }
 
-  // ---- MINOR arm (diagonals) – slimmer, shorter, crisp end ----
-  function minorArmGroup(rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
-    // half-widths: base=8, shoulder=14, waist=7, near-tip=4  (shorter length)
-    const p = [
-      `M ${100-8} 100`,
-      `C ${100-11} 98, ${100-14} 94, ${100-14} 90`,
-      `C ${100-14} 82, ${100-7} 70, ${100-7} 62`,
-      `C ${100-7} 56, ${100-6} 52, ${100-4} 50`,
-      `C ${100-4} 44, ${100-4} 40, ${100-4} 34`,
-      `L ${100+4} 34`,
-      `C ${100+4} 40, ${100+4} 44, ${100+4} 50`,
-      `C ${100+6} 52, ${100+7} 56, ${100+7} 62`,
-      `C ${100+7} 70, ${100+14} 82, ${100+14} 90`,
-      `C ${100+14} 94, ${100+11} 98, ${100+8} 100`,
-      'Z'
-    ].join(' ');
-    g.appendChild(S('path', { d:p, fill:'#000' }));
-    g.appendChild(forkTip(100, 28, 0));
-    return g;
+  // Build one arm polyline set (trunk, shoulder, spur, tips)
+  function buildArm(){
+    return {
+      trunk: sampleCurve(ARM_CTRL.trunk, 180),
+      shoulder: sampleCurve(ARM_CTRL.shoulder, 80),
+      innerSpur: sampleCurve(ARM_CTRL.innerSpur, 70),
+      tip: ARM_CTRL.tip
+    };
   }
 
-  // ---- central hub with 8 subtle petals that blend into arms ----
-  const hub = S('g', {});
-  hub.appendChild(S('circle', { cx:100, cy:100, r:30, fill:'#000' }));
-  for (let i=0;i<8;i++){
-    hub.appendChild(S('path', {
-      d:'M100 80 C 95 88, 95 112, 100 120 C 105 112, 105 88, 100 80 Z',
-      transform:`rotate(${i*45} 100 100)`, fill:'#000'
-    }));
+  const armGeom = buildArm();
+
+  // Random sparkles
+  const sparks = Array.from({length:CFG.sparkCount}, () => ({
+    r: Math.random()*0.4 + 0.35,
+    a: Math.random()*Math.PI*2,
+    z: Math.random()*0.5 + 0.75,
+    p: Math.random(),
+    s: Math.random()*0.7 + 0.3
+  }));
+
+  // Draw helpers
+  function setGlow(intensity){
+    const blur = Math.floor(12 + 28*intensity);
+    ctx.shadowBlur = blur;
+    ctx.shadowColor = `hsla(${CFG.baseHue}, 100%, 70%, ${0.35+0.35*intensity})`;
   }
-  root.appendChild(hub);
 
-  // place 4 major arms at 0/90/180/270 (up/right/down/left)
-  [0,90,180,270].forEach(a => root.appendChild(majorArmGroup(a)));
-  // place 4 minor arms at 45/135/225/315
-  [45,135,225,315].forEach(a => root.appendChild(minorArmGroup(a)));
+  function strokeWire(points, w=1.2, alpha=1){
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    for (let i=0;i<points.length;i++){
+      const p=points[i];
+      if(i===0) ctx.moveTo(p.x, -p.y); else ctx.lineTo(p.x, -p.y);
+    }
+    ctx.stroke();
+  }
 
-  svg.appendChild(root);
-  return svg;
-}
+  function drawDots(points, step=3, size=2.6, alpha=1){
+    ctx.globalAlpha = alpha;
+    for (let i=0;i<points.length;i+=step){
+      const p=points[i];
+      ctx.beginPath();
+      ctx.arc(p.x, -p.y, size, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function rotate(theta){ ctx.rotate(theta); }
+
+  // Render one arm at current rotation, with mirrored side for thickness
+  function renderArm(scale){
+    const w = 1.2;
+    const dotStep = Math.max(2, Math.floor(4 - 2*CFG.dotDensity));
+
+    ctx.save();
+    ctx.scale(scale, scale);
+
+    // shoulder bulge (outer)
+    strokeWire(armGeom.shoulder, w, 0.55);
+    drawDots(armGeom.shoulder, dotStep, 2.2, CFG.dotOpacity*0.6);
+
+    // inner spur
+    strokeWire(armGeom.innerSpur, w, 0.45);
+    drawDots(armGeom.innerSpur, dotStep, 2.0, CFG.dotOpacity*0.55);
+
+    // trunk (main)
+    strokeWire(armGeom.trunk, w+0.2, 0.9);
+    drawDots(armGeom.trunk, dotStep, 2.6, CFG.dotOpacity);
+
+    // tip tri-prongs
+    const t = armGeom.tip;
+    ctx.lineWidth = w+0.4;
+    ctx.globalAlpha = 0.9;
+    // center prong
+    ctx.beginPath();
+    ctx.moveTo(t[0].x, -t[0].y); ctx.lineTo(t[1].x, -t[1].y); ctx.stroke();
+    // right
+    ctx.beginPath();
+    ctx.moveTo(t[0].x, -t[0].y); ctx.lineTo(t[2].x, -t[2].y); ctx.stroke();
+    // left
+    ctx.beginPath();
+    ctx.moveTo(t[0].x, -t[0].y); ctx.lineTo(t[3].x, -t[3].y); ctx.stroke();
+
+    if (CFG.tipFlash){
+      const flash = 0.6 + 0.4*Math.sin(performance.now()*0.006);
+      ctx.globalAlpha = 0.6 + 0.4*flash;
+      ctx.beginPath(); ctx.arc(t[1].x, -t[1].y, 2.4+1.2*flash, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t[2].x, -t[2].y, 2.0+1.0*flash, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t[3].x, -t[3].y, 2.0+1.0*flash, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function renderRings(scale){
+    ctx.save();
+    ctx.scale(scale, scale);
+    const rings = CFG.ringCount;
+    for(let i=0;i<rings;i++){
+      const r = 0.42 + i*0.1;
+      ctx.globalAlpha = 0.25 - i*0.06;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(0,0, r*100, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function renderHub(scale, tPulse){
+    ctx.save();
+    ctx.scale(scale, scale);
+    // outer ring
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0,0, 26, 0, Math.PI*2); ctx.stroke();
+    // inner ring
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(0,0, 14, 0, Math.PI*2); ctx.stroke();
+    // core pulse
+    ctx.globalAlpha = 0.55 + 0.35*tPulse;
+    ctx.beginPath(); ctx.arc(0,0, 6+2*tPulse, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function renderSparks(scale, rot, t){
+    ctx.save();
+    ctx.scale(scale, scale);
+    for (const s of sparks){
+      const r = s.r*110;
+      const a = s.a + rot*0.4 + t*0.0006*(0.5+s.s);
+      const x = Math.cos(a)*r, y = Math.sin(a)*r;
+      const twinkle = 0.5 + 0.5*Math.sin((t*0.006 + s.p*6.28) * (0.5+s.s));
+      ctx.globalAlpha = 0.12 + 0.35*twinkle;
+      ctx.beginPath(); ctx.arc(x, y, 1.1 + 1.4*twinkle, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Main loop
+  let last = performance.now(), rot = 0;
+  function frame(now){
+    const dt = (now - last) / 1000; last = now; rot += CFG.spin * dt;
+
+    // background clear
+    ctx.clearRect(0,0,cvs.width, cvs.height);
+
+    // center / palette / glow
+    const w = cvs.clientWidth, h = cvs.clientHeight;
+    ctx.save();
+    ctx.translate(w*0.5, h*0.6);
+
+    const pulse = 0.5 + 0.5*Math.sin(now*0.002);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = `hsla(${CFG.baseHue}, 100%, 60%, ${CFG.wireOpacity})`;
+    ctx.fillStyle   = `hsla(${CFG.baseHue}, 100%, 60%, ${CFG.dotOpacity})`;
+    setGlow(CFG.glow*(1.0 + CFG.pulseAmp*(pulse-0.5)));
+
+    // soft projector glow
+    ctx.globalAlpha = 0.18 + 0.12*pulse;
+    const grad = ctx.createRadialGradient(0,0, 0, 0,0, Math.max(w,h)*0.45);
+    grad.addColorStop(0, `hsla(${CFG.baseHue}, 100%, 55%, 0.18)`);
+    grad.addColorStop(1, `rgba(0,0,0,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0, Math.max(w,h)*0.45, 0, Math.PI*2); ctx.fill();
+
+    // rings + sparks (background)
+    ctx.strokeStyle = `hsla(${CFG.baseHue}, 100%, 70%, 0.35)`;
+    ctx.fillStyle   = `hsla(${CFG.baseHue}, 100%, 70%, 0.35)`;
+    renderRings(1.0);
+    renderSparks(1.0, rot, now);
+
+    // spin & draw arms
+    ctx.strokeStyle = `hsla(${CFG.baseHue}, 100%, 62%, ${CFG.wireOpacity})`;
+    ctx.fillStyle   = `hsla(${CFG.baseHue}, 100%, 62%, ${CFG.dotOpacity})`;
+    for(let i=0;i<CFG.arms;i++){
+      ctx.save();
+      rotate(rot + i*(Math.PI*2/CFG.arms));
+      renderArm(100);    // model units → px (100 is convenient scale)
+      ctx.restore();
+    }
+
+    // hub on top
+    ctx.strokeStyle = `hsla(${CFG.baseHue}, 100%, 70%, 0.95)`;
+    ctx.fillStyle   = `hsla(${CFG.baseHue}, 100%, 70%, 0.85)`;
+    renderHub(1.0, pulse);
+
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
 
 function svgShieldWorld(){
   const svg = baseSVG();
