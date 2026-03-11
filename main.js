@@ -645,7 +645,7 @@ function renderPanel(id, details){
     <div class="stats-grid">
       <div class="stat-cell">
         <div class="stat-key">Star Class</div>
-        <div class="stat-val" style="color:${sm.text};font-size:14px;">${star.kind || '—'}</div>
+        <div class="stat-val" style="color:${sm.text};font-size:16px;">${star.kind || '—'}</div>
         <div class="stat-sub">${sm.abbr} TYPE</div>
       </div>
       <div class="stat-cell">
@@ -655,12 +655,12 @@ function renderPanel(id, details){
       </div>
       <div class="stat-cell">
         <div class="stat-key">Nearest</div>
-        <div class="stat-val gold" style="font-size:13px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||99)<(b.semi_major_AU||99)?a:b).semi_major_AU ?? '?') : '—'}</div>
+        <div class="stat-val gold" style="font-size:15px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||99)<(b.semi_major_AU||99)?a:b).semi_major_AU ?? '?') : '—'}</div>
         <div class="stat-sub">AU INNER ORBIT</div>
       </div>
       <div class="stat-cell">
         <div class="stat-key">Farthest</div>
-        <div class="stat-val" style="font-size:13px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||0)>(b.semi_major_AU||0)?a:b).semi_major_AU ?? '?') : '—'}</div>
+        <div class="stat-val" style="font-size:15px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||0)>(b.semi_major_AU||0)?a:b).semi_major_AU ?? '?') : '—'}</div>
         <div class="stat-sub">AU OUTER ORBIT</div>
       </div>
     </div>
@@ -668,9 +668,9 @@ function renderPanel(id, details){
     <div class="meta-row"><span class="mk">System ID</span><span class="mv hi">${id}</span></div>
     <div class="meta-row"><span class="mk">Name</span><span class="mv">${sys?.name || '—'}</span></div>
     ${sys?.owner ? `<div class="meta-row"><span class="mk">Owner</span><span class="mv go">${sys.owner}</span></div>` : ''}
-    ${sys?.source ? `<div class="meta-row"><span class="mk">Source</span><span class="mv" style="font-size:10px;color:var(--text-muted);">${sys.source}</span></div>` : ''}
+    ${sys?.source ? `<div class="meta-row"><span class="mk">Source</span><span class="mv" style="font-size:13px;color:var(--text-muted);">${sys.source}</span></div>` : ''}
     ${tags ? `<div class="meta-row"><span class="mk">Tags</span><span class="mv">${tags}</span></div>` : ''}
-    <div class="meta-row"><span class="mk">Record</span><span class="mv" style="font-size:10px;color:var(--text-muted);">${details?.version || '—'} · ${details?.generated_at ? new Date(details.generated_at).toLocaleDateString() : 'unscanned'}</span></div>
+    <div class="meta-row"><span class="mk">Record</span><span class="mv" style="font-size:13px;color:var(--text-muted);">${details?.version || '—'} · ${details?.generated_at ? new Date(details.generated_at).toLocaleDateString() : 'unscanned'}</span></div>
   `;
 
   // ── BODIES pane ──
@@ -719,7 +719,7 @@ function renderEditPane(id, details, sys){
     <form id="sys-edit">
       <div class="edit-section">
         <div class="edit-section-title">System Identity</div>
-        <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
+        <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
         <div class="form-row">
           <label class="fl" for="sysName">Name</label>
           <input id="sysName" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
@@ -796,7 +796,7 @@ function planetEditorRow(p,i){
   <div class="planetRow planet-row">
     <div class="planet-row-head">
       <span class="p-idx pIndex" style="display:flex;align-items:center;gap:6px;">
-        <span style="color:${pm.color};font-size:12px;">${pm.icon}</span>
+        <span style="color:${pm.color};font-size:14px;">${pm.icon}</span>
         BODY ${i+1}
       </span>
       <button type="button" class="delPlanet pbtn danger" style="padding:3px 8px;">REMOVE</button>
