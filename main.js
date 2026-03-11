@@ -210,7 +210,7 @@ const uColGlow    = gl.getUniformLocation(progHalo, 'uColGlow');
 const uColCore    = gl.getUniformLocation(progHalo, 'uColCore');
 
 // --- camera/orbit/pan ---
-let yaw = 0, pitch = 0, dist = 1800, dragging = false, lx = 0, ly = 0;
+let yaw = 0, pitch = 0, dist = 1800, dragging = false, dragMoved = false, lx = 0, ly = 0;
 let panning = false, panX = 0, panY = 0;
 
 // prevent context menu during RMB pan
@@ -218,6 +218,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 canvas.addEventListener('mousedown', e => {
   lx = e.clientX; ly = e.clientY;
+  dragMoved = false;
   if (e.button === 2) panning = true;   // right button -> pan
   else dragging = true;                 // left button  -> orbit / select / add
 });
@@ -226,7 +227,8 @@ addEventListener('mousemove', e => {
   const dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
   if (dragging) {
-    if (!addMode) {
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragMoved = true;
+    if (!addMode && dragMoved) {
       yaw   += dx * 0.005;
       pitch += dy * 0.005;
       pitch = Math.max(-1.55, Math.min(1.55, pitch));
@@ -441,7 +443,10 @@ canvas.addEventListener('click', (e) => {
   }
 
   const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-  if (id) selectedId = id;
+  if (!id) return;
+  selectedId = id;
+  updateHUD();
+  ensureSystemDetails(id).then(det => renderPanel(id, det));
 });
 
 // Middle-click to delete nearest lane (edit mode)
