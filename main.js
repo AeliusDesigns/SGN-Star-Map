@@ -446,7 +446,13 @@ canvas.addEventListener('click', (e) => {
   if (!id) return;
   selectedId = id;
   updateHUD();
-  ensureSystemDetails(id).then(det => renderPanel(id, det));
+  ensureSystemDetails(id).then(det => {
+    try {
+      renderPanel(id, det);
+    } catch(err) {
+      console.error('[SGN] renderPanel crashed:', err);
+    }
+  }).catch(err => console.error('[SGN] ensureSystemDetails crashed:', err));
 });
 
 // Middle-click to delete nearest lane (edit mode)
@@ -821,7 +827,10 @@ function darkenHex(hex, amt) {
         b = Math.max(0,parseInt(hex.slice(5,7),16)-amt);
   return `rgb(${r},${g},${b})`;
 }
-function showPanel(){ panel.style.transform = 'translateX(0)'; }
+function showPanel(){ 
+  console.log('[SGN] showPanel called');
+  panel.style.transform = 'translateX(0)'; 
+}
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 
 // system details cache/generator
@@ -1250,7 +1259,7 @@ function renderEditPane(id, details, sys){
       </div>
 
       <div class="edit-actions">
-        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">�- SAVE CHANGES</button>
+        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">&#10003; SAVE CHANGES</button>
         <button id="cancelEdit" type="button" class="pbtn danger"  style="padding:8px 12px;">✕</button>
       </div>
     </form>
@@ -1369,13 +1378,12 @@ function screenToWorldOnZ0(clientX, clientY, mvp){
   return [ p0[0] + dir[0]*t, p0[1] + dir[1]*t, 0 ];
 }
 
-// Find nearest system id to given client coords (within r CSS pixels)
+// Find nearest system id to given client coords (within r pixels)
 function findNearestSystemId(clientX, clientY, mvp, r=32){
   const dpr = window.devicePixelRatio || 1;
   const mx = clientX * (canvas.width  / canvas.clientWidth);
   const my = clientY * (canvas.height / canvas.clientHeight);
-  const rPx = r * dpr;   // convert CSS radius to canvas pixel radius
-  let best = null, bestId = null, r2 = rPx * rPx;
+  let best = null, bestId = null, r2 = (r * dpr) * (r * dpr);
   for (const sys of systems){
     const p = idToWorld.get(sys.id);
     if (!p) continue;
@@ -1444,7 +1452,7 @@ function loop() {
   if (starsVBO && starCount > 0) {
     gl.useProgram(progPoints);
     gl.uniformMatrix4fv(uMVP_points, false, mvp);
-    gl.uniform1f(uSize, 8.0 * (window.devicePixelRatio || 1));
+    gl.uniform1f(uSize, 7.0 * (window.devicePixelRatio || 1));
     gl.uniform3f(uColorPts, 0.78, 0.90, 1.0);  // blue-white
     gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
     gl.enableVertexAttribArray(aPos_points);
