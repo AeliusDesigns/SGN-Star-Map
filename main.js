@@ -516,6 +516,306 @@ document.getElementById('sp-gen').onclick    = async () => {
   renderPanel(selectedId, d);
 };
 document.getElementById('sp-exp').onclick    = () => { if (selectedId) exportSystemDetails(selectedId); };
+document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
+
+// ── Orrery Modal ──────────────────────────────────────────────────────────
+const orreryModal  = document.getElementById('orrery-modal');
+const orreryCanvas = document.getElementById('orrery-canvas');
+const orreryCtx    = orreryCanvas.getContext('2d');
+const orreryClose  = document.getElementById('orrery-close');
+const orreryHover  = document.getElementById('orrery-hover');
+
+let orreryRAF    = null;
+let orreryData   = null;   // { sys, details, planets, star, sm }
+let orrerySpeed  = 1;
+let orreryT      = 0;      // simulation time (years)
+let lastTS       = null;
+const YEAR_SECS  = 8;      // real seconds per sim-year at 1x
+
+orreryClose.onclick = closeOrrery;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && orreryModal.classList.contains('open')) closeOrrery(); });
+
+// Speed buttons
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.onclick = () => {
+    orrerySpeed = parseFloat(btn.dataset.speed);
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b === btn));
+  };
+});
+
+function openOrrery(id) {
+  const det = getCachedSystem(id);
+  if (!det) return;
+  const sys  = systems.find(s => s.id === id) || { name: id };
+  const star = det.star || {};
+  const sm   = getStarMeta(star.kind);
+  const planets = (det.planets || []).slice().sort((a, b) => (a.semi_major_AU||0) - (b.semi_major_AU||0));
+
+  orreryData = { sys, details: det, planets, star, sm };
+  orreryT    = 0;
+  lastTS     = null;
+
+  // Title
+  document.getElementById('orrery-name').textContent = sys.name || id;
+  document.getElementById('orrery-sub').textContent  =
+    `${star.kind || '—'} · ${planets.length} ORBITAL OBJECT${planets.length !== 1 ? 'S' : ''}`;
+
+  // Legend
+  buildOrreryLegend(planets, star.hz);
+
+  orreryModal.classList.add('open');
+  resizeOrreryCanvas();
+  if (orreryRAF) cancelAnimationFrame(orreryRAF);
+  orreryRAF = requestAnimationFrame(orreryTick);
+}
+
+function closeOrrery() {
+  orreryModal.classList.remove('open');
+  if (orreryRAF) { cancelAnimationFrame(orreryRAF); orreryRAF = null; }
+}
+
+function resizeOrreryCanvas() {
+  const frame = orreryCanvas.parentElement;
+  const rect  = frame.getBoundingClientRect();
+  orreryCanvas.width  = rect.width  * devicePixelRatio;
+  orreryCanvas.height = rect.height * devicePixelRatio;
+}
+
+window.addEventListener('resize', () => { if (orreryModal.classList.contains('open')) resizeOrreryCanvas(); });
+
+function buildOrreryLegend(planets, hz) {
+  const leg = document.getElementById('orrery-legend');
+  const types = [...new Set(planets.map(p => p.type))];
+  let html = '';
+  if (hz && hz[0] > 0) {
+    html += `<div class="orrery-legend-item"><div class="orrery-legend-ring"></div>HABITABLE ZONE</div>`;
+  }
+  types.forEach(t => {
+    const pm = getPlanetMeta(t);
+    html += `<div class="orrery-legend-item"><div class="orrery-legend-dot" style="background:${pm.color}"></div>${t.toUpperCase()}</div>`;
+  });
+  leg.innerHTML = html;
+}
+
+function orreryTick(ts) {
+  if (!orreryData) return;
+  if (lastTS !== null) {
+    const dt = Math.min((ts - lastTS) / 1000, 0.1); // cap at 100ms
+    orreryT += dt * orrerySpeed / YEAR_SECS;
+  }
+  lastTS = ts;
+  drawOrrery();
+  orreryRAF = requestAnimationFrame(orreryTick);
+}
+
+function drawOrrery() {
+  const cvs = orreryCanvas;
+  const ctx = orreryCtx;
+  const W = cvs.width, H = cvs.height;
+  const cx = W / 2, cy = H / 2;
+  const dpr = devicePixelRatio;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (!orreryData) return;
+  const { planets, star, sm } = orreryData;
+  if (!planets.length) return;
+
+  // ── Sizing ──
+  // Use log scale matching the static diagram
+  const allAU  = planets.map(p => p.semi_major_AU || 0.1);
+  const minAU  = Math.max(0.01, (star.inner_edge || 0.05) * 0.5);
+  const maxAU  = Math.max(...allAU) * 1.2;
+  const margin = 60 * dpr;
+  const maxR   = Math.min(cx, cy) - margin;
+  const logMin = Math.log(minAU), logMax = Math.log(maxAU);
+
+  function auToR(au) {
+    const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
+    return 12 * dpr + t * (maxR - 12 * dpr);
+  }
+
+  // ── Subtle radial grid ──
+  ctx.save();
+  for (let r = maxR * 0.25; r <= maxR; r += maxR * 0.25) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56,232,255,0.04)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Habitable zone ──
+  const hz = star.hz || [0, 0];
+  if (hz[0] > 0 && hz[1] > hz[0]) {
+    const r1 = auToR(hz[0]), r2 = auToR(hz[1]);
+    ctx.save();
+    const grad = ctx.createRadialGradient(cx, cy, r1, cx, cy, r2);
+    grad.addColorStop(0,   'rgba(60,220,100,0.00)');
+    grad.addColorStop(0.3, 'rgba(60,220,100,0.06)');
+    grad.addColorStop(0.7, 'rgba(60,220,100,0.06)');
+    grad.addColorStop(1,   'rgba(60,220,100,0.00)');
+    ctx.beginPath();
+    ctx.arc(cx, cy, r2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r1, 0, Math.PI * 2, true);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    // HZ border rings (dashed)
+    ctx.setLineDash([4 * dpr, 6 * dpr]);
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = 'rgba(60,220,100,0.22)';
+    ctx.beginPath(); ctx.arc(cx, cy, r1, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r2, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // ── Orbit ellipses ──
+  ctx.save();
+  planets.forEach(p => {
+    const a   = auToR(p.semi_major_AU || 0.1);
+    const ecc = p.ecc || 0;
+    const b   = a * Math.sqrt(1 - ecc * ecc);
+    const off = a * ecc * 0.3;
+    const rot = ((p.angle_deg || 0) * Math.PI) / 180;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    ctx.translate(off, 0);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56,232,255,0.18)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+
+  // ── Star ──
+  const starR = Math.max(6, (star.radius_hint || 5) * dpr * 1.2);
+  const starColor = sm.glow || '#38e8ff';
+  // Outer glow
+  const sg1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, starR * 5);
+  sg1.addColorStop(0,   hexToRgba(starColor, 0.35));
+  sg1.addColorStop(0.3, hexToRgba(starColor, 0.12));
+  sg1.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(cx, cy, starR * 5, 0, Math.PI * 2);
+  ctx.fillStyle = sg1; ctx.fill();
+  // Core
+  const sg2 = ctx.createRadialGradient(cx - starR * 0.3, cy - starR * 0.3, 0, cx, cy, starR);
+  sg2.addColorStop(0, '#ffffff');
+  sg2.addColorStop(0.4, starColor);
+  sg2.addColorStop(1, hexToRgba(starColor, 0.6));
+  ctx.beginPath(); ctx.arc(cx, cy, starR, 0, Math.PI * 2);
+  ctx.fillStyle = sg2; ctx.fill();
+
+  // ── Planets ──
+  const planetPositions = []; // for hover detection
+  planets.forEach(p => {
+    const a     = auToR(p.semi_major_AU || 0.1);
+    const ecc   = p.ecc || 0;
+    const b     = a * Math.sqrt(1 - ecc * ecc);
+    const off   = a * ecc * 0.3;
+    const rot   = ((p.angle_deg || 0) * Math.PI) / 180;
+    // Orbital period ~ sqrt(AU^3) years (Kepler's 3rd law)
+    const period  = Math.sqrt(Math.pow(p.semi_major_AU || 1, 3));
+    const angle   = (orreryT / period) * Math.PI * 2;
+    // Position on ellipse
+    const lx = Math.cos(angle) * a - off;
+    const ly = Math.sin(angle) * b;
+    // Rotate by orbit orientation
+    const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
+    const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
+
+    const pm   = getPlanetMeta(p.type);
+    const pr   = Math.max(3 * dpr, Math.min(9 * dpr, (p.radius_hint || 1) * 3.2 * dpr));
+    const isHz = p.zone === 'habitable';
+
+    // Habitable zone glow ring
+    if (isHz) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(px, py, pr + 4 * dpr, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(80,255,120,0.4)';
+      ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+    }
+
+    // Planet glow
+    const pg = ctx.createRadialGradient(px, py, 0, px, py, pr * 2.5);
+    pg.addColorStop(0, hexToRgba(pm.color, 0.5));
+    pg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(px, py, pr * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = pg; ctx.fill();
+
+    // Planet body (radial shaded sphere)
+    const pb = ctx.createRadialGradient(px - pr * 0.3, py - pr * 0.3, 0, px, py, pr);
+    pb.addColorStop(0, lightenHex(pm.color, 60));
+    pb.addColorStop(0.5, pm.color);
+    pb.addColorStop(1, darkenHex(pm.color, 50));
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fillStyle = pb; ctx.fill();
+
+    // Name label
+    ctx.save();
+    ctx.font = `${11 * dpr}px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = 'rgba(180,210,255,0.65)';
+    ctx.textAlign = px > cx ? 'left' : 'right';
+    ctx.fillText(p.name, px + (px > cx ? pr + 4 * dpr : -(pr + 4 * dpr)), py + 4 * dpr);
+    ctx.restore();
+
+    planetPositions.push({ p, px, py, pr });
+  });
+
+  // Store for hover
+  orreryCanvas._planets = planetPositions;
+}
+
+// Hover detection
+orreryCanvas.addEventListener('mousemove', e => {
+  if (!orreryCanvas._planets) return;
+  const rect = orreryCanvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * devicePixelRatio;
+  const my = (e.clientY - rect.top)  * devicePixelRatio;
+  const hover = document.getElementById('orrery-hover');
+  let hit = null;
+  for (const { p, px, py, pr } of orreryCanvas._planets) {
+    if (Math.hypot(mx - px, my - py) < pr + 8 * devicePixelRatio) { hit = p; break; }
+  }
+  if (hit) {
+    document.getElementById('ohl-name').textContent = hit.name;
+    document.getElementById('ohl-sub').textContent  = `${hit.type} · ${hit.semi_major_AU} AU`;
+    hover.style.display = 'block';
+    hover.style.left = (e.clientX - orreryModal.getBoundingClientRect().left + 14) + 'px';
+    hover.style.top  = (e.clientY - orreryModal.getBoundingClientRect().top  - 14) + 'px';
+    orreryCanvas.style.cursor = 'crosshair';
+  } else {
+    hover.style.display = 'none';
+    orreryCanvas.style.cursor = 'default';
+  }
+});
+orreryCanvas.addEventListener('mouseleave', () => {
+  document.getElementById('orrery-hover').style.display = 'none';
+});
+
+// Colour helpers
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function lightenHex(hex, amt) {
+  const r = Math.min(255,parseInt(hex.slice(1,3),16)+amt),
+        g = Math.min(255,parseInt(hex.slice(3,5),16)+amt),
+        b = Math.min(255,parseInt(hex.slice(5,7),16)+amt);
+  return `rgb(${r},${g},${b})`;
+}
+function darkenHex(hex, amt) {
+  const r = Math.max(0,parseInt(hex.slice(1,3),16)-amt),
+        g = Math.max(0,parseInt(hex.slice(3,5),16)-amt),
+        b = Math.max(0,parseInt(hex.slice(5,7),16)-amt);
+  return `rgb(${r},${g},${b})`;
+}
 function showPanel(){ panel.style.transform = 'translateX(0)'; }
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 
