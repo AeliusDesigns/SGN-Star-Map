@@ -434,7 +434,7 @@ canvas.addEventListener('click', (e) => {
 
     selectedId = newId;
     ensureSystemDetails(newId).then(det=>{
-      renderPanel(newId, det, true);
+      renderPanel(newId, det);
     });
 
     return;
@@ -492,18 +492,30 @@ canvas.addEventListener('auxclick', (e)=>{
 });
 
 // Panel — already in index.html as #sidePanel
-const panel   = document.getElementById('sidePanel');
-const spTitle = document.getElementById('sp-title');
-const spBody  = document.getElementById('sp-body');
+const panel      = document.getElementById('sidePanel');
+const spTitle    = document.getElementById('sp-title');
+const spBody     = document.getElementById('sp-body');
+const spSysId    = document.getElementById('sp-sys-id');
+const spOwner    = document.getElementById('sp-owner');
+const spStarOrb  = document.getElementById('sp-star-orb');
+const spStarAbbr = document.getElementById('sp-star-abbr');
+
+// Tab switching
+document.getElementById('sp-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  const name = tab.dataset.tab;
+  document.querySelectorAll('#sp-tabs .tab').forEach(t => t.classList.toggle('active', t===tab));
+  document.querySelectorAll('#sp-body .tab-pane').forEach(p => p.classList.toggle('active', p.id === `pane-${name}`));
+});
+
 document.getElementById('sp-close').onclick = () => hidePanel();
-document.getElementById('sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
-document.getElementById('sp-edit').onclick  = async ()=>{
-  if(!selectedId) return;
-  if(!requireEditor()) return;
-  const d = await ensureSystemDetails(selectedId);
-  renderPanel(selectedId, d, true);
+document.getElementById('sp-gen').onclick    = async () => {
+  if (!selectedId) return;
+  const d = await ensureSystemDetails(selectedId, true); // force regen
+  renderPanel(selectedId, d);
 };
-document.getElementById('sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
+document.getElementById('sp-exp').onclick    = () => { if (selectedId) exportSystemDetails(selectedId); };
 function showPanel(){ panel.style.transform = 'translateX(0)'; }
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 
@@ -531,8 +543,8 @@ function generateDeterministic(id){
   }));
   return { version: SYSGEN_VERSION, system_id: id, seeded: true, generated_at: new Date().toISOString(), star: { kind }, planets };
 }
-async function ensureSystemDetails(id){
-  let det = getCachedSystem(id);
+async function ensureSystemDetails(id, forceRegen=false){
+  let det = forceRegen ? null : getCachedSystem(id);
   if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
   return det;
 }
@@ -547,153 +559,269 @@ function exportSystemDetails(id){
   URL.revokeObjectURL(a.href);
 }
 
-// Renders read or edit mode
-function renderPanel(id, details, edit=false){
-  const sys = systems.find(s=>s.id===id);
-  spTitle.textContent = sys?.name || id;
+// ── Star type metadata ──
+const STAR_META = {
+  'Main Sequence': { abbr:'MS',  bg:'#2a4a1a', glow:'#7ed44a', text:'#7ed44a' },
+  'K-Dwarf':       { abbr:'K',   bg:'#4a2e10', glow:'#e8832a', text:'#e8832a' },
+  'G-Dwarf':       { abbr:'G',   bg:'#4a3a10', glow:'#f5c542', text:'#f5c542' },
+  'F-Dwarf':       { abbr:'F',   bg:'#3a3a1a', glow:'#fff0a0', text:'#ffe060' },
+  'M-Dwarf':       { abbr:'M',   bg:'#4a1a1a', glow:'#ff6666', text:'#ff6666' },
+  'Subgiant':      { abbr:'SG',  bg:'#3a2a10', glow:'#ffaa44', text:'#ffaa44' },
+  'Giant':         { abbr:'GI',  bg:'#2a1a40', glow:'#cc88ff', text:'#cc88ff' },
+  'Neutron':       { abbr:'NS',  bg:'#102030', glow:'#38e8ff', text:'#38e8ff' },
+  'Black Hole':    { abbr:'BH',  bg:'#080808', glow:'#9955ff', text:'#9955ff' },
+};
 
-  if (!edit){
-    const star = details?.star || {};
-    const planets = details?.planets || [];
-    spBody.innerHTML = `
-      <div>
-        <div class="data-row"><span class="dk">ID</span><span class="dv hi" style="font-family:'Share Tech Mono',monospace;font-size:11px;">${id}</span></div>
-        <div class="data-row"><span class="dk">Name</span><span class="dv">${sys?.name || '(unnamed)'}</span></div>
-        <div class="data-row"><span class="dk">Star</span><span class="dv go">${star.kind || '—'}</span></div>
-        ${sys?.owner ? `<div class="data-row"><span class="dk">Owner</span><span class="dv">${sys.owner}</span></div>` : ''}
-        ${Array.isArray(sys?.tags) ? `<div class="data-row"><span class="dk">Tags</span><span class="dv" style="font-size:11px;">${sys.tags.join(', ')}</span></div>` : ''}
-        <div class="data-row"><span class="dk">Record</span><span class="dv" style="font-size:11px;color:var(--text-muted);">${details?.version || '—'}</span></div>
-      </div>
+// ── Planet type metadata ──
+const PLANET_META = {
+  'Rocky':         { icon:'◉', color:'#aa8866' },
+  'Ice':           { icon:'❄', color:'#88ccee' },
+  'Gas':           { icon:'⬤', color:'#8866bb' },
+  'Ocean':         { icon:'◉', color:'#3388cc' },
+  'Desert':        { icon:'◉', color:'#cc9944' },
+  'Shield World':  { icon:'⬡', color:'#33ccaa' },
+  'Ecumenopolis':  { icon:'⬡', color:'#ffcc44' },
+  'Installation':  { icon:'◈', color:'#38e8ff' },
+  'Habitat':       { icon:'◈', color:'#88ff88' },
+};
 
-      <div class="sec-title">Orbital Bodies (${planets.length})</div>
-      <div id="planetListRead">
-        ${
-          planets.length
-          ? planets.map((p,i)=>`
-            <div class="planet-card" data-type="${(p.type||'').replace(/"/g,'&quot;')}" data-name="${(p.name||('P'+(i+1))).replace(/"/g,'&quot;')}">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                <span class="p-name">${p.name || 'P'+(i+1)}</span>
-                <span class="p-meta">${p.type ?? 'UNKNOWN'}</span>
-              </div>
-              <div class="p-orbit">${p.semi_major_AU ?? '?'} AU</div>
-              ${p.notes ? `<div class="p-notes">${p.notes}</div>` : ''}
-            </div>
-          `).join('')
-          : '<em style="text-align:left;margin-top:8px;">// NO ORBITAL DATA<br>// PRESS SCAN TO GENERATE</em>'
-        }
+function getPlanetMeta(type){ return PLANET_META[type] || { icon:'◉', color:'#888' }; }
+function getStarMeta(kind){ return STAR_META[kind] || { abbr:'?', bg:'#1a2a3a', glow:'#38e8ff', text:'#38e8ff' }; }
+
+// ── Mini orbit diagram SVG ──
+function buildOrbitSVG(planets, starColor){
+  const cx=96, cy=96, r=96;
+  const maxAU = Math.max(...planets.map(p=>p.semi_major_AU||1), 1);
+  const scale = (r-16) / maxAU;
+  let rings='', dots='';
+  planets.forEach((p,i)=>{
+    const or = 10 + (p.semi_major_AU||1)*scale;
+    const pm = getPlanetMeta(p.type);
+    const angle = (i / planets.length) * Math.PI * 2 - Math.PI/2;
+    const px = cx + Math.cos(angle)*or, py = cy + Math.sin(angle)*or;
+    rings += `<circle cx="${cx}" cy="${cy}" r="${or.toFixed(1)}" fill="none" stroke="rgba(56,232,255,.12)" stroke-width="0.7"/>`;
+    dots  += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${pm.color}" opacity=".85">
+      <title>${p.name} · ${p.type} · ${p.semi_major_AU}AU</title>
+    </circle>`;
+  });
+  return `<svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(8,13,24,.6)" stroke="rgba(56,232,255,.08)" stroke-width="1"/>
+    ${rings}
+    <circle cx="${cx}" cy="${cy}" r="7" fill="${starColor}" opacity=".9" filter="url(#sg)"/>
+    <circle cx="${cx}" cy="${cy}" r="12" fill="${starColor}" opacity=".15"/>
+    <defs><filter id="sg"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    ${dots}
+  </svg>`;
+}
+
+// Renders the panel for given id
+function renderPanel(id, details){
+  const sys    = systems.find(s=>s.id===id);
+  const star   = details?.star || {};
+  const planets= details?.planets || [];
+  const sm     = getStarMeta(star.kind);
+
+  // ── Header ──
+  spTitle.textContent       = sys?.name || id;
+  spSysId.textContent       = id;
+  spOwner.textContent       = sys?.owner ? `◈ ${sys.owner}` : '';
+  spStarAbbr.textContent    = sm.abbr;
+  spStarOrb.style.background= `radial-gradient(circle at 35% 35%, ${sm.glow}44, ${sm.bg})`;
+  spStarOrb.style.boxShadow = `0 0 12px ${sm.glow}44, inset 0 0 8px ${sm.glow}22`;
+  spStarOrb.style.color     = sm.text;
+
+  // ── OVERVIEW pane ──
+  const pov = document.getElementById('pane-overview');
+  const tags = Array.isArray(sys?.tags) && sys.tags.length
+    ? sys.tags.map(t=>`<span class="tag-chip">${t}</span>`).join('')
+    : '';
+
+  const orbitSVG = planets.length
+    ? `<div class="orbit-diagram">${buildOrbitSVG(planets, sm.glow)}</div>`
+    : '';
+
+  pov.innerHTML = `
+    ${orbitSVG}
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-key">Star Class</div>
+        <div class="stat-val" style="color:${sm.text};font-size:14px;">${star.kind || '—'}</div>
+        <div class="stat-sub">${sm.abbr} TYPE</div>
       </div>
-    `;
+      <div class="stat-cell">
+        <div class="stat-key">Bodies</div>
+        <div class="stat-val cyan">${planets.length}</div>
+        <div class="stat-sub">ORBITAL OBJECTS</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-key">Nearest</div>
+        <div class="stat-val gold" style="font-size:13px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||99)<(b.semi_major_AU||99)?a:b).semi_major_AU ?? '?') : '—'}</div>
+        <div class="stat-sub">AU INNER ORBIT</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-key">Farthest</div>
+        <div class="stat-val" style="font-size:13px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||0)>(b.semi_major_AU||0)?a:b).semi_major_AU ?? '?') : '—'}</div>
+        <div class="stat-sub">AU OUTER ORBIT</div>
+      </div>
+    </div>
+
+    <div class="meta-row"><span class="mk">System ID</span><span class="mv hi">${id}</span></div>
+    <div class="meta-row"><span class="mk">Name</span><span class="mv">${sys?.name || '—'}</span></div>
+    ${sys?.owner ? `<div class="meta-row"><span class="mk">Owner</span><span class="mv go">${sys.owner}</span></div>` : ''}
+    ${sys?.source ? `<div class="meta-row"><span class="mk">Source</span><span class="mv" style="font-size:10px;color:var(--text-muted);">${sys.source}</span></div>` : ''}
+    ${tags ? `<div class="meta-row"><span class="mk">Tags</span><span class="mv">${tags}</span></div>` : ''}
+    <div class="meta-row"><span class="mk">Record</span><span class="mv" style="font-size:10px;color:var(--text-muted);">${details?.version || '—'} · ${details?.generated_at ? new Date(details.generated_at).toLocaleDateString() : 'unscanned'}</span></div>
+  `;
+
+  // ── BODIES pane ──
+  const pbod = document.getElementById('pane-bodies');
+  if (!planets.length){
+    pbod.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">◎</div>
+      <div class="empty-state-text">// NO ORBITAL DATA<br>// PRESS ⟳ SCAN SYSTEM</div>
+    </div>`;
   } else {
-    const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
-    const planets = details?.planets || [];
-    const options = starKinds.map(k=>`<option value="${k}" ${details?.star?.kind===k?'selected':''}>${k}</option>`).join('');
-    spBody.innerHTML = `
-      <form id="sys-edit" style="display:flex;flex-direction:column;gap:10px;">
-        <div class="form-grid">
-          <span class="fl">ID</span>
-          <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span>
+    const sorted = [...planets].sort((a,b)=>(a.semi_major_AU||0)-(b.semi_major_AU||0));
+    pbod.innerHTML = `
+      <div class="bodies-header">
+        <span class="bodies-count">${planets.length} ORBITAL OBJECT${planets.length!==1?'S':''} DETECTED</span>
+      </div>
+      ${sorted.map(p=>{
+        const pm = getPlanetMeta(p.type);
+        return `<div class="planet-card">
+          <div class="p-icon" style="background:${pm.color}22;color:${pm.color};">${pm.icon}</div>
+          <div class="p-info">
+            <div class="p-name">${p.name}</div>
+            <div class="p-type-badge">${p.type ?? 'UNKNOWN'}</div>
+            ${p.notes ? `<div class="p-notes-line">${p.notes}</div>` : ''}
+          </div>
+          <div class="p-orbit-val">${p.semi_major_AU ?? '?'}<br><span style="font-size:7px;color:var(--text-muted);">AU</span></div>
+        </div>`;
+      }).join('')}
+    `;
+  }
 
+  // ── EDIT pane ──
+  renderEditPane(id, details, sys);
+
+  showPanel();
+}
+
+function renderEditPane(id, details, sys){
+  if (!sys) sys = systems.find(s=>s.id===id);
+  const star   = details?.star || {};
+  const planets= details?.planets || [];
+  const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
+  const options = starKinds.map(k=>`<option value="${k}" ${star.kind===k?'selected':''}>${k}</option>`).join('');
+
+  const pedit = document.getElementById('pane-edit');
+  pedit.innerHTML = `
+    <form id="sys-edit">
+      <div class="edit-section">
+        <div class="edit-section-title">System Identity</div>
+        <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
+        <div class="form-row">
           <label class="fl" for="sysName">Name</label>
           <input id="sysName" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
-
-          <label class="fl" for="starKind">Star Type</label>
+        </div>
+        <div class="form-row">
+          <label class="fl" for="starKind">Star Class</label>
           <select id="starKind" class="sci-select">${options}</select>
         </div>
+      </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-          <div class="sec-title" style="margin:0;flex:1;">Orbital Bodies (${planets.length})</div>
-          <button id="addPlanet" type="button" class="pbtn primary" style="pointer-events:all;">+ ADD</button>
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Orbital Bodies</div>
+          <button id="addPlanet" type="button" class="pbtn primary" style="margin-bottom:10px;">+ ADD BODY</button>
         </div>
-
-        <div id="planetList" style="display:flex;flex-direction:column;">
+        <div id="planetList" style="margin-top:8px;">
           ${planets.map((p,i)=>planetEditorRow(p,i)).join('')}
         </div>
+      </div>
 
-        <div style="display:flex;gap:6px;margin-top:4px;">
-          <button id="saveEdit"   type="submit" class="pbtn primary" style="flex:1;pointer-events:all;padding:7px;">SAVE</button>
-          <button id="cancelEdit" type="button" class="pbtn danger"  style="flex:1;pointer-events:all;padding:7px;">CANCEL</button>
-        </div>
-      </form>
-    `;
+      <div class="edit-actions">
+        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">✓ SAVE CHANGES</button>
+        <button id="cancelEdit" type="button" class="pbtn danger"  style="padding:8px 12px;">✕</button>
+      </div>
+    </form>
+  `;
 
-    const form = spBody.querySelector('#sys-edit');
-    const btnAdd = spBody.querySelector('#addPlanet');
-    const listEl = spBody.querySelector('#planetList');
-    btnAdd.onclick = ()=>{
-      const idx = listEl.children.length;
-      const row = document.createElement('div');
-      row.innerHTML = planetEditorRow({name:`P${idx+1}`, type:'Rocky', semi_major_AU:1.0, notes:''}, idx);
-      listEl.appendChild(row.firstElementChild);
-    };
-    listEl.addEventListener('click', (e)=>{
-      if (e.target && e.target.matches('.delPlanet')) {
-        e.target.closest('.planetRow').remove();
-        Array.from(listEl.querySelectorAll('.planetRow')).forEach((el,i)=>{
-          el.querySelector('.pIndex').textContent = `#${i+1}`;
-        });
-      }
-    });
-    form.onsubmit = (ev)=>{
-      ev.preventDefault();
-      const newName = spBody.querySelector('#sysName').value.trim();
-      const newKind = spBody.querySelector('#starKind').value;
+  const form  = pedit.querySelector('#sys-edit');
+  const btnAdd= pedit.querySelector('#addPlanet');
+  const listEl= pedit.querySelector('#planetList');
 
-      const rows = Array.from(listEl.querySelectorAll('.planetRow'));
-      const planets = rows.map(row=>{
-        const name = row.querySelector('.pName').value.trim() || 'Planet';
-        const type = row.querySelector('.pType').value;
-        const sma  = parseFloat(row.querySelector('.pSMA').value);
-        const notes= row.querySelector('.pNotes').value.trim();
-        return {
-          name,
-          type,
-          semi_major_AU: isFinite(sma) ? +sma.toFixed(2) : null,
-          notes
-        };
-      });
+  btnAdd.onclick = () => {
+    const idx = listEl.querySelectorAll('.planetRow').length;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = planetEditorRow({name:`P${idx+1}`, type:'Rocky', semi_major_AU:1.0, notes:''}, idx);
+    listEl.appendChild(tmp.firstElementChild);
+  };
 
-      const updated = {
-        ...(getCachedSystem(id) || {version: SYSGEN_VERSION, system_id: id, seeded:true}),
-        star: { kind: newKind },
-        planets
-      };
-      setCachedSystem(id, updated);
+  listEl.addEventListener('click', e => {
+    if (e.target?.matches('.delPlanet')) {
+      e.target.closest('.planetRow').remove();
+      listEl.querySelectorAll('.planetRow .p-idx').forEach((el,i)=>{ el.textContent=`BODY ${i+1}`; });
+    }
+  });
 
-      if (newName) {
-        const s = systems.find(s=>s.id===id);
-        if (s) s.name = newName;
-        spTitle.textContent = newName;
-      }
+  form.onsubmit = ev => {
+    ev.preventDefault();
+    if (!requireEditor()) return;
+    const newName = pedit.querySelector('#sysName').value.trim();
+    const newKind = pedit.querySelector('#starKind').value;
+    const rows    = Array.from(listEl.querySelectorAll('.planetRow'));
+    const newPlanets = rows.map(row=>({
+      name:          row.querySelector('.pName').value.trim() || 'Body',
+      type:          row.querySelector('.pType').value,
+      semi_major_AU: +parseFloat(row.querySelector('.pSMA').value).toFixed(2) || null,
+      notes:         row.querySelector('.pNotes').value.trim()
+    }));
+    const updated = { ...(getCachedSystem(id)||{version:SYSGEN_VERSION,system_id:id,seeded:true}), star:{kind:newKind}, planets:newPlanets };
+    setCachedSystem(id, updated);
+    if (newName){ const s=systems.find(s=>s.id===id); if(s) s.name=newName; }
+    renderPanel(id, updated);
+    // switch to overview after save
+    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
+  };
 
-      renderPanel(id, updated, false);
-    };
-    spBody.querySelector('#cancelEdit').onclick = ()=>{
-      renderPanel(id, details, false);
-    };
-  }
-  showPanel();
+  pedit.querySelector('#cancelEdit').onclick = () => {
+    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
+  };
 }
 function planetEditorRow(p,i){
   const opt = (v,sel)=> `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
+  const pm  = getPlanetMeta(p.type);
   return `
   <div class="planetRow planet-row">
-    <div class="planet-row-hdr">
-      <span class="p-idx pIndex">BODY #${i+1}</span>
-      <button type="button" class="delPlanet pbtn danger" style="pointer-events:all;padding:3px 7px;">REMOVE</button>
+    <div class="planet-row-head">
+      <span class="p-idx pIndex" style="display:flex;align-items:center;gap:6px;">
+        <span style="color:${pm.color};font-size:12px;">${pm.icon}</span>
+        BODY ${i+1}
+      </span>
+      <button type="button" class="delPlanet pbtn danger" style="padding:3px 8px;">REMOVE</button>
     </div>
-    <div class="form-grid">
-      <span class="fl">Name</span>
-      <input class="pName sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/>
-      <span class="fl">Type</span>
-      <select class="pType sci-select">
-        ${opt('Rocky',p.type)}${opt('Ice',p.type)}${opt('Gas',p.type)}${opt('Ocean',p.type)}
-        ${opt('Desert',p.type)}${opt('Shield World',p.type)}${opt('Ecumenopolis',p.type)}
-        ${opt('Installation',p.type)}${opt('Habitat',p.type)}
-      </select>
-      <span class="fl">Orbit (AU)</span>
-      <input class="pSMA sci-input" type="number" step="0.01" value="${p.semi_major_AU ?? 1}"/>
-      <span class="fl">Notes</span>
-      <input class="pNotes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}"/>
+    <div class="planet-row-body">
+      <div class="form-row">
+        <span class="fl">Name</span>
+        <input class="pName sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/>
+      </div>
+      <div class="form-row">
+        <span class="fl">Type</span>
+        <select class="pType sci-select">
+          ${opt('Rocky',p.type)}${opt('Ice',p.type)}${opt('Gas',p.type)}${opt('Ocean',p.type)}
+          ${opt('Desert',p.type)}${opt('Shield World',p.type)}${opt('Ecumenopolis',p.type)}
+          ${opt('Installation',p.type)}${opt('Habitat',p.type)}
+        </select>
+      </div>
+      <div class="form-row">
+        <span class="fl">Orbit (AU)</span>
+        <input class="pSMA sci-input" type="number" step="0.01" min="0.01" value="${p.semi_major_AU ?? 1}"/>
+      </div>
+      <div class="form-row">
+        <span class="fl">Notes</span>
+        <input class="pNotes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}"/>
+      </div>
     </div>
   </div>`;
 }
@@ -879,7 +1007,7 @@ canvas.addEventListener('dblclick', async (e)=>{
 
   if (selectedId === id){
     const details = await ensureSystemDetails(id);
-    renderPanel(id, details, false);
+    renderPanel(id, details);
     return;
   }
   if (!requireEditor()) return; // guard rename
@@ -913,7 +1041,7 @@ window.addEventListener('keydown', async (e) => {
   }
   if (k === 'enter' && selectedId){
     const details = await ensureSystemDetails(selectedId);
-    renderPanel(selectedId, details, false);
+    renderPanel(selectedId, details);
     return;
   }
 
