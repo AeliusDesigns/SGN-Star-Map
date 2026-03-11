@@ -255,10 +255,11 @@ let systems = [];
 let lanesSet = new Set();
 let imgW = 1090, imgH = 1494, worldW = 2200, worldH = 2200*(1090/1494);
 
-// Hover tooltip + hover id
-const tip = document.createElement('div');
-tip.style.cssText = "position:fixed;padding:6px 8px;background:#111c;border:1px solid #444;border-radius:8px;pointer-events:none;display:none;color:#fff;font:12px/1.3 system-ui";
-document.body.appendChild(tip);
+// Hover tooltip + hover id (new sci-fi tooltip in index.html)
+const tip = document.getElementById('tooltip');
+const tipName  = document.getElementById('tip-name');
+const tipId    = document.getElementById('tip-id');
+const tipOwner = document.getElementById('tip-owner');
 let mouseX = 0, mouseY = 0;
 addEventListener('mousemove', (e)=>{ mouseX = e.clientX; mouseY = e.clientY; });
 
@@ -282,441 +283,11 @@ function requireEditor() {
   return false;
 }
 
-/* =========================================================
-   HOLOGRAM DOCK + HIGH-FIDELITY SVG PLANET BUILDERS
-   ========================================================= */
 
-// UTIL: create SVG/HTML nodes quickly
-function S(tag, attrs={}, children=[]){
-  const el = (tag === 'svg' || tag === 'defs' || tag === 'g' || tag === 'path' || tag === 'circle' || tag === 'ellipse' || tag === 'linearGradient' || tag === 'radialGradient' || tag === 'stop' || tag === 'clipPath' || tag === 'polygon')
-    ? document.createElementNS('http://www.w3.org/2000/svg', tag)
-    : document.createElement(tag);
-  for (const k in attrs) {
-    if (attrs[k] == null) continue;
-    if (k === 'style' && typeof attrs[k] === 'object') {
-      Object.assign(el.style, attrs[k]);
-    } else {
-      el.setAttribute(k, String(attrs[k]));
-    }
-  }
-  if (!Array.isArray(children)) children = [children];
-  children.forEach(ch => { if (ch) el.appendChild(ch); });
-  return el;
-}
+// Holographic dock removed — planet cards replaced by inline system panel
+window.showHologram = function(){}
+window.hideHologram = function(){}
 
-const HOLO_DETAIL = 'high';
-
-// Global lighting
-const LIGHT_AZIMUTH_DEG = -35;
-const LIGHT_ELEV_DEG    =  25;
-function deg2rad(a){ return a * Math.PI / 180; }
-function lightVec(){
-  const a = deg2rad(LIGHT_AZIMUTH_DEG), e = deg2rad(LIGHT_ELEV_DEG);
-  return { x: Math.cos(e)*Math.cos(a), y: Math.cos(e)*Math.sin(a), z: Math.sin(e) };
-}
-
-// Base <svg> with filters/defs
-function baseSVG(){
-  const svg = S('svg',{ viewBox:'0 0 200 200', width:'190', height:'190', xmlns:'http://www.w3.org/2000/svg' });
-
-  const defs = S('defs',{},[
-    // soft glow
-    S('filter',{id:'glow', x:'-30%', y:'-30%', width:'160%', height:'160%'},[
-      S('feGaussianBlur',{ stdDeviation:'1.8', result:'b' }),
-      S('feMerge',{},[ S('feMergeNode',{ in:'b' }), S('feMergeNode',{ in:'SourceGraphic' }) ])
-    ]),
-    // chromatic slight spread
-    S('filter',{id:'chromatic', x:'-40%', y:'-40%', width:'180%', height:'180%'},[
-      S('feColorMatrix',{ type:'matrix', values:'1 0 0 0 0  0 1 0 0 0.05  0 0 1 0 0.12  0 0 0 1 0' })
-    ]),
-    // subtle grain
-    S('filter',{id:'grain', x:'-30%', y:'-30%', width:'160%', height:'160%'},[
-      S('feTurbulence',{type:'fractalNoise', baseFrequency:'0.9', numOctaves:'2', result:'n'}),
-      S('feColorMatrix',{type:'saturate', values:'0', result:'m'}),
-      S('feBlend',{in:'SourceGraphic', in2:'m', mode:'overlay'})
-    ]),
-    // hot spot gradient for gas vortex
-    S('radialGradient',{id:'hot', cx:'50%', cy:'50%', r:'50%'},[
-      S('stop',{offset:'0%','stop-color':'#fff','stop-opacity':'0.8'}),
-      S('stop',{offset:'100%','stop-color':'#acf2ff','stop-opacity':'0.0'})
-    ])
-  ]);
-
-  svg.appendChild(defs);
-  // Base scan rings
-  svg.appendChild(S('circle',{cx:100,cy:100,r:92,fill:'none',stroke:'#6be3ff','stroke-opacity':'.18','stroke-width':'1.2',filter:'url(#glow)'}));
-  svg.appendChild(S('circle',{cx:100,cy:100,r:78,fill:'none',stroke:'#6be3ff','stroke-opacity':'.10','stroke-width':'1',filter:'url(#glow)'}));
-
-  return svg;
-}
-
-// Polar grid overlay
-function addPolarGrid(svg){
-  const g = S('g',{opacity:0.13});
-  [20,40,60,80].forEach(r=>{
-    g.appendChild(S('circle',{cx:100,cy:100,r,fill:'none',stroke:'#9deaff','stroke-width':'0.6'}));
-  });
-  for (let a=0; a<180; a+=15){
-    const rad = deg2rad(a);
-    const x = 100 + Math.cos(rad)*90;
-    const y = 100 + Math.sin(rad)*90;
-    g.appendChild(S('path',{d:`M 100,100 L ${x},${y}`, stroke:'#9deaff','stroke-width':'0.5'}));
-  }
-  svg.appendChild(g);
-}
-
-// sweeping outer rings (holo flair)
-function addSweepingRings(svg){
-  const g = S('g',{opacity:0.18});
-  [0, 35, 70].forEach((off,i)=>{
-    const ry = 28 + i*6;
-    g.appendChild(S('ellipse',{cx:100,cy:100,rx:90,ry,fill:'none',stroke:'#6be3ff','stroke-width':'1'}));
-  });
-  svg.appendChild(g);
-}
-
-// Sphere shell with shading + rim
-function sphereBase({r=58, cx=100, cy=100, color='#90faff', tint=0.8, atm=0.35}={}){
-  const lv = lightVec();
-  const gidShade = `shade_${Math.random().toString(36).slice(2,8)}`;
-  const gidRim   = `rim_${Math.random().toString(36).slice(2,8)}`;
-
-  const defs = S('defs',{},[
-    S('radialGradient',{ id:gidShade, cx:`${50 + lv.x*25}%`, cy:`${50 - lv.y*25}%`, r:'60%' },[
-      S('stop',{offset:'0%','stop-color':'#eaffff','stop-opacity':Math.min(0.95,0.65 + tint*0.3)}),
-      S('stop',{offset:'60%','stop-color':color,'stop-opacity':tint}),
-      S('stop',{offset:'100%','stop-color':'#002a33','stop-opacity':0.9})
-    ]),
-    S('radialGradient',{ id:gidRim, cx:'50%', cy:'50%', r:'50%' },[
-      S('stop',{offset:'80%','stop-color':color,'stop-opacity':'0'}),
-      S('stop',{offset:'98%','stop-color':color,'stop-opacity':atm}),
-      S('stop',{offset:'100%','stop-color':color,'stop-opacity':'0'})
-    ])
-  ]);
-
-  const g = S('g',{ filter:'url(#chromatic)'});
-  g.appendChild(defs);
-  g.appendChild(S('circle',{ cx, cy, r, fill:`url(#${gidShade})`, stroke:color, 'stroke-opacity':0.45, 'stroke-width': HOLO_DETAIL==='high' ? 1.4 : 1.1, filter:'url(#glow)'}));
-  g.appendChild(S('circle',{ cx, cy, r:r+1.3, fill:`url(#${gidRim})`, stroke:'none', filter:'url(#glow)', opacity:0.9 }));
-  return g;
-}
-
-// Helpers for arcs
-function arcPath(cx,cy,r, a0deg,a1deg){
-  const a0 = a0deg*Math.PI/180, a1 = a1deg*Math.PI/180;
-  const x0 = cx + Math.cos(a0)*r, y0 = cy + Math.sin(a0)*r;
-  const x1 = cx + Math.cos(a1)*r, y1 = cy + Math.sin(a1)*r;
-  const large = ((a1 - a0 + 360) % 360) > 180 ? 1 : 0;
-  return `M ${x0},${y0} A ${r} ${r} 0 ${large} 1 ${x1},${y1}`;
-}
-
-// Details
-function addSpecular(svgGroup, {r=58, cx=100, cy=100}={}){
-  const lv = lightVec();
-  const px = cx + lv.x * (r*0.55);
-  const py = cy - lv.y * (r*0.55);
-  svgGroup.appendChild(S('ellipse',{cx:px, cy:py, rx:r*0.16, ry:r*0.08, fill:'white', 'fill-opacity':0.35, stroke:'none', filter:'url(#glow)'}));
-  svgGroup.appendChild(S('circle',{cx:px, cy:py, r:1.6, fill:'white', 'fill-opacity':0.85, filter:'url(#glow)'}));
-}
-
-function addGasBands(svg, {r=58, cx=100, cy=100, color='#90faff'}={}){
-  const clipId = `clip_${Math.random().toString(36).slice(2,8)}`;
-  const bandGrad = `band_${Math.random().toString(36).slice(2,8)}`;
-  svg.appendChild(S('clipPath',{id:clipId}, [ S('circle',{cx,cy,r}) ]));
-  svg.appendChild(S('linearGradient',{id:bandGrad, x1:'0%',y1:'0%',x2:'0%',y2:'100%'},[
-    S('stop',{offset:'0%','stop-color':color,'stop-opacity':0.05}),
-    S('stop',{offset:'50%','stop-color':color,'stop-opacity':0.75}),
-    S('stop',{offset:'100%','stop-color':color,'stop-opacity':0.05}),
-  ]));
-  const g = S('g',{clipPath:`url(#${clipId})`, opacity:0.95});
-  const bands = S('g');
-  for (let i=-6;i<=6;i++){
-    const lat = i * 7;
-    const rr  = r * Math.cos(deg2rad(lat));
-    const y   = cy + r * Math.sin(deg2rad(lat)) * 0.6;
-    const sw  = (i % 2 === 0) ? 1.6 : 1.0;
-    bands.appendChild(S('ellipse',{cx, cy:y, rx:rr, ry:rr*0.28, fill:'none', stroke:`url(#${bandGrad})`, 'stroke-width':sw}));
-  }
-  const vortexY = cy + r*0.28, vortexX = cx + r*0.62;
-  bands.appendChild(S('ellipse',{cx:vortexX, cy:vortexY, rx:r*0.12, ry:r*0.07, fill:'url(#hot)', stroke:'none', filter:'url(#glow)', opacity:0.9}));
-  const style = document.createElement('style');
-  style.textContent = `@keyframes bandDrift { 0% { transform: translateX(0px) } 100% { transform: translateX(-24px) } }`;
-  svg.appendChild(style);
-  bands.style.animation = 'bandDrift 18s linear infinite';
-  g.appendChild(bands);
-  svg.appendChild(g);
-}
-
-function addRockyDetail(svg, {r=58, cx=100, cy=100}={}){
-  const g = S('g',{opacity:0.9, filter:'url(#grain)'});
-  const arcs = [
-    {R: r*0.78, a0:210, a1:310, offY:-r*0.10},
-    {R: r*0.65, a0: 40, a1:120, offY: r*0.05},
-    {R: r*0.60, a0:130, a1:190, offY: r*0.02},
-  ];
-  arcs.forEach(({R,a0,a1,offY})=>{
-    const p = arcPath(cx, cy+offY, R, a0, a1);
-    g.appendChild(S('path',{d:p, opacity:0.7, stroke:'#c7fbff','stroke-width':'0.8', fill:'none'}));
-  });
-  [[-0.15,-0.08,6],[0.18,0.12,8],[0.05,0.23,4]].forEach(([dx,dy,rr])=>{
-    const x = cx + dx*r*1.2, y = cy + dy*r*0.9;
-    g.appendChild(S('circle',{cx:x, cy:y, r:rr, opacity:0.9, stroke:'#c7fbff','stroke-width':'0.8', fill:'none'}));
-    g.appendChild(S('circle',{cx:x, cy:y, r:rr*1.6, opacity:0.25, 'stroke-dasharray':'2 2', stroke:'#c7fbff','stroke-width':'0.6', fill:'none'}));
-  });
-  svg.appendChild(g);
-}
-
-function addOceanDetail(svg, {r=58, cx=100, cy=100}={}){
-  const clouds = S('g',{opacity:0.85});
-  [0.15,0.0,-0.18].forEach((off,i)=>{
-    const d = arcPath(cx, cy+off*r*0.6, r*0.88 - i*4, 200, 340);
-    clouds.appendChild(S('path',{d, 'stroke-width': (i===1?1.6:1.2), opacity:(i===1?0.8:0.55), stroke:'#dffcff', fill:'none'}));
-  });
-  const style = document.createElement('style');
-  style.textContent = `@keyframes cloudSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`;
-  svg.appendChild(style);
-  clouds.style.transformOrigin = '100px 100px';
-  clouds.style.animation = 'cloudSpin 40s linear infinite';
-  svg.appendChild(clouds);
-  addSpecular(svg,{r, cx, cy});
-}
-
-function addIceDetail(svg, {r=58, cx=100, cy=100}={}){
-  const g = S('g',{opacity:0.95});
-  [20, 36, 52].forEach((lat,i)=>{
-    const rr = r*Math.cos(deg2rad(lat));
-    const y  = cy + r*Math.sin(deg2rad(lat))*0.55;
-    g.appendChild(S('ellipse',{cx, cy:y, rx:rr, ry:rr*0.22, fill:'none', stroke:'#eaffff', 'stroke-opacity':0.55}));
-  });
-  const cracks = [
-    `M ${cx-r*0.6},${cy-r*0.15} C ${cx-r*0.2},${cy-r*0.25} ${cx+r*0.1},${cy-r*0.1} ${cx+r*0.55},${cy-r*0.05}`,
-    `M ${cx-r*0.5},${cy+r*0.1} C ${cx-r*0.2},${cy} ${cx+r*0.25},${cy+r*0.05} ${cx+r*0.5},${cy+r*0.12}`
-  ];
-  cracks.forEach(d=> g.appendChild(S('path',{d, opacity:0.75, stroke:'#eaffff', fill:'none'})));
-  svg.appendChild(g);
-  addSpecular(svg,{r, cx, cy});
-}
-
-// Builders
-function svgGas(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({}); svg.appendChild(body); addGasBands(svg, {}); addSweepingRings(svg); return svg; }
-function svgRocky(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.75 }); svg.appendChild(body); addRockyDetail(svg, {}); addSweepingRings(svg); return svg; }
-function svgOcean(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.85, atm:0.45 }); svg.appendChild(body); addOceanDetail(svg,{}); addSweepingRings(svg); return svg; }
-function svgIce(){ const svg = baseSVG(); addPolarGrid(svg); const body = sphereBase({ tint:0.8, atm:0.4 }); svg.appendChild(body); addIceDetail(svg,{}); addSweepingRings(svg); return svg; }
-
-// SPECIALS
-function svgLesserArk(){
-  // viewBox 0..200 like your other holograms
-  const svg = baseSVG();
-  const root = S('g', { fill:'#000', stroke:'none' });
-
-  // ---- fork used on every arm (three-prong white tip) ----
-  function forkTip(cx, cy, rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} ${cx} ${cy})` });
-    // center spear
-    g.appendChild(S('polygon', { points:`${cx},${cy-8} ${cx-1.2},${cy+6} ${cx+1.2},${cy+6}`, fill:'#fff' }));
-    // side prongs
-    g.appendChild(S('rect', { x:cx-3.2, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
-    g.appendChild(S('rect', { x:cx+1.8, y:cy+3.5, width:1.4, height:7.5, fill:'#fff' }));
-    // center notch
-    g.appendChild(S('rect', { x:cx-0.6, y:cy+3.5, width:1.2, height:2.2, fill:'#000' }));
-    return g;
-  }
-
-  // ---- MAJOR arm (cardinals) – shoulder bulge, long waist, subtle plate, taper ----
-  function majorArmGroup(rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
-
-    // One full closed profile built around x=100 (so rotation is clean)
-    // widths at key stations (half-widths): base=12, shoulder=22, waist=10, near-tip=6
-    const p = [
-      // start at left base
-      `M ${100-12} 100`,
-      // shoulder bulge (smooth, near hub)
-      `C ${100-16} 96, ${100-22} 92, ${100-22} 88`,
-      // tighten to waist
-      `C ${100-22} 78, ${100-10} 64, ${100-10} 56`,
-      // slight plate/band (square-ish feel)
-      `C ${100-10} 50, ${100-9} 46, ${100-6} 44`,
-      // taper to near-tip
-      `C ${100-6} 38, ${100-6} 34, ${100-6} 28`,
-      // straight across the nose
-      `L ${100+6} 28`,
-      // mirror back (right side)
-      `C ${100+6} 34, ${100+6} 38, ${100+6} 44`,
-      `C ${100+9} 46, ${100+10} 50, ${100+10} 56`,
-      `C ${100+10} 64, ${100+22} 78, ${100+22} 88`,
-      `C ${100+22} 92, ${100+16} 96, ${100+12} 100`,
-      'Z'
-    ].join(' ');
-    g.appendChild(S('path', { d:p, fill:'#000' }));
-
-    // small mid-arm plate (gives the blocky segment seen on refs)
-    g.appendChild(S('rect', { x:100-8, y:40, width:16, height:4, rx:1.2, fill:'#000' }));
-
-    // three-prong fork pointing outward (rotated with the group)
-    g.appendChild(forkTip(100, 20, 0));
-    return g;
-  }
-
-  // ---- MINOR arm (diagonals) – slimmer, shorter, crisp end ----
-  function minorArmGroup(rotDeg){
-    const g = S('g', { transform:`rotate(${rotDeg} 100 100)` });
-    // half-widths: base=8, shoulder=14, waist=7, near-tip=4  (shorter length)
-    const p = [
-      `M ${100-8} 100`,
-      `C ${100-11} 98, ${100-14} 94, ${100-14} 90`,
-      `C ${100-14} 82, ${100-7} 70, ${100-7} 62`,
-      `C ${100-7} 56, ${100-6} 52, ${100-4} 50`,
-      `C ${100-4} 44, ${100-4} 40, ${100-4} 34`,
-      `L ${100+4} 34`,
-      `C ${100+4} 40, ${100+4} 44, ${100+4} 50`,
-      `C ${100+6} 52, ${100+7} 56, ${100+7} 62`,
-      `C ${100+7} 70, ${100+14} 82, ${100+14} 90`,
-      `C ${100+14} 94, ${100+11} 98, ${100+8} 100`,
-      'Z'
-    ].join(' ');
-    g.appendChild(S('path', { d:p, fill:'#000' }));
-    g.appendChild(forkTip(100, 28, 0));
-    return g;
-  }
-
-  // ---- central hub with 8 subtle petals that blend into arms ----
-  const hub = S('g', {});
-  hub.appendChild(S('circle', { cx:100, cy:100, r:30, fill:'#000' }));
-  for (let i=0;i<8;i++){
-    hub.appendChild(S('path', {
-      d:'M100 80 C 95 88, 95 112, 100 120 C 105 112, 105 88, 100 80 Z',
-      transform:`rotate(${i*45} 100 100)`, fill:'#000'
-    }));
-  }
-  root.appendChild(hub);
-
-  // place 4 major arms at 0/90/180/270 (up/right/down/left)
-  [0,90,180,270].forEach(a => root.appendChild(majorArmGroup(a)));
-  // place 4 minor arms at 45/135/225/315
-  [45,135,225,315].forEach(a => root.appendChild(minorArmGroup(a)));
-
-  svg.appendChild(root);
-  return svg;
-}
-
-function svgShieldWorld(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
-  const body = sphereBase({ tint:0.9, atm:0.5 });
-  svg.appendChild(body);
-  // hex shield mesh
-  const mesh = S('g',{opacity:0.35});
-  for (let y=30; y<=170; y+=12){
-    for (let x=30; x<=170; x+=14){
-      mesh.appendChild(S('polygon',{points:`${x},${y-6} ${x+6},${y-3} ${x+6},${y+3} ${x},${y+6} ${x-6},${y+3} ${x-6},${y-3}`, fill:'none', stroke:'#bff6ff','stroke-width':'0.5'}));
-    }
-  }
-  svg.appendChild(mesh);
-  addSweepingRings(svg);
-  return svg;
-}
-
-function svgEcumenopolis(){
-  const svg = baseSVG();
-  addPolarGrid(svg);
-  const body = sphereBase({ tint:0.8, atm:0.35 });
-  svg.appendChild(body);
-  const rings = S('g',{opacity:0.25});
-  for (let r=20; r<=85; r+=6){
-    rings.appendChild(S('circle',{cx:100,cy:100,r,fill:'none',stroke:'#bff6ff','stroke-width':'0.6'}));
-  }
-  svg.appendChild(rings);
-  addSweepingRings(svg);
-  return svg;
-}
-
-// Router (Installation == Lesser Ark)
-function makeSVGFor(type){
-  const t=(type||'').toLowerCase();
-  if (t.includes('installation') || t.includes('ark')) return svgLesserArk();
-  if (t.includes('shield'))        return svgShieldWorld();
-  if (t.includes('ecumen'))        return svgEcumenopolis();
-  if (t.includes('gas'))           return svgGas();
-  if (t.includes('ocean'))         return svgOcean();
-  if (t.includes('rocky'))         return svgRocky();
-  if (t.includes('ice'))           return svgIce();
-  return svgRocky();
-}
-
-// Holo dock UI
-(function mountHolo(){
-  const style = document.createElement('style');
-  style.textContent = `
-    #holoDock {
-      position: fixed; left: 16px; bottom: 16px; width: 260px; height: 260px;
-      border: 1px solid #27404f; border-radius: 14px; background: rgba(6,12,18,.75);
-      box-shadow: 0 0 24px rgba(0,255,255,.08) inset, 0 0 24px rgba(0,0,0,.5);
-      backdrop-filter: blur(2px);
-      display: none; z-index: 20; overflow: hidden;
-    }
-    #holoDock .hdr {
-      height: 32px; display: flex; align-items: center; justify-content: space-between;
-      padding: 0 10px; font: 12px/1 system-ui; color: #cfe9ff; letter-spacing:.3px;
-      background: linear-gradient(180deg, rgba(20,30,42,.6), rgba(8,14,22,.2));
-      border-bottom: 1px solid #1e3142;
-    }
-    #holoDock .hdr .close { cursor:pointer; color:#9fdcff; opacity:.8; padding:2px 6px; border-radius:6px; }
-    #holoDock .hdr .close:hover { background:#0e1a24; opacity:1 }
-    #holoStage { position:absolute; inset:32px 0 0 0; display:flex; align-items:center; justify-content:center; }
-    #holoStage .svgWrap { width: 190px; height: 190px; display:flex; align-items:center; justify-content:center;
-      filter: drop-shadow(0 0 8px rgba(120,220,255,.35)) drop-shadow(0 0 16px rgba(120,220,255,.2));
-      transform-origin: 50% 50%;
-    }
-    #holoDock .foot {
-      position:absolute; left:0; right:0; bottom:0; height:26px; display:flex;
-      align-items:center; justify-content:center; color:#86d4ff; font:10px system-ui;
-      opacity:.7; border-top:1px solid #173243;
-      background: linear-gradient(180deg, rgba(10,18,26,.0), rgba(10,18,26,.3));
-    }`;
-  document.head.appendChild(style);
-
-  const dock = document.createElement('div');
-  dock.id='holoDock';
-  dock.innerHTML = `
-    <div class="hdr">
-      <div class="name">Holographic Scan</div>
-      <div class="close">✕</div>
-    </div>
-    <div id="holoStage"><div class="svgWrap"></div></div>
-    <div class="foot">interactive scan</div>`;
-  document.body.appendChild(dock);
-
-  const wrap = dock.querySelector('.svgWrap');
-  let rafId=null, tStart=0;
-  function anim(ts){
-    if (!tStart) tStart = ts;
-    const t = (ts - tStart)/1000;
-    const rot = (t*22)%360;
-    const osc = 1 + Math.sin(t*1.6)*0.02;
-    wrap.style.transform = `scale(${osc}) rotate(${rot}deg)`;
-    rafId = requestAnimationFrame(anim);
-  }
-  function startAnim(){ cancelAnimationFrame(rafId); tStart=0; rafId=requestAnimationFrame(anim); }
-  function stopAnim(){ cancelAnimationFrame(rafId); rafId=null; tStart=0; }
-
-  window.showHologram = function({type, name}){
-    const svg = makeSVGFor(type);
-    wrap.innerHTML = '';
-    wrap.appendChild(svg);
-    dock.querySelector('.name').textContent = name ? `${name} — ${type}` : (type||'scan');
-    dock.style.display = 'block';
-    startAnim();
-  };
-  window.hideHologram = function(){
-    stopAnim();
-    dock.style.display = 'none';
-    wrap.innerHTML = '';
-  };
-  dock.querySelector('.close').onclick = ()=>hideHologram();
-})();
-
-/* ===================== END HOLOGRAM BLOCK ===================== */
 
 // Helpers for ID + HUD
 let editMode = false; // lanes editor
@@ -724,8 +295,10 @@ let addMode  = false; // add system mode
 function updateHUD(){
   const hudLanes = document.getElementById('hud-lanes');
   const hudAdd   = document.getElementById('hud-add');
-  if (hudLanes) hudLanes.innerHTML = `Lanes: <b>${editMode?'ON':'OFF'}</b> (E)`;
-  if (hudAdd)   hudAdd.innerHTML   = `Add System: <b>${addMode?'ON':'OFF'}</b> (A)`;
+  if (hudLanes) hudLanes.innerHTML = `LANES &nbsp;<b>${editMode?'ON':'OFF'}</b>`;
+  if (hudAdd)   hudAdd.innerHTML   = `ADD &nbsp;<b>${addMode?'ON':'OFF'}</b>`;
+  if (hudLanes) hudLanes.style.color = editMode ? 'var(--cyan)' : '';
+  if (hudAdd)   hudAdd.style.color   = addMode  ? 'var(--cyan)' : '';
 }
 
 // === Boot data (robust) ===
@@ -792,17 +365,13 @@ function initFromData(data){
   lanesSet = new Set(lanes.map(([a,b]) => [a,b].sort().join('::')));
   rebuildLinesVBOFromSet();
 
-  // build the HUD content now (after DOM existing)
-  const hud = document.querySelector('#hud');
-  if (hud && !document.getElementById('hud-lanes')) {
-    hud.insertAdjacentHTML('beforeend', `
-      <span id="hud-sep1" style="margin:0 8px;opacity:.35;">|</span>
-      <span id="hud-lanes" style="opacity:.8;">Lanes: <b>OFF</b> (E)</span>
-      <span id="hud-sep2" style="margin:0 8px;opacity:.35;">|</span>
-      <span id="hud-add" style="opacity:.8;">Add System: <b>OFF</b> (A)</span>
-    `);
-  }
   updateHUD();
+
+  // Update status bar
+  const sbSys = document.getElementById('sb-sys');
+  const sbLanes = document.getElementById('sb-lanes-ct');
+  if (sbSys) sbSys.textContent = `${systems.length} NODES ACTIVE`;
+  if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
 
   console.log(`[SGN] Initialized: ${systems.length} systems, ${lanesSet.size} lanes`);
 }
@@ -922,41 +491,19 @@ canvas.addEventListener('auxclick', (e)=>{
   deleteNearestLane(mx, my, mvp);
 });
 
-// Panel
-const panel = document.createElement('div');
-panel.style.cssText = `
-  position:fixed; top:0; right:0; height:100vh; width:360px; background:#0b0f14e6;
-  border-left:1px solid #243143; color:#e8f0ff; font:14px/1.4 system-ui;
-  transform:translateX(100%); transition:transform .18s ease; display:flex; flex-direction:column; z-index:10;
-`;
-panel.innerHTML = `
-  <div style="padding:12px 14px; border-bottom:1px solid #243143; display:flex; justify-content:space-between; align-items:center;">
-    <strong id="sp-title">System</strong>
-    <div style="display:flex; gap:8px;">
-      <button id="sp-gen"  title="Generate/Load" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Generate/Load</button>
-      <button id="sp-edit" title="Edit"          style="background:#1b2a3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Edit</button>
-      <button id="sp-close"                      style="background:#17202b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:6px 10px;cursor:pointer;">Close</button>
-    </div>
-  </div>
-  <div id="sp-body" style="padding:12px 14px; overflow:auto; flex:1;">
-    <em>Select a star and press Enter, or double-click the selected star.</em>
-  </div>
-  <div style="padding:10px 14px; border-top:1px solid #243143; display:flex; gap:8px;">
-    <button id="sp-exp"  style="flex:1;background:#1f2b3a;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Export</button>
-  </div>
-`;
-document.body.appendChild(panel);
-const spTitle = panel.querySelector('#sp-title');
-const spBody  = panel.querySelector('#sp-body');
-panel.querySelector('#sp-close').onclick = () => hidePanel();
-panel.querySelector('#sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
-panel.querySelector('#sp-edit').onclick  = async ()=>{
+// Panel — already in index.html as #sidePanel
+const panel   = document.getElementById('sidePanel');
+const spTitle = document.getElementById('sp-title');
+const spBody  = document.getElementById('sp-body');
+document.getElementById('sp-close').onclick = () => hidePanel();
+document.getElementById('sp-gen').onclick   = async ()=>{ if(selectedId){ const d = await ensureSystemDetails(selectedId); renderPanel(selectedId, d, false); } };
+document.getElementById('sp-edit').onclick  = async ()=>{
   if(!selectedId) return;
   if(!requireEditor()) return;
   const d = await ensureSystemDetails(selectedId);
   renderPanel(selectedId, d, true);
 };
-panel.querySelector('#sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
+document.getElementById('sp-exp').onclick   = ()=>{ if(selectedId){ exportSystemDetails(selectedId); } };
 function showPanel(){ panel.style.transform = 'translateX(0)'; }
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 
@@ -1009,73 +556,62 @@ function renderPanel(id, details, edit=false){
     const star = details?.star || {};
     const planets = details?.planets || [];
     spBody.innerHTML = `
-      <div style="margin-bottom:10px;">
-        <div><strong>ID:</strong> ${id}</div>
-        <div><strong>Name:</strong> ${sys?.name || '(unnamed)'}</div>
-        <div><strong>Star:</strong> ${star.kind || '—'}</div>
-        <div><strong>Version:</strong> ${details?.version || '—'}</div>
-        ${Array.isArray(sys?.tags) ? `<div><strong>Tags:</strong> ${sys.tags.join(', ')}</div>` : ``}
+      <div>
+        <div class="data-row"><span class="dk">ID</span><span class="dv hi" style="font-family:'Share Tech Mono',monospace;font-size:11px;">${id}</span></div>
+        <div class="data-row"><span class="dk">Name</span><span class="dv">${sys?.name || '(unnamed)'}</span></div>
+        <div class="data-row"><span class="dk">Star</span><span class="dv go">${star.kind || '—'}</span></div>
+        ${sys?.owner ? `<div class="data-row"><span class="dk">Owner</span><span class="dv">${sys.owner}</span></div>` : ''}
+        ${Array.isArray(sys?.tags) ? `<div class="data-row"><span class="dk">Tags</span><span class="dv" style="font-size:11px;">${sys.tags.join(', ')}</span></div>` : ''}
+        <div class="data-row"><span class="dk">Record</span><span class="dv" style="font-size:11px;color:var(--text-muted);">${details?.version || '—'}</span></div>
       </div>
-      <div style="margin:10px 0;"><strong>Planets (${planets.length})</strong></div>
-      <div id="planetListRead" style="display:flex; flex-direction:column; gap:6px;">
+
+      <div class="sec-title">Orbital Bodies (${planets.length})</div>
+      <div id="planetListRead">
         ${
           planets.length
           ? planets.map((p,i)=>`
-            <div class="planet-card" data-type="${(p.type||'').replace(/"/g,'&quot;')}" data-name="${(p.name||('Planet '+(i+1))).replace(/"/g,'&quot;')}"
-                 style="border:1px solid #243143; border-radius:8px; padding:8px; cursor:pointer;">
-              <div><strong>${p.name || 'Planet '+(i+1)}</strong> — ${p.type ?? 'Unknown'}</div>
-              <div>Orbit: ${p.semi_major_AU ?? '?'} AU</div>
-              ${p.notes ? `<div style="opacity:.8;">${p.notes}</div>` : ``}
+            <div class="planet-card" data-type="${(p.type||'').replace(/"/g,'&quot;')}" data-name="${(p.name||('P'+(i+1))).replace(/"/g,'&quot;')}">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <span class="p-name">${p.name || 'P'+(i+1)}</span>
+                <span class="p-meta">${p.type ?? 'UNKNOWN'}</span>
+              </div>
+              <div class="p-orbit">${p.semi_major_AU ?? '?'} AU</div>
+              ${p.notes ? `<div class="p-notes">${p.notes}</div>` : ''}
             </div>
           `).join('')
-          : '<em>No planets generated yet. Click Generate/Load.</em>'
+          : '<em style="text-align:left;margin-top:8px;">// NO ORBITAL DATA<br>// PRESS SCAN TO GENERATE</em>'
         }
       </div>
     `;
-
-    // click → hologram
-    const listRead = spBody.querySelector('#planetListRead');
-    if (listRead) {
-      listRead.addEventListener('click', (e)=>{
-        const card = e.target.closest('.planet-card');
-        if (!card) return;
-        const type = card.getAttribute('data-type') || 'Rocky';
-        const name = card.getAttribute('data-name') || 'Body';
-        showHologram({ type, name });
-      });
-    }
-
   } else {
     const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
     const planets = details?.planets || [];
     const options = starKinds.map(k=>`<option value="${k}" ${details?.star?.kind===k?'selected':''}>${k}</option>`).join('');
     spBody.innerHTML = `
-      <form id="sys-edit" style="display:flex; flex-direction:column; gap:10px;">
-        <div style="display:grid; grid-template-columns:100px 1fr; gap:8px; align-items:center;">
-          <label><strong>ID</strong></label>
-          <div>${id}</div>
+      <form id="sys-edit" style="display:flex;flex-direction:column;gap:10px;">
+        <div class="form-grid">
+          <span class="fl">ID</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span>
 
-          <label for="sysName"><strong>Name</strong></label>
-          <input id="sysName" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+          <label class="fl" for="sysName">Name</label>
+          <input id="sysName" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
 
-          <label for="starKind"><strong>Star</strong></label>
-          <select id="starKind" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
-            ${options}
-          </select>
+          <label class="fl" for="starKind">Star Type</label>
+          <select id="starKind" class="sci-select">${options}</select>
         </div>
 
-        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-          <strong>Planets (${planets.length})</strong>
-          <button id="addPlanet" type="button" style="background:#12314b;border:1px solid #2a3b52;color:#e8f0ff;border-radius:6px;padding:6px 10px;cursor:pointer;">+ Add Planet</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+          <div class="sec-title" style="margin:0;flex:1;">Orbital Bodies (${planets.length})</div>
+          <button id="addPlanet" type="button" class="pbtn primary" style="pointer-events:all;">+ ADD</button>
         </div>
 
-        <div id="planetList" style="display:flex; flex-direction:column; gap:8px;">
+        <div id="planetList" style="display:flex;flex-direction:column;">
           ${planets.map((p,i)=>planetEditorRow(p,i)).join('')}
         </div>
 
-        <div style="display:flex; gap:8px; margin-top:6px;">
-          <button id="saveEdit" type="submit" style="flex:1;background:#1e3b26;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Save</button>
-          <button id="cancelEdit" type="button" style="flex:1;background:#3a1e1e;border:1px solid #2a3b52;color:#e8f0ff;border-radius:8px;padding:8px;cursor:pointer;">Cancel</button>
+        <div style="display:flex;gap:6px;margin-top:4px;">
+          <button id="saveEdit"   type="submit" class="pbtn primary" style="flex:1;pointer-events:all;padding:7px;">SAVE</button>
+          <button id="cancelEdit" type="button" class="pbtn danger"  style="flex:1;pointer-events:all;padding:7px;">CANCEL</button>
         </div>
       </form>
     `;
@@ -1140,25 +676,24 @@ function renderPanel(id, details, edit=false){
 function planetEditorRow(p,i){
   const opt = (v,sel)=> `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
   return `
-  <div class="planetRow" style="border:1px solid #243143; border-radius:8px; padding:8px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <strong class="pIndex">#${i+1}</strong>
-      <button type="button" class="delPlanet" style="background:#3a2424;border:1px solid #503636;color:#ffd9d9;border-radius:6px;padding:4px 8px;cursor:pointer;">Remove</button>
+  <div class="planetRow planet-row">
+    <div class="planet-row-hdr">
+      <span class="p-idx pIndex">BODY #${i+1}</span>
+      <button type="button" class="delPlanet pbtn danger" style="pointer-events:all;padding:3px 7px;">REMOVE</button>
     </div>
-    <div style="display:grid; grid-template-columns:110px 1fr; gap:8px; align-items:center;">
-      <label><strong>Name</strong></label>
-      <input class="pName" type="text" value="${(p.name||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
-
-      <label><strong>Type</strong></label>
-      <select class="pType" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;">
-        ${opt('Rocky', p.type)}${opt('Ice', p.type)}${opt('Gas', p.type)}${opt('Ocean', p.type)}${opt('Desert', p.type)}${opt('Shield World', p.type)}${opt('Ecumenopolis', p.type)}${opt('Installation', p.type)}${opt('Habitat', p.type)}
+    <div class="form-grid">
+      <span class="fl">Name</span>
+      <input class="pName sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/>
+      <span class="fl">Type</span>
+      <select class="pType sci-select">
+        ${opt('Rocky',p.type)}${opt('Ice',p.type)}${opt('Gas',p.type)}${opt('Ocean',p.type)}
+        ${opt('Desert',p.type)}${opt('Shield World',p.type)}${opt('Ecumenopolis',p.type)}
+        ${opt('Installation',p.type)}${opt('Habitat',p.type)}
       </select>
-
-      <label><strong>Orbit (AU)</strong></label>
-      <input class="pSMA" type="number" step="0.01" value="${p.semi_major_AU ?? 1}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
-
-      <label><strong>Notes</strong></label>
-      <input class="pNotes" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" style="background:#0e1620;color:#e8f0ff;border:1px solid #2a3b52;border-radius:6px;padding:6px 8px;"/>
+      <span class="fl">Orbit (AU)</span>
+      <input class="pSMA sci-input" type="number" step="0.01" value="${p.semi_major_AU ?? 1}"/>
+      <span class="fl">Notes</span>
+      <input class="pNotes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}"/>
     </div>
   </div>`;
 }
@@ -1245,7 +780,7 @@ function rebuildLinesVBOFromSet() {
 
 // --- render loop ---
 function loop() {
-  gl.clearColor(0.043, 0.055, 0.075, 1);
+  gl.clearColor(0.020, 0.031, 0.063, 1);  // deep void #050810
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
@@ -1253,23 +788,25 @@ function loop() {
   const view = mat4Translate(-panX, -panY, -dist);
   const mvp  = mat4Mul(rot, mat4Mul(view, proj));
 
-  // lanes first
+  // lanes first — cyan with low opacity for sci-fi look
   if (linesVBO && lineVertCount > 0) {
     gl.useProgram(progLines);
     gl.uniformMatrix4fv(uMVP_lines, false, mvp);
-    gl.uniform3f(uColorLines, 1.0, 0.85, 0.35);
+    gl.uniform3f(uColorLines, 0.15, 0.65, 0.78);  // muted cyan
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
     gl.enableVertexAttribArray(aPos_lines);
     gl.vertexAttribPointer(aPos_lines, 3, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.LINES, 0, lineVertCount);
   }
 
-  // stars
+  // stars — cool blue-white points
   if (starsVBO && starCount > 0) {
     gl.useProgram(progPoints);
     gl.uniformMatrix4fv(uMVP_points, false, mvp);
-    gl.uniform1f(uSize, 6.0);
-    gl.uniform3f(uColorPts, 1.0, 0.92, 0.6);
+    gl.uniform1f(uSize, 7.0);
+    gl.uniform3f(uColorPts, 0.78, 0.90, 1.0);  // blue-white
     gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
     gl.enableVertexAttribArray(aPos_points);
     gl.vertexAttribPointer(aPos_points, 3, gl.FLOAT, false, 0, 0);
@@ -1295,9 +832,11 @@ function loop() {
     })();
     if (hoveredNow){
       const sys = systems.find(s => s.id === hoveredNow);
-      tip.innerHTML = `<strong>${sys.name || sys.id}</strong><br/><small>${sys.id}</small>`;
-      tip.style.left = (mouseX + 12) + 'px';
-      tip.style.top  = (mouseY + 12) + 'px';
+      if (tipName)  tipName.textContent  = sys.name || sys.id;
+      if (tipId)    tipId.textContent    = sys.id;
+      if (tipOwner) tipOwner.textContent = sys.owner ? `◈ ${sys.owner}` : '';
+      tip.style.left    = mouseX + 'px';
+      tip.style.top     = mouseY + 'px';
       tip.style.display = 'block';
     } else {
       tip.style.display = 'none';
