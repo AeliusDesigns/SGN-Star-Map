@@ -1369,11 +1369,13 @@ function screenToWorldOnZ0(clientX, clientY, mvp){
   return [ p0[0] + dir[0]*t, p0[1] + dir[1]*t, 0 ];
 }
 
-// Find nearest system id to given client coords (within r pixels)
-function findNearestSystemId(clientX, clientY, mvp, r=18){
+// Find nearest system id to given client coords (within r CSS pixels)
+function findNearestSystemId(clientX, clientY, mvp, r=32){
+  const dpr = window.devicePixelRatio || 1;
   const mx = clientX * (canvas.width  / canvas.clientWidth);
   const my = clientY * (canvas.height / canvas.clientHeight);
-  let best = null, bestId = null, r2 = r*r;
+  const rPx = r * dpr;   // convert CSS radius to canvas pixel radius
+  let best = null, bestId = null, r2 = rPx * rPx;
   for (const sys of systems){
     const p = idToWorld.get(sys.id);
     if (!p) continue;
@@ -1442,7 +1444,7 @@ function loop() {
   if (starsVBO && starCount > 0) {
     gl.useProgram(progPoints);
     gl.uniformMatrix4fv(uMVP_points, false, mvp);
-    gl.uniform1f(uSize, 7.0);
+    gl.uniform1f(uSize, 8.0 * (window.devicePixelRatio || 1));
     gl.uniform3f(uColorPts, 0.78, 0.90, 1.0);  // blue-white
     gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
     gl.enableVertexAttribArray(aPos_points);
@@ -1458,7 +1460,7 @@ function loop() {
     hoveredNow = (function(){
       const mx = mouseX * (canvas.width  / canvas.clientWidth);
       const my = mouseY * (canvas.height / canvas.clientHeight);
-      let best=null,bestId=null,r2=18*18;
+      let best=null,bestId=null,r2=(32*(window.devicePixelRatio||1))**2;
       for (const sys of systems){
         const p = idToWorld.get(sys.id); if(!p) continue;
         const s = projectToScreen(p[0], p[1], p[2], mvp); if(!s) continue;
