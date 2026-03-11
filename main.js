@@ -530,19 +530,6 @@ function prngSeed(str){
   let s = h || 0xdeadbeef;
   return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s>>>0) / 4294967296); };
 }
-function generateDeterministic(id){
-  const rnd = prngSeed(id);
-  const kinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
-  const kind = kinds[Math.floor(rnd()*kinds.length)];
-  const planetCount = 1 + Math.floor(rnd()*10);
-  const planets = Array.from({length: planetCount}, (_,i)=>({
-    name: `P${i+1}`,
-    semi_major_AU: +(0.2 + rnd()*15).toFixed(2),
-    type: rnd()<0.3 ? "Rocky" : (rnd()<0.7 ? "Ice" : "Gas"),
-    notes: rnd()<0.15 ? "In resonance" : ""
-  }));
-  return { version: SYSGEN_VERSION, system_id: id, seeded: true, generated_at: new Date().toISOString(), star: { kind }, planets };
-}
 async function ensureSystemDetails(id, forceRegen=false){
   let det = forceRegen ? null : getCachedSystem(id);
   if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
@@ -830,6 +817,9 @@ function buildOrbitSVG(planets, starColor, starMeta, starData){
     ${defs}${bg}${grid}${hz}${orbits}${labels}${ticks}${hzLabel}${starGlow}${dots}
   </svg>`;
 }
+
+// Renders the panel for given id
+function renderPanel(id, details){
   const sys    = systems.find(s=>s.id===id);
   const star   = details?.star || {};
   const planets= details?.planets || [];
@@ -955,7 +945,7 @@ function renderEditPane(id, details, sys){
       </div>
 
       <div class="edit-actions">
-        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">✓ SAVE CHANGES</button>
+        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">�- SAVE CHANGES</button>
         <button id="cancelEdit" type="button" class="pbtn danger"  style="padding:8px 12px;">✕</button>
       </div>
     </form>
