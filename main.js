@@ -227,7 +227,7 @@ addEventListener('mousemove', e => {
   const dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
   if (dragging) {
-    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragMoved = true;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) { dragMoved = true; _clickMoved = true; }
     if (!addMode && dragMoved) {
       yaw   += dx * 0.005;
       pitch += dy * 0.005;
@@ -378,21 +378,55 @@ function initFromData(data){
   console.log(`[SGN] Initialized: ${systems.length} systems, ${lanesSet.size} lanes`);
 }
 
-// CLICK handler: lane edit / select / ADD SYSTEM
-canvas.addEventListener('click', (e) => {
-  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(-panX, -panY, -dist);
-  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+// CLICK handler — uses hoveredId stored by the render loop each frame
+// This is reliable because hover detection already works correctly
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  _clickDownId = hoveredId; // capture which system is under cursor at mousedown
+  _clickMoved  = false;
+});
 
-  if (editMode){
-    const bestId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-    if (!bestId) return;
-    if (!window._lanePickA) window._lanePickA = null;
+canvas.addEventListener('mouseup', async e => {
+  if (e.button !== 0) return;
+  if (_clickMoved) return;            // was a drag, not a click
+  if (!_clickDownId) {
+    // clicked empty space — handle addMode world-placement
+    if (addMode) {
+      const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+      const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+      const view = mat4Translate(-panX, -panY, -dist);
+      const mvp  = mat4Mul(rot, mat4Mul(view, proj));
+      const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
+      if (!world) return;
+      const [wx, wy] = world;
+      let xn = Math.max(0, Math.min(1, (wx / worldW) + 0.5));
+      let yn = Math.max(0, Math.min(1, 0.5 - (wy / worldH)));
+      const base = "SYS_";
+      let n = systems.length + 1;
+      while (systems.some(s=>s.id === base+n)) n++;
+      const newId = base + n;
+      const defaultName = prompt('Name for new system:', `New System ${n}`) || `New System ${n}`;
+      const sys = { id:newId, name:defaultName, coords:{x_norm:xn, y_norm:yn, z:0}, tags:["installation"] };
+      systems.push(sys);
+      idToWorld.set(newId, [wx, wy, 0]);
+      rebuildStarsVBO();
+      selectedId = newId;
+      const det = await ensureSystemDetails(newId);
+      renderPanel(newId, det);
+    }
+    return;
+  }
+
+  const id = _clickDownId;
+  _clickDownId = null;
+
+  if (editMode) {
+    // Lane editor: click two systems to toggle a lane
     if (!window._lanePickA) {
-      window._lanePickA = bestId;
+      window._lanePickA = id;
+      console.log('[SGN] Lane pick A:', id);
     } else {
-      const key = [window._lanePickA, bestId].sort().join('::');
+      const key = [window._lanePickA, id].sort().join('::');
       if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
       window._lanePickA = null;
       rebuildLinesVBOFromSet();
@@ -400,60 +434,24 @@ canvas.addEventListener('click', (e) => {
     return;
   }
 
-  if (addMode){
-    const nearId = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-    if (nearId){
-      selectedId = nearId;
-      updateHUD();
-      return;
-    }
-    const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
-    if (!world) return;
-    const [wx, wy] = world;
-
-    let xn = (wx / worldW) + 0.5;
-    let yn = 0.5 - (wy / worldH);
-    xn = Math.max(0, Math.min(1, xn));
-    yn = Math.max(0, Math.min(1, yn));
-
-    const base = "SYS_";
-    let n = systems.length + 1;
-    while (systems.some(s=>s.id === base + n)) n++;
-    const newId = base + n;
-
-    const defaultName = prompt('Name for new system:', `New System ${n}`) || `New System ${n}`;
-
-    const sys = {
-      id: newId,
-      name: defaultName,
-      coords: { x_norm: xn, y_norm: yn, z: 0 },
-      // NOTE: original used ["manmade"]; not using "Artificial World" anywhere
-      tags: ["installation"]
-    };
-    systems.push(sys);
-    idToWorld.set(newId, [wx, wy, 0]);
-    rebuildStarsVBO();
-
-    selectedId = newId;
-    ensureSystemDetails(newId).then(det=>{
-      renderPanel(newId, det);
-    });
-
+  if (addMode) {
+    // Clicked an existing system in addMode — just select it
+    selectedId = id;
+    updateHUD();
+    const det = await ensureSystemDetails(id);
+    renderPanel(id, det);
     return;
   }
 
-  const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-  if (!id) return;
+  // Normal mode — select and open panel
   selectedId = id;
   updateHUD();
-  ensureSystemDetails(id).then(det => {
-    try {
-      renderPanel(id, det);
-    } catch(err) {
-      console.error('[SGN] renderPanel crashed:', err);
-    }
-  }).catch(err => console.error('[SGN] ensureSystemDetails crashed:', err));
+  const det = await ensureSystemDetails(id);
+  renderPanel(id, det);
 });
+
+let _clickDownId = null;
+let _clickMoved  = false;
 
 // Middle-click to delete nearest lane (edit mode)
 function mouseToCanvas(e){
@@ -827,10 +825,7 @@ function darkenHex(hex, amt) {
         b = Math.max(0,parseInt(hex.slice(5,7),16)-amt);
   return `rgb(${r},${g},${b})`;
 }
-function showPanel(){ 
-  console.log('[SGN] showPanel called');
-  panel.style.transform = 'translateX(0)'; 
-}
+function showPanel(){ panel.style.transform = 'translateX(0)'; }
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 
 // system details cache/generator
@@ -1477,6 +1472,7 @@ function loop() {
       }
       return bestId;
     })();
+    hoveredId = hoveredNow || null;
     if (hoveredNow){
       const sys = systems.find(s => s.id === hoveredNow);
       if (tipName)  tipName.textContent  = sys.name || sys.id;
