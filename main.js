@@ -520,7 +520,7 @@ function showPanel(){ panel.style.transform = 'translateX(0)'; }
 function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
 
 // system details cache/generator
-const SYSGEN_VERSION = "v1";
+const SYSGEN_VERSION = "v2";
 function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
 function getCachedSystem(id){ try { const raw = localStorage.getItem(sysKey(id)); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function setCachedSystem(id, details){ try { localStorage.setItem(sysKey(id), JSON.stringify(details)); } catch {} }
@@ -588,34 +588,248 @@ const PLANET_META = {
 function getPlanetMeta(type){ return PLANET_META[type] || { icon:'◉', color:'#888' }; }
 function getStarMeta(kind){ return STAR_META[kind] || { abbr:'?', bg:'#1a2a3a', glow:'#38e8ff', text:'#38e8ff' }; }
 
-// ── Mini orbit diagram SVG ──
-function buildOrbitSVG(planets, starColor){
-  const cx=96, cy=96, r=96;
-  const maxAU = Math.max(...planets.map(p=>p.semi_major_AU||1), 1);
-  const scale = (r-16) / maxAU;
-  let rings='', dots='';
-  planets.forEach((p,i)=>{
-    const or = 10 + (p.semi_major_AU||1)*scale;
-    const pm = getPlanetMeta(p.type);
-    const angle = (i / planets.length) * Math.PI * 2 - Math.PI/2;
-    const px = cx + Math.cos(angle)*or, py = cy + Math.sin(angle)*or;
-    rings += `<circle cx="${cx}" cy="${cy}" r="${or.toFixed(1)}" fill="none" stroke="rgba(56,232,255,.12)" stroke-width="0.7"/>`;
-    dots  += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${pm.color}" opacity=".85">
-      <title>${p.name} · ${p.type} · ${p.semi_major_AU}AU</title>
-    </circle>`;
-  });
-  return `<svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(8,13,24,.6)" stroke="rgba(56,232,255,.08)" stroke-width="1"/>
-    ${rings}
-    <circle cx="${cx}" cy="${cy}" r="7" fill="${starColor}" opacity=".9" filter="url(#sg)"/>
-    <circle cx="${cx}" cy="${cy}" r="12" fill="${starColor}" opacity=".15"/>
-    <defs><filter id="sg"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    ${dots}
-  </svg>`;
+// ── Deterministic system generator — realistic orbital mechanics ──
+function generateDeterministic(id){
+  const rnd = prngSeed(id);
+
+  // Star class with weighted probability (M-dwarfs most common, black holes rare)
+  const starTable = [
+    { kind:'M-Dwarf',       w:34, hz:[0.1,0.4],  innerEdge:0.05, outerEdge:8,  starR:3  },
+    { kind:'K-Dwarf',       w:22, hz:[0.4,0.9],  innerEdge:0.08, outerEdge:15, starR:4  },
+    { kind:'G-Dwarf',       w:18, hz:[0.8,1.6],  innerEdge:0.15, outerEdge:20, starR:5  },
+    { kind:'Main Sequence', w:10, hz:[0.9,1.8],  innerEdge:0.15, outerEdge:20, starR:5  },
+    { kind:'F-Dwarf',       w:8,  hz:[1.2,2.5],  innerEdge:0.2,  outerEdge:25, starR:6  },
+    { kind:'Subgiant',      w:4,  hz:[2.0,5.0],  innerEdge:0.3,  outerEdge:40, starR:7  },
+    { kind:'Giant',         w:2,  hz:[5.0,12.0], innerEdge:0.5,  outerEdge:60, starR:9  },
+    { kind:'Neutron',       w:1,  hz:[0.02,0.08],innerEdge:0.01, outerEdge:5,  starR:2  },
+    { kind:'Black Hole',    w:1,  hz:[0.0,0.0],  innerEdge:0.3,  outerEdge:50, starR:2  },
+  ];
+  const totalW = starTable.reduce((s,e)=>s+e.w, 0);
+  let pick = rnd() * totalW;
+  const starEntry = starTable.find(e=>{ pick-=e.w; return pick<=0; }) || starTable[2];
+  const kind = starEntry.kind;
+
+  // Titius-Bode inspired cascade: each orbit = prev * (1.4–2.2) with jitter
+  // Starting orbit randomised per inner edge of the star type
+  const planetCount = 2 + Math.floor(rnd() * 9); // 2–10
+  const planets = [];
+  let au = starEntry.innerEdge * (1 + rnd() * 2); // first orbit
+  const [hzIn, hzOut] = starEntry.hz;
+
+  // Zone classifier
+  function classifyZone(a){
+    if (a < starEntry.innerEdge * 1.5)            return 'inner';
+    if (a >= hzIn * 0.7 && a <= hzOut * 1.3)      return 'habitable';
+    if (a > hzOut * 1.3 && a < starEntry.outerEdge * 0.4) return 'outer';
+    return 'fringe';
+  }
+
+  // Type probabilities per zone
+  function pickType(zone){
+    const r = rnd();
+    if (kind === 'Neutron'){
+      const t = ['Rocky','Installation','Habitat','Ice'];
+      return t[Math.floor(rnd()*t.length)];
+    }
+    if (kind === 'Black Hole'){
+      const t = ['Rocky','Desert','Installation'];
+      return t[Math.floor(rnd()*t.length)];
+    }
+    switch(zone){
+      case 'inner':     return r<0.50?'Rocky' : r<0.75?'Desert' : r<0.88?'Ocean' : 'Installation';
+      case 'habitable': return r<0.30?'Ocean'  : r<0.55?'Rocky'  : r<0.70?'Desert': r<0.82?'Ecumenopolis': r<0.90?'Shield World':'Installation';
+      case 'outer':     return r<0.45?'Gas'    : r<0.70?'Ice'    : r<0.85?'Rocky': 'Habitat';
+      case 'fringe':    return r<0.55?'Ice'    : r<0.80?'Gas'    : 'Rocky';
+    }
+  }
+
+  // Planet radius hint for visual sizing (AU-relative, not real)
+  const TYPE_RADIUS = {
+    'Rocky':0.9,'Desert':0.85,'Ocean':1.0,'Ice':0.8,'Gas':2.2,'Ecumenopolis':1.1,
+    'Shield World':1.0,'Installation':0.6,'Habitat':0.5
+  };
+
+  const usedNames = new Set();
+  const prefixes  = ['Aryn','Vel','Cor','Sith','Eld','Myr','Tar','Keth','Vor','Sev','Nox','Cal'];
+  const suffixes  = ['is','os','ax','en','ar','ia','um','on','eth','el'];
+  function genName(){
+    let n;
+    do {
+      n = prefixes[Math.floor(rnd()*prefixes.length)] + suffixes[Math.floor(rnd()*suffixes.length)];
+    } while(usedNames.has(n));
+    usedNames.add(n);
+    return n;
+  }
+
+  for (let i=0; i<planetCount; i++){
+    const zone = classifyZone(au);
+    const type = pickType(zone);
+    const eccFactor = 0.85 + rnd()*0.30; // slight eccentricity variation for rendering
+    const resonanceChance = i > 0 && rnd() < 0.12;
+    planets.push({
+      name:          genName(),
+      semi_major_AU: +au.toFixed(3),
+      type,
+      zone,
+      radius_hint:   +(TYPE_RADIUS[type] || 1) * (0.85 + rnd()*0.3),
+      ecc:           +((rnd()*0.18)).toFixed(3),   // 0–0.18 eccentricity
+      angle_deg:     +((rnd()*360)).toFixed(1),     // current orbital position
+      notes:         resonanceChance ? 'Orbital resonance detected' : ''
+    });
+    // Next orbit: Titius-Bode-style spacing with randomness
+    const spacing = 1.45 + rnd() * 0.75;
+    au = au * spacing * (0.9 + rnd()*0.2);
+    if (au > starEntry.outerEdge) break;
+  }
+
+  return {
+    version: SYSGEN_VERSION,
+    system_id: id,
+    seeded: true,
+    generated_at: new Date().toISOString(),
+    star: { kind, hz: starEntry.hz, inner_edge: starEntry.innerEdge, outer_edge: starEntry.outerEdge, radius_hint: starEntry.starR },
+    planets
+  };
 }
 
-// Renders the panel for given id
-function renderPanel(id, details){
+// ── Orbit diagram — logarithmic scale, habitable zone, per-planet sizing ──
+function buildOrbitSVG(planets, starColor, starMeta, starData){
+  const cx = 110, cy = 110, maxR = 100;
+
+  // log scale: map AU -> radius in SVG units
+  const allAU  = planets.map(p=>p.semi_major_AU||0.1);
+  const minAU  = Math.max(0.01, (starData?.inner_edge||0.05) * 0.5);
+  const maxAU  = Math.max(...allAU, 1) * 1.15;
+  const logMin = Math.log(minAU), logMax = Math.log(maxAU);
+
+  function auToR(au){
+    const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
+    return 8 + t * (maxR - 8);
+  }
+
+  // Habitable zone ring
+  const [hzIn, hzOut] = starData?.hz || [0.8, 1.6];
+  const hzR1 = auToR(hzIn), hzR2 = auToR(hzOut);
+  const hzVisible = hzR1 < maxR && hzR2 > 8 && hzIn > 0;
+
+  // Star radius visual (scaled by star type)
+  const starVisR = Math.min(7, 3 + (starData?.radius_hint||5) * 0.6);
+
+  let defs = `
+    <defs>
+      <filter id="glow-s" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="glow-p" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="1.5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <radialGradient id="star-grad" cx="40%" cy="35%" r="60%">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.9"/>
+        <stop offset="50%" stop-color="${starColor}" stop-opacity="0.9"/>
+        <stop offset="100%" stop-color="${starColor}" stop-opacity="0.5"/>
+      </radialGradient>
+    </defs>`;
+
+  // Background
+  let bg = `<circle cx="${cx}" cy="${cy}" r="108" fill="rgba(4,7,14,.85)" stroke="rgba(56,232,255,.06)" stroke-width="1"/>`;
+
+  // Subtle radial grid lines (every ~20 SVG units)
+  let grid = '';
+  for (let r = 20; r <= maxR; r += 20){
+    grid += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(56,232,255,.05)" stroke-width="0.5"/>`;
+  }
+
+  // Habitable zone band
+  let hz = '';
+  if (hzVisible){
+    hz = `<circle cx="${cx}" cy="${cy}" r="${hzR2.toFixed(1)}" fill="rgba(80,255,120,.06)" stroke="rgba(80,255,120,.18)" stroke-width="0.8" stroke-dasharray="3 4"/>
+          <circle cx="${cx}" cy="${cy}" r="${hzR1.toFixed(1)}" fill="rgba(4,7,14,.0)" stroke="rgba(80,255,120,.12)" stroke-width="0.6" stroke-dasharray="2 5"/>`;
+  }
+
+  // Orbit ellipses — slightly elliptical using ecc
+  let orbits = '';
+  planets.forEach(p => {
+    const a   = auToR(p.semi_major_AU || 0.1);
+    const ecc = p.ecc || 0;
+    const b   = a * Math.sqrt(1 - ecc*ecc);       // semi-minor axis
+    const off = a * ecc;                            // focus offset
+    // Rotate ellipse by planet's angle_deg for variety
+    const rot = p.angle_deg || 0;
+    orbits += `<ellipse cx="${(cx + off * 0.3).toFixed(1)}" cy="${cy}" rx="${a.toFixed(1)}" ry="${b.toFixed(1)}"
+      fill="none" stroke="rgba(56,232,255,.16)" stroke-width="0.7"
+      transform="rotate(${rot} ${cx} ${cy})"/>`;
+  });
+
+  // Planet dots — sized by radius_hint, positioned at angle_deg on orbit
+  let dots = '';
+  let labels = '';
+  planets.forEach(p => {
+    const a    = auToR(p.semi_major_AU || 0.1);
+    const ecc  = p.ecc || 0;
+    const b    = a * Math.sqrt(1 - ecc*ecc);
+    const off  = a * ecc * 0.3;
+    const ang  = ((p.angle_deg || 0) * Math.PI) / 180;
+    // Position on the ellipse at angle
+    const px   = cx + off + Math.cos(ang) * a;
+    const py   = cy + Math.sin(ang) * b;
+    const pr   = Math.max(2.2, Math.min(5.5, (p.radius_hint||1) * 2.2));
+    const pm   = getPlanetMeta(p.type);
+    const isHz = p.zone === 'habitable';
+
+    // Glow ring for habitable-zone planets
+    if (isHz){
+      dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(pr+3).toFixed(1)}" fill="none" stroke="rgba(80,255,120,.3)" stroke-width="0.8"/>`;
+    }
+    dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${pr.toFixed(1)}"
+      fill="${pm.color}" opacity=".92" filter="url(#glow-p)">
+      <title>${p.name} · ${p.type} · ${p.semi_major_AU} AU</title>
+    </circle>`;
+
+    // Label: only if enough room (not too close to edge/center)
+    const labelDist = Math.hypot(px - cx, py - cy);
+    if (labelDist > 14 && labelDist < 104){
+      // Push label radially outward from center
+      const lx = cx + (px-cx)/labelDist * (labelDist + pr + 5);
+      const ly = cy + (py-cy)/labelDist * (labelDist + pr + 5);
+      const anchor = lx > cx ? 'start' : 'end';
+      labels += `<text x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}"
+        font-family="'Share Tech Mono',monospace" font-size="7" fill="rgba(180,210,255,.55)"
+        text-anchor="${anchor}" letter-spacing="0.5">${p.name}</text>`;
+    }
+  });
+
+  // Star
+  const starGlow = `<circle cx="${cx}" cy="${cy}" r="${(starVisR*3.5).toFixed(1)}" fill="${starColor}" opacity=".08"/>
+    <circle cx="${cx}" cy="${cy}" r="${(starVisR*1.8).toFixed(1)}" fill="${starColor}" opacity=".15"/>
+    <circle cx="${cx}" cy="${cy}" r="${starVisR.toFixed(1)}" fill="url(#star-grad)" filter="url(#glow-s)"/>`;
+
+  // AU scale tick
+  const tickAUs = [0.5, 1, 5, 10, 20].filter(v => v >= minAU && v <= maxAU);
+  let ticks = '';
+  tickAUs.forEach(v => {
+    const tr = auToR(v);
+    if (tr > 10 && tr < maxR - 2){
+      ticks += `<text x="${(cx + tr + 2).toFixed(1)}" y="${(cy + 3).toFixed(1)}"
+        font-family="'Share Tech Mono',monospace" font-size="6" fill="rgba(56,232,255,.3)"
+        letter-spacing="0">${v}AU</text>`;
+    }
+  });
+
+  // HZ label
+  let hzLabel = '';
+  if (hzVisible){
+    const midR = (hzR1 + hzR2) / 2;
+    hzLabel = `<text x="${(cx + midR + 2).toFixed(1)}" y="${(cy - 3).toFixed(1)}"
+      font-family="'Share Tech Mono',monospace" font-size="6" fill="rgba(80,255,120,.45)"
+      letter-spacing="0.5">HZ</text>`;
+  }
+
+  return `<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+    ${defs}${bg}${grid}${hz}${orbits}${labels}${ticks}${hzLabel}${starGlow}${dots}
+  </svg>`;
+}
   const sys    = systems.find(s=>s.id===id);
   const star   = details?.star || {};
   const planets= details?.planets || [];
@@ -637,7 +851,7 @@ function renderPanel(id, details){
     : '';
 
   const orbitSVG = planets.length
-    ? `<div class="orbit-diagram">${buildOrbitSVG(planets, sm.glow)}</div>`
+    ? `<div class="orbit-diagram">${buildOrbitSVG(planets, sm.glow, sm, details?.star)}</div>`
     : '';
 
   pov.innerHTML = `
