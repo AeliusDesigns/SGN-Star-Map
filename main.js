@@ -204,7 +204,7 @@ void main(){
   gl_FragColor = vec4(col, alpha);
 }`;
 
-/* ── Halo rings ── */
+/* ── Halo / targeting reticle (hover + selection) ── */
 const VS_HALO = `
 attribute vec3 position;
 uniform mat4 uMVP;
@@ -214,22 +214,76 @@ void main(){
   gl_PointSize = uPixelSize;
 }`;
 const FS_HALO = `
-precision mediump float;
+precision highp float;
 uniform float uTime;
 uniform vec3 uColGlow;
 uniform vec3 uColCore;
+uniform float uMode; // 0 = hover, 1 = selected, 2 = lane-pick
+
 void main(){
   vec2 uv = gl_PointCoord * 2.0 - 1.0;
   float r = length(uv);
-  float inner = 0.55, outer = 0.85;
-  float ring = smoothstep(inner, inner+0.02, r) * (1.0 - smoothstep(outer-0.02, outer, r));
   float ang = atan(uv.y, uv.x);
-  float phase = fract((ang / 6.2831853) * 3.0 + uTime * 1.8);
-  float scanner = smoothstep(0.05, 0.0, abs(phase - 0.5) - 0.25);
-  float glow = exp(-6.0 * (r*r));
-  vec3 col = mix(uColGlow, uColCore, 0.35);
-  float alpha = clamp(ring * (0.55 + 0.45*scanner) + glow*0.15, 0.0, 1.0);
-  gl_FragColor = vec4(col, alpha);
+  float PI = 3.14159265;
+  float alpha = 0.0;
+  vec3 col = mix(uColGlow, uColCore, 0.4);
+
+  // ── outer segmented arc ring ──
+  float outerR = 0.82;
+  float outerW = 0.025;
+  float outerRing = smoothstep(outerR - outerW, outerR, r) * (1.0 - smoothstep(outerR, outerR + outerW, r));
+  // segment into 8 arcs with gaps
+  float seg8 = mod(ang + PI, PI * 0.25) / (PI * 0.25);
+  float arcMask = smoothstep(0.08, 0.12, seg8) * (1.0 - smoothstep(0.88, 0.92, seg8));
+  outerRing *= arcMask;
+  // slow rotation
+  float rotOuter = mod(ang + uTime * 0.4, PI * 2.0);
+  alpha += outerRing * 0.7;
+
+  // ── inner ring (thinner, continuous, brighter) ──
+  float innerR = 0.55;
+  float innerW = 0.015;
+  float innerRing = smoothstep(innerR - innerW, innerR, r) * (1.0 - smoothstep(innerR, innerR + innerW, r));
+  alpha += innerRing * 0.85;
+
+  // ── scanning sweep (single beam rotating) ──
+  float sweep = mod(ang + uTime * 1.5, PI * 2.0);
+  float sweepArc = smoothstep(0.0, 0.3, sweep) * (1.0 - smoothstep(0.3, 0.6, sweep));
+  float sweepMask = smoothstep(innerR - 0.05, innerR, r) * (1.0 - smoothstep(outerR, outerR + 0.05, r));
+  alpha += sweepArc * sweepMask * 0.3;
+  col += uColCore * sweepArc * sweepMask * 0.15;
+
+  // ── 4 cardinal tick marks on outer ring ──
+  for(int i = 0; i < 4; i++){
+    float tickAng = float(i) * PI * 0.5;
+    float da = abs(mod(ang - tickAng + PI, PI * 2.0) - PI);
+    float tick = smoothstep(0.04, 0.0, da);
+    float tickR = smoothstep(outerR + outerW, outerR + outerW + 0.01, r) * (1.0 - smoothstep(outerR + outerW + 0.06, outerR + outerW + 0.08, r));
+    alpha += tick * tickR * 0.9;
+  }
+
+  // ── 4 diamond indicators at diagonals (selected only) ──
+  if(uMode > 0.5){
+    for(int i = 0; i < 4; i++){
+      float dAng = float(i) * PI * 0.5 + PI * 0.25;
+      float da = abs(mod(ang - dAng + PI, PI * 2.0) - PI);
+      float diamond = smoothstep(0.08, 0.0, da) * smoothstep(0.02, 0.0, abs(r - outerR));
+      alpha += diamond * 0.8;
+      col += uColCore * diamond * 0.2;
+    }
+  }
+
+  // ── center glow ──
+  float center = exp(-r * r * 12.0) * 0.12;
+  alpha += center;
+
+  // ── pulse on selected ──
+  if(uMode > 0.5){
+    float pulse = 0.85 + 0.15 * sin(uTime * 2.0);
+    alpha *= pulse;
+  }
+
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }`;
 
 /* ── Compile programs ── */
@@ -266,6 +320,7 @@ const uPix_halo  = gl.getUniformLocation(progHalo, 'uPixelSize');
 const uTime_halo = gl.getUniformLocation(progHalo, 'uTime');
 const uColGlow   = gl.getUniformLocation(progHalo, 'uColGlow');
 const uColCore   = gl.getUniformLocation(progHalo, 'uColCore');
+const uMode_halo = gl.getUniformLocation(progHalo, 'uMode');
 
 let yaw = 0, pitch = 0, dist = 1800;
 let dragging = false, dragMoved = false, lx = 0, ly = 0;
@@ -1721,7 +1776,7 @@ function loop() {
 
   /* ── 5. Halos ── */
   if (!haloVBO) haloVBO = gl.createBuffer();
-  function drawHalo(id, pix, ht, glow, core) {
+  function drawHalo(id, pix, ht, glow, core, mode) {
     const p = idToWorld.get(id); if (!p) return;
     gl.useProgram(progHalo);
     gl.uniformMatrix4fv(uMVP_halo, false, mvp);
@@ -1729,6 +1784,7 @@ function loop() {
     gl.uniform1f(uTime_halo, ht);
     gl.uniform3f(uColGlow, glow[0], glow[1], glow[2]);
     gl.uniform3f(uColCore, core[0], core[1], core[2]);
+    gl.uniform1f(uMode_halo, mode || 0.0);
     gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(aPos_halo);
@@ -1740,9 +1796,9 @@ function loop() {
   }
 
   const t = wallTime;
-  if (hoveredNow) drawHalo(hoveredNow, 34.0, t,        [0.35,0.95,1.0], [1.0,0.95,0.50]);
-  if (selectedId) drawHalo(selectedId, 42.0, t*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.70]);
-  if (window._lanePickA) drawHalo(window._lanePickA, 38.0, t*1.5, [0.15,0.65,0.78], [0.4,0.85,1.0]);
+  if (hoveredNow) drawHalo(hoveredNow, 40.0, t,        [0.35,0.95,1.0], [1.0,0.95,0.50], 0.0);
+  if (selectedId) drawHalo(selectedId, 52.0, t*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.70], 1.0);
+  if (window._lanePickA) drawHalo(window._lanePickA, 44.0, t*1.5, [0.15,0.65,0.78], [0.4,0.85,1.0], 2.0);
 
   updateFleetMapIcons(mvp);
 
