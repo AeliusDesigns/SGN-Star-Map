@@ -1,36 +1,38 @@
-// === Vanilla WebGL star map with LANES + Hover Highlight + Rename + Select + System Panel (Edit Mode) + ADD SYSTEM MODE ===
-const canvas = document.getElementById('gl');
-let gl = canvas.getContext('webgl2', { antialias: true });
-if (!gl) gl = canvas.getContext('webgl', { antialias: true });
-if (!gl) { alert('WebGL not supported'); throw new Error('WebGL not supported'); }
+// ============================================================
+//  SGN — Stellar Gate Network  |  Star Map  |  main.js
+//  Ground-up rewrite. No type=module. Click uses hoveredId
+//  written by the render loop — zero separate hit-testing.
+// ============================================================
 
-console.log('[SGN] Booting…');
+// ── WebGL context ────────────────────────────────────────────
+var canvas = document.getElementById('gl');
+var gl = canvas.getContext('webgl2', { antialias: true })
+      || canvas.getContext('webgl',  { antialias: true });
+if (!gl) { alert('WebGL not supported'); throw new Error('no webgl'); }
 
-// Resize
+console.log('[SGN] boot');
+
+// ── Canvas resize (DPR=1 keeps picking simple) ───────────────
 function resize() {
-  const dpr = 1;
-  canvas.width = Math.floor(innerWidth * dpr);
-  canvas.height = Math.floor(innerHeight * dpr);
-  canvas.style.width = innerWidth + 'px';
+  canvas.width  = innerWidth;
+  canvas.height = innerHeight;
+  canvas.style.width  = innerWidth  + 'px';
   canvas.style.height = innerHeight + 'px';
   gl.viewport(0, 0, canvas.width, canvas.height);
 }
-addEventListener('resize', resize);
+window.addEventListener('resize', resize);
 resize();
 
-// --- tiny matrix helpers ---
+// ── Matrix helpers ───────────────────────────────────────────
 function mat4Mul(a, b) {
-  const o = new Float32Array(16);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
-    o[r*4+c] =
-      a[r*4+0]*b[0*4+c] +
-      a[r*4+1]*b[1*4+c] +
-      a[r*4+2]*b[2*4+c] +
-      a[r*4+3]*b[3*4+c];
+  var o = new Float32Array(16);
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++)
+      o[r*4+c] = a[r*4+0]*b[c] + a[r*4+1]*b[4+c] + a[r*4+2]*b[8+c] + a[r*4+3]*b[12+c];
   return o;
 }
 function mat4Perspective(fovy, aspect, near, far) {
-  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
   return new Float32Array([
     f/aspect, 0, 0, 0,
     0, f, 0, 0,
@@ -42,536 +44,917 @@ function mat4Translate(x, y, z) {
   return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
 }
 function mat4RotateY(a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return new Float32Array([ c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1 ]);
+  var c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
 }
 function mat4RotateX(a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return new Float32Array([ 1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1 ]);
+  var c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
 }
-function mat4Invert(m){
-  const a = m, out = new Float32Array(16);
-  const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
-        a10=a[4],a11=a[5],a12=a[6],a13=a[7],
-        a20=a[8],a21=a[9],a22=a[10],a23=a[11],
-        a30=a[12],a31=a[13],a32=a[14],a33=a[15];
-
-  const b00=a00*a11 - a01*a10;
-  const b01=a00*a12 - a02*a10;
-  const b02=a00*a13 - a03*a10;
-  const b03=a01*a12 - a02*a11;
-  const b04=a01*a13 - a03*a11;
-  const b05=a02*a13 - a03*a12;
-  const b06=a20*a31 - a21*a30;
-  const b07=a20*a32 - a22*a30;
-  const b08=a20*a33 - a23*a30;
-  const b09=a21*a32 - a22*a31;
-  const b10=a21*a33 - a23*a31;
-  const b11=a22*a33 - a23*a32;
-
-  let det = b00*b11 - b01*b10 + b02*b09 + b03*b08 - b04*b07 + b05*b06;
+function mat4Invert(m) {
+  var a=m, o=new Float32Array(16);
+  var a00=a[0],a01=a[1],a02=a[2],a03=a[3],
+      a10=a[4],a11=a[5],a12=a[6],a13=a[7],
+      a20=a[8],a21=a[9],a22=a[10],a23=a[11],
+      a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+  var b00=a00*a11-a01*a10, b01=a00*a12-a02*a10, b02=a00*a13-a03*a10,
+      b03=a01*a12-a02*a11, b04=a01*a13-a03*a11, b05=a02*a13-a03*a12,
+      b06=a20*a31-a21*a30, b07=a20*a32-a22*a30, b08=a20*a33-a23*a30,
+      b09=a21*a32-a22*a31, b10=a21*a33-a23*a31, b11=a22*a33-a23*a32;
+  var det=b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;
   if (!det) return null;
-  det = 1.0 / det;
-
-  out[0]  = ( a11*b11 - a12*b10 + a13*b09) * det;
-  out[1]  = (-a01*b11 + a02*b10 - a03*b09) * det;
-  out[2]  = ( a31*b05 - a32*b04 + a33*b03) * det;
-  out[3]  = (-a21*b05 + a22*b04 - a23*b03) * det;
-  out[4]  = (-a10*b11 + a12*b08 - a13*b07) * det;
-  out[5]  = ( a00*b11 - a02*b08 + a03*b07) * det;
-  out[6]  = (-a30*b05 + a32*b02 - a33*b01) * det;
-  out[7]  = ( a20*b05 - a22*b02 + a23*b01) * det;
-  out[8]  = ( a10*b10 - a11*b08 + a13*b06) * det;
-  out[9]  = (-a00*b10 + a01*b08 - a03*b06) * det;
-  out[10] = ( a30*b04 - a31*b02 + a33*b00) * det;
-  out[11] = (-a20*b04 + a21*b02 - a23*b00) * det;
-  out[12] = (-a10*b09 + a11*b07 - a12*b06) * det;
-  out[13] = ( a00*b09 - a01*b07 + a02*b06) * det;
-  out[14] = (-a30*b03 + a31*b01 - a32*b00) * det;
-  out[15] = ( a20*b03 - a21*b01 + a22*b00) * det;
-  return out;
+  det=1/det;
+  o[0]=(a11*b11-a12*b10+a13*b09)*det; o[1]=(-a01*b11+a02*b10-a03*b09)*det;
+  o[2]=(a31*b05-a32*b04+a33*b03)*det; o[3]=(-a21*b05+a22*b04-a23*b03)*det;
+  o[4]=(-a10*b11+a12*b08-a13*b07)*det; o[5]=(a00*b11-a02*b08+a03*b07)*det;
+  o[6]=(-a30*b05+a32*b02-a33*b01)*det; o[7]=(a20*b05-a22*b02+a23*b01)*det;
+  o[8]=(a10*b10-a11*b08+a13*b06)*det; o[9]=(-a00*b10+a01*b08-a03*b06)*det;
+  o[10]=(a30*b04-a31*b02+a33*b00)*det; o[11]=(-a20*b04+a21*b02-a23*b00)*det;
+  o[12]=(-a10*b09+a11*b07-a12*b06)*det; o[13]=(a00*b09-a01*b07+a02*b06)*det;
+  o[14]=(-a30*b03+a31*b01-a32*b00)*det; o[15]=(a20*b03-a21*b01+a22*b00)*det;
+  return o;
 }
-function vec4MulMat(m, v){
-  const x=v[0],y=v[1],z=v[2],w=v[3];
+function vec4MulMat(m, v) {
+  var x=v[0],y=v[1],z=v[2],w=v[3];
   return new Float32Array([
-    m[0]*x + m[4]*y + m[8]*z  + m[12]*w,
-    m[1]*x + m[5]*y + m[9]*z  + m[13]*w,
-    m[2]*x + m[6]*y + m[10]*z + m[14]*w,
-    m[3]*x + m[7]*y + m[11]*z + m[15]*w
+    m[0]*x+m[4]*y+m[8]*z+m[12]*w,
+    m[1]*x+m[5]*y+m[9]*z+m[13]*w,
+    m[2]*x+m[6]*y+m[10]*z+m[14]*w,
+    m[3]*x+m[7]*y+m[11]*z+m[15]*w
   ]);
 }
 
-// --- shader helpers ---
-function compile(type, src) {
-  const s = gl.createShader(type);
+// ── Shader helpers ────────────────────────────────────────────
+function compileShader(type, src) {
+  var s = gl.createShader(type);
   gl.shaderSource(s, src);
   gl.compileShader(s);
   if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-    throw gl.getShaderInfoLog(s);
+    throw new Error('Shader error: ' + gl.getShaderInfoLog(s));
   return s;
 }
 function makeProgram(vsSrc, fsSrc) {
-  const p = gl.createProgram();
-  gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
-  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+  var p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, compileShader(gl.FRAGMENT_SHADER, fsSrc));
   gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS))
-    throw gl.getProgramInfoLog(p);
+    throw new Error('Program error: ' + gl.getProgramInfoLog(p));
   return p;
 }
 
-// --- programs: points + lines ---
-const VS_POINTS = `
-attribute vec3 position;
-uniform mat4 uMVP;
-uniform float uPointSize;
-void main(){
-  gl_Position = uMVP * vec4(position, 1.0);
-  gl_PointSize = uPointSize;
-}`;
-const FS_POINTS = `
-precision mediump float;
-uniform vec3 uColor;
-void main(){
-  vec2 uv = gl_PointCoord*2.0 - 1.0;
-  float d = dot(uv,uv);
-  float alpha = smoothstep(1.0, 0.8, 1.0 - d);
-  gl_FragColor = vec4(uColor, alpha);
-}`;
-const VS_LINES = `
-attribute vec3 position;
-uniform mat4 uMVP;
-void main(){
-  gl_Position = uMVP * vec4(position, 1.0);
-}`;
-const FS_LINES = `
-precision mediump float;
-uniform vec3 uColor;
-void main(){ gl_FragColor = vec4(uColor, 1.0); }`;
+// ── Programs ──────────────────────────────────────────────────
+var progPoints = makeProgram(
+  'attribute vec3 position;uniform mat4 uMVP;uniform float uPointSize;void main(){gl_Position=uMVP*vec4(position,1.0);gl_PointSize=uPointSize;}',
+  'precision mediump float;uniform vec3 uColor;void main(){vec2 uv=gl_PointCoord*2.0-1.0;float d=dot(uv,uv);float a=smoothstep(1.0,0.8,1.0-d);gl_FragColor=vec4(uColor,a);}'
+);
+var progLines = makeProgram(
+  'attribute vec3 position;uniform mat4 uMVP;void main(){gl_Position=uMVP*vec4(position,1.0);}',
+  'precision mediump float;uniform vec3 uColor;void main(){gl_FragColor=vec4(uColor,1.0);}'
+);
+var progHalo = makeProgram(
+  'attribute vec3 position;uniform mat4 uMVP;uniform float uPixelSize;void main(){gl_Position=uMVP*vec4(position,1.0);gl_PointSize=uPixelSize;}',
+  'precision mediump float;uniform float uTime;uniform vec3 uColGlow;uniform vec3 uColCore;void main(){vec2 uv=gl_PointCoord*2.0-1.0;float r=length(uv);float inner=0.55,outer=0.85;float ring=smoothstep(inner,inner+0.02,r)*(1.0-smoothstep(outer-0.02,outer,r));float ang=atan(uv.y,uv.x);float phase=fract((ang/6.2831853)*3.0+uTime*1.8);float scanner=smoothstep(0.05,0.0,abs(phase-0.5)-0.25);float glow=exp(-6.0*(r*r));vec3 col=mix(uColGlow,uColCore,0.35);float alpha=clamp(ring*(0.55+0.45*scanner)+glow*0.15,0.0,1.0);gl_FragColor=vec4(col,alpha);}'
+);
 
-const progPoints = makeProgram(VS_POINTS, FS_POINTS);
-const progLines  = makeProgram(VS_LINES,  FS_LINES);
+// Attrib/uniform locations
+var aPos_pts  = gl.getAttribLocation(progPoints, 'position');
+var uMVP_pts  = gl.getUniformLocation(progPoints, 'uMVP');
+var uSize_pts = gl.getUniformLocation(progPoints, 'uPointSize');
+var uCol_pts  = gl.getUniformLocation(progPoints, 'uColor');
 
-// --- uniforms/attribs (points + lines) ---
-let aPos_points, uMVP_points, uSize, uColorPts;
-let aPos_lines,  uMVP_lines,  uColorLines;
+var aPos_lin  = gl.getAttribLocation(progLines, 'position');
+var uMVP_lin  = gl.getUniformLocation(progLines, 'uMVP');
+var uCol_lin  = gl.getUniformLocation(progLines, 'uColor');
 
-aPos_points = gl.getAttribLocation(progPoints, 'position');
-uMVP_points = gl.getUniformLocation(progPoints, 'uMVP');
-uSize       = gl.getUniformLocation(progPoints, 'uPointSize');
-uColorPts   = gl.getUniformLocation(progPoints, 'uColor');
+var aPos_halo   = gl.getAttribLocation(progHalo, 'position');
+var uMVP_halo   = gl.getUniformLocation(progHalo, 'uMVP');
+var uPix_halo   = gl.getUniformLocation(progHalo, 'uPixelSize');
+var uTime_halo  = gl.getUniformLocation(progHalo, 'uTime');
+var uColGlow    = gl.getUniformLocation(progHalo, 'uColGlow');
+var uColCore    = gl.getUniformLocation(progHalo, 'uColCore');
 
-aPos_lines  = gl.getAttribLocation(progLines,  'position');
-uMVP_lines  = gl.getUniformLocation(progLines, 'uMVP');
-uColorLines = gl.getUniformLocation(progLines, 'uColor');
+// ── Camera state ──────────────────────────────────────────────
+var yaw   = 0, pitch = 0, dist  = 1800;
+var panX  = 0, panY  = 0;
+var t0    = performance.now();
 
-// --- HALO shaders (hover + selection) ---
-const VS_HALO = `
-attribute vec3 position;
-uniform mat4 uMVP;
-uniform float uPixelSize;
-void main(){
-  gl_Position = uMVP * vec4(position, 1.0);
-  gl_PointSize = uPixelSize; // size in pixels
-}`;
-const FS_HALO = `
-precision mediump float;
-uniform float uTime;
-uniform vec3 uColGlow;
-uniform vec3 uColCore;
+// ── Mouse state ───────────────────────────────────────────────
+var mouseX = 0, mouseY = 0;
+var dragging = false, panning = false;
+var dragMoved = false, lx = 0, ly = 0;
 
-void main(){
-  vec2 uv = gl_PointCoord * 2.0 - 1.0;
-  float r = length(uv);
-
-  float inner = 0.55;
-  float outer = 0.85;
-  float ring = smoothstep(inner, inner+0.02, r) * (1.0 - smoothstep(outer-0.02, outer, r));
-
-  float ang = atan(uv.y, uv.x);
-  float turns = 3.0;
-  float speed = 1.8;
-  float phase = fract((ang / 6.2831853) * turns + uTime * speed);
-  float scanner = smoothstep(0.05, 0.0, abs(phase - 0.5) - 0.25);
-
-  float glow = exp(-6.0 * (r*r));
-
-  vec3 col = mix(uColGlow, uColCore, 0.35);
-  float alpha = clamp(ring * (0.55 + 0.45*scanner) + glow*0.15, 0.0, 1.0);
-  gl_FragColor = vec4(col, alpha);
-}`;
-
-const progHalo = makeProgram(VS_HALO, FS_HALO);
-const aPos_halo   = gl.getAttribLocation(progHalo, 'position');
-const uMVP_halo   = gl.getUniformLocation(progHalo, 'uMVP');
-const uPix_halo   = gl.getUniformLocation(progHalo, 'uPixelSize');
-const uTime_halo  = gl.getUniformLocation(progHalo, 'uTime');
-const uColGlow    = gl.getUniformLocation(progHalo, 'uColGlow');
-const uColCore    = gl.getUniformLocation(progHalo, 'uColCore');
-
-// --- camera/orbit/pan ---
-let yaw = 0, pitch = 0, dist = 1800, dragging = false, dragMoved = false, lx = 0, ly = 0;
-let panning = false, panX = 0, panY = 0;
-
-// prevent context menu during RMB pan
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-canvas.addEventListener('mousedown', e => {
-  lx = e.clientX; ly = e.clientY;
-  dragMoved = false;
-  if (e.button === 2) panning = true;   // right button -> pan
-  else dragging = true;                 // left button  -> orbit / select / add
-});
-addEventListener('mouseup', () => { dragging = false; panning = false; });
-addEventListener('mousemove', e => {
-  const dx = e.clientX - lx, dy = e.clientY - ly;
+window.addEventListener('mousemove', function(e) {
+  mouseX = e.clientX; mouseY = e.clientY;
+  var dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
   if (dragging) {
-    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) { dragMoved = true; _clickMoved = true; }
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragMoved = true;
     if (!addMode && dragMoved) {
       yaw   += dx * 0.005;
-      pitch += dy * 0.005;
-      pitch = Math.max(-1.55, Math.min(1.55, pitch));
+      pitch  = Math.max(-1.55, Math.min(1.55, pitch + dy * 0.005));
     }
   } else if (panning) {
-    const s = dist / 1000;  // pan speed scales with zoom distance
+    var s = dist / 1000;
     panX -= dx * s;
     panY += dy * s;
   }
 });
-addEventListener('wheel', e => {
-  dist *= (1 + Math.sign(e.deltaY) * 0.12);
-  dist = Math.max(300, Math.min(6000, dist));
+
+canvas.addEventListener('mousedown', function(e) {
+  lx = e.clientX; ly = e.clientY;
+  dragMoved = false;
+  if (e.button === 2) panning  = true;
+  else                dragging = true;
 });
 
-// --- data buffers ---
-let starsVBO = null, starCount = 0;
-let linesVBO = null, lineVertCount = 0;
+canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-// JSON path
-const jsonURL = './systems.json';
+window.addEventListener('mouseup', function() { dragging = false; panning = false; });
 
-// Globals for interactivity/export
-let idToWorld = new Map();
-let systems = [];
-let lanesSet = new Set();
-let imgW = 1090, imgH = 1494, worldW = 2200, worldH = 2200*(1090/1494);
+window.addEventListener('wheel', function(e) {
+  dist = Math.max(300, Math.min(6000, dist * (1 + Math.sign(e.deltaY) * 0.12)));
+});
 
-// Hover tooltip + hover id (new sci-fi tooltip in index.html)
-const tip = document.getElementById('tooltip');
-const tipName  = document.getElementById('tip-name');
-const tipId    = document.getElementById('tip-id');
-const tipOwner = document.getElementById('tip-owner');
-let mouseX = 0, mouseY = 0;
-addEventListener('mousemove', (e)=>{ mouseX = e.clientX; mouseY = e.clientY; });
+// ── Data ──────────────────────────────────────────────────────
+var systems   = [];
+var lanesSet  = new Set();
+var idToWorld = new Map();
+var imgW = 1090, imgH = 1494, worldW = 2200, worldH = 2200*(1090/1494);
 
-let hoveredId = null;         // hovered system id
-let selectedId = null;        // sticky selection
-let haloVBO = null;           // single-vertex buffer for halos
-let t0 = performance.now();   // time base for animation
+var starsVBO = null, starCount = 0;
+var linesVBO = null, lineVertCount = 0;
+var haloVBO  = null;
 
-// === simple editor auth ===
-let editorOK = sessionStorage.getItem('starmap_editor_ok') === '1';
+// ── Selection state ───────────────────────────────────────────
+// hoveredId is written EVERY FRAME by the render loop.
+// Click just reads it — no separate picking math ever.
+var hoveredId  = null;
+var selectedId = null;
+
+// ── Modes ─────────────────────────────────────────────────────
+var editMode = false;
+var addMode  = false;
+var editorOK = sessionStorage.getItem('sgn_editor') === '1';
+var lanePickA = null;
+
 function requireEditor() {
   if (editorOK) return true;
-  const pw = prompt('Enter editor password:');
-  if (pw === '1776') {
-    editorOK = true;
-    sessionStorage.setItem('starmap_editor_ok', '1');
-    updateHUD?.();
-    return true;
+  var pw = prompt('Editor password:');
+  if (pw === '1776') { editorOK = true; sessionStorage.setItem('sgn_editor','1'); updateHUD(); return true; }
+  alert('Incorrect.'); return false;
+}
+
+function updateHUD() {
+  var el = document.getElementById('hud-lanes');
+  var ea = document.getElementById('hud-add');
+  if (el) { el.innerHTML = 'LANES &nbsp;<b>' + (editMode ? 'ON' : 'OFF') + '</b>'; el.style.color = editMode ? 'var(--cyan)' : ''; }
+  if (ea) { ea.innerHTML = 'ADD &nbsp;<b>'   + (addMode  ? 'ON' : 'OFF') + '</b>'; ea.style.color = addMode  ? 'var(--cyan)' : ''; }
+}
+
+// ── Project 3-D world point → canvas pixel coords ────────────
+function projectToScreen(x, y, z, mvp) {
+  var cx = x*mvp[0]+y*mvp[4]+z*mvp[8]+mvp[12];
+  var cy = x*mvp[1]+y*mvp[5]+z*mvp[9]+mvp[13];
+  var cw = x*mvp[3]+y*mvp[7]+z*mvp[11]+mvp[15];
+  if (Math.abs(cw) < 1e-6) return null;
+  var ndcX = cx/cw, ndcY = cy/cw;
+  return [
+    (ndcX * 0.5 + 0.5) * canvas.width,
+    (-ndcY * 0.5 + 0.5) * canvas.height
+  ];
+}
+
+// Unproject screen → world on Z=0 plane (for addMode placement)
+function screenToWorldZ0(clientX, clientY, mvp) {
+  var inv = mat4Invert(mvp);
+  if (!inv) return null;
+  var nx =  (clientX / canvas.clientWidth)  * 2 - 1;
+  var ny = -((clientY / canvas.clientHeight) * 2 - 1);
+  var p0 = vec4MulMat(inv, new Float32Array([nx,ny,-1,1]));
+  var p1 = vec4MulMat(inv, new Float32Array([nx,ny, 1,1]));
+  p0[0]/=p0[3]; p0[1]/=p0[3]; p0[2]/=p0[3];
+  p1[0]/=p1[3]; p1[1]/=p1[3]; p1[2]/=p1[3];
+  var dz = p1[2]-p0[2];
+  if (Math.abs(dz) < 1e-6) return null;
+  var t = -p0[2]/dz;
+  return [p0[0]+t*(p1[0]-p0[0]), p0[1]+t*(p1[1]-p0[1])];
+}
+
+// ── Click handler ─────────────────────────────────────────────
+// Simple and reliable: if hoveredId is set at mouseup we have a click.
+canvas.addEventListener('click', function(e) {
+  if (dragMoved) return;   // was a drag, not a click
+
+  if (addMode && !hoveredId) {
+    // Place a new system at clicked world position
+    var mvp = getMVP();
+    var world = screenToWorldZ0(e.clientX, e.clientY, mvp);
+    if (!world) return;
+    var wx = world[0], wy = world[1];
+    var xn = Math.max(0, Math.min(1, wx/worldW + 0.5));
+    var yn = Math.max(0, Math.min(1, 0.5 - wy/worldH));
+    var n = systems.length + 1;
+    while (systems.some(function(s){ return s.id === 'SYS_'+n; })) n++;
+    var newId = 'SYS_' + n;
+    var defName = prompt('Name for new system:', 'New System ' + n) || ('New System ' + n);
+    var sys = { id: newId, name: defName, coords: { x_norm: xn, y_norm: yn, z: 0 }, tags: ['installation'] };
+    systems.push(sys);
+    idToWorld.set(newId, [wx, wy, 0]);
+    rebuildStarsVBO();
+    selectSystem(newId);
+    return;
   }
-  alert('Incorrect password.');
-  return false;
+
+  if (!hoveredId) return;   // clicked empty space
+  var id = hoveredId;
+
+  if (editMode) {
+    // Lane toggle
+    if (!lanePickA) {
+      lanePickA = id;
+      console.log('[SGN] lane pick A:', id);
+    } else {
+      var key = [lanePickA, id].sort().join('::');
+      if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
+      lanePickA = null;
+      rebuildLinesVBO();
+    }
+    return;
+  }
+
+  // Normal click — select and open panel
+  selectSystem(id);
+});
+
+function selectSystem(id) {
+  selectedId = id;
+  ensureDetails(id).then(function(det) {
+    renderPanel(id, det);
+  });
 }
 
-
-// Holographic dock removed — planet cards replaced by inline system panel
-window.showHologram = function(){}
-window.hideHologram = function(){}
-
-
-// Helpers for ID + HUD
-let editMode = false; // lanes editor
-let addMode  = false; // add system mode
-function updateHUD(){
-  const hudLanes = document.getElementById('hud-lanes');
-  const hudAdd   = document.getElementById('hud-add');
-  if (hudLanes) hudLanes.innerHTML = `LANES &nbsp;<b>${editMode?'ON':'OFF'}</b>`;
-  if (hudAdd)   hudAdd.innerHTML   = `ADD &nbsp;<b>${addMode?'ON':'OFF'}</b>`;
-  if (hudLanes) hudLanes.style.color = editMode ? 'var(--cyan)' : '';
-  if (hudAdd)   hudAdd.style.color   = addMode  ? 'var(--cyan)' : '';
+// ── Build MVP from current camera state ───────────────────────
+function getMVP() {
+  var proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
+  var rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
+  var view = mat4Translate(-panX, -panY, -dist);
+  return mat4Mul(rot, mat4Mul(view, proj));
 }
 
-// === Boot data (robust) ===
-const DEFAULT_DATA = {
+// ── Render loop ───────────────────────────────────────────────
+function loop() {
+  gl.clearColor(0.020, 0.031, 0.063, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  var mvp = getMVP();
+
+  // Lanes
+  if (linesVBO && lineVertCount > 0) {
+    gl.useProgram(progLines);
+    gl.uniformMatrix4fv(uMVP_lin, false, mvp);
+    gl.uniform3f(uCol_lin, 0.15, 0.65, 0.78);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
+    gl.enableVertexAttribArray(aPos_lin);
+    gl.vertexAttribPointer(aPos_lin, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, lineVertCount);
+  }
+
+  // Stars
+  if (starsVBO && starCount > 0) {
+    gl.useProgram(progPoints);
+    gl.uniformMatrix4fv(uMVP_pts, false, mvp);
+    gl.uniform1f(uSize_pts, 7.0);
+    gl.uniform3f(uCol_pts, 0.78, 0.90, 1.0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
+    gl.enableVertexAttribArray(aPos_pts);
+    gl.vertexAttribPointer(aPos_pts, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, starCount);
+  }
+
+  // ── Hover detection (runs every frame, writes hoveredId) ────
+  // mouseX/mouseY are in CSS pixels == canvas pixels (DPR=1)
+  var newHover = null;
+  if (systems.length) {
+    var PICK_R2 = 28 * 28;  // 28-pixel hit radius
+    var best = Infinity;
+    for (var i = 0; i < systems.length; i++) {
+      var sys = systems[i];
+      var wp = idToWorld.get(sys.id);
+      if (!wp) continue;
+      var sp = projectToScreen(wp[0], wp[1], wp[2], mvp);
+      if (!sp) continue;
+      var dx = sp[0] - mouseX, dy = sp[1] - mouseY;
+      var d2 = dx*dx + dy*dy;
+      if (d2 < PICK_R2 && d2 < best) { best = d2; newHover = sys.id; }
+    }
+  }
+  hoveredId = newHover;
+
+  // Tooltip
+  var tip = document.getElementById('tooltip');
+  if (hoveredId) {
+    var hs = systems.find(function(s){ return s.id === hoveredId; });
+    if (hs) {
+      document.getElementById('tip-name').textContent  = hs.name || hs.id;
+      document.getElementById('tip-id').textContent    = hs.id;
+      document.getElementById('tip-owner').textContent = hs.owner ? ('\u25C8 ' + hs.owner) : '';
+      tip.style.left    = mouseX + 'px';
+      tip.style.top     = mouseY + 'px';
+      tip.style.display = 'block';
+    }
+  } else {
+    tip.style.display = 'none';
+  }
+
+  // Halos
+  if (!haloVBO) haloVBO = gl.createBuffer();
+  var now = (performance.now() - t0) * 0.001;
+  if (hoveredId)  drawHalo(hoveredId,  34, now,          [0.35,0.95,1.0], [1.0,0.95,0.50], mvp);
+  if (selectedId) drawHalo(selectedId, 42, now * 0.7,    [1.0,0.85,0.35], [1.0,0.98,0.70], mvp);
+
+  requestAnimationFrame(loop);
+}
+
+function drawHalo(id, pix, t, glow, core, mvp) {
+  var p = idToWorld.get(id); if (!p) return;
+  gl.useProgram(progHalo);
+  gl.uniformMatrix4fv(uMVP_halo, false, mvp);
+  gl.uniform1f(uPix_halo,  pix);
+  gl.uniform1f(uTime_halo, t);
+  gl.uniform3f(uColGlow, glow[0], glow[1], glow[2]);
+  gl.uniform3f(uColCore, core[0], core[1], core[2]);
+  gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(aPos_halo);
+  gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.drawArrays(gl.POINTS, 0, 1);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+}
+
+// ── VBO builders ──────────────────────────────────────────────
+function rebuildStarsVBO() {
+  var verts = [];
+  systems.forEach(function(s) {
+    var p = idToWorld.get(s.id);
+    if (p) verts.push(p[0], p[1], p[2]);
+  });
+  starCount = verts.length / 3;
+  if (!starsVBO) starsVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+}
+
+function rebuildLinesVBO() {
+  var verts = [];
+  lanesSet.forEach(function(key) {
+    var ab = key.split('::');
+    var pa = idToWorld.get(ab[0]), pb = idToWorld.get(ab[1]);
+    if (pa && pb) verts.push(pa[0],pa[1],pa[2], pb[0],pb[1],pb[2]);
+  });
+  lineVertCount = verts.length / 3;
+  if (!linesVBO) linesVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+}
+
+// ── Boot / data loading ───────────────────────────────────────
+var DEFAULT_DATA = {
   image_size: { width: 1090, height: 1494 },
   systems: [
     { id:'SYS_1', name:'Vanyamar', coords:{ x_norm:0.52, y_norm:0.41, z:0 } },
     { id:'SYS_2', name:'Calithen', coords:{ x_norm:0.31, y_norm:0.64, z:0 } },
     { id:'SYS_3', name:'Elendir',  coords:{ x_norm:0.75, y_norm:0.22, z:0 } }
   ],
-  lanes: [['SYS_1','SYS_2'], ['SYS_1','SYS_3']]
+  lanes: [['SYS_1','SYS_2'],['SYS_1','SYS_3']]
 };
 
-// Start the render loop ASAP so you never see a blank screen
 requestAnimationFrame(loop);
-console.log('[SGN] Render loop started');
 
-// Load JSON and boot (with fallback)
-(async function boot(){
-  try {
-    console.log('[SGN] Fetching systems.json…');
-    const r = await fetch(jsonURL, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status} for ${jsonURL}`);
-    const data = await r.json();
-    console.log('[SGN] systems.json loaded');
-    initFromData(data);
-  } catch (err) {
-    console.warn('[SGN] Could not load systems.json, using fallback:', err?.message || err);
-    initFromData(DEFAULT_DATA);
-  }
-})();
+fetch('./systems.json', { cache: 'no-store' })
+  .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(function(d) { initFromData(d); })
+  .catch(function(err) { console.warn('[SGN] using fallback data:', err); initFromData(DEFAULT_DATA); });
 
-function initFromData(data){
-  // dimensions
-  imgW = data?.image_size?.width  ?? 1090;
-  imgH = data?.image_size?.height ?? 1494;
-  const SCALE = 2200, aspect = imgW / imgH;
+function initFromData(data) {
+  imgW = (data.image_size && data.image_size.width)  || 1090;
+  imgH = (data.image_size && data.image_size.height) || 1494;
+  var SCALE = 2200, aspect = imgW / imgH;
   worldW = SCALE; worldH = SCALE / aspect;
 
-  const toWorldXY = (xn, yn) => {
-    const x = (xn - 0.5) * worldW;
-    const y = -(yn - 0.5) * worldH;
-    return [x, y];
-  };
-
-  // stars (z = 0 unless JSON has it)
   idToWorld = new Map();
   systems = data.systems || [];
-  for (const sys of systems){
-    let xn = sys.coords?.x_norm, yn = sys.coords?.y_norm;
+  systems.forEach(function(sys) {
+    var xn = sys.coords && sys.coords.x_norm;
+    var yn = sys.coords && sys.coords.y_norm;
     if (xn == null || yn == null) {
-      const px = sys.pixel?.x, py = sys.pixel?.y;
-      if (px == null || py == null) continue;
+      var px = sys.pixel && sys.pixel.x, py = sys.pixel && sys.pixel.y;
+      if (px == null || py == null) return;
       xn = px / imgW; yn = py / imgH;
     }
-    const [x, y] = toWorldXY(xn, yn);
-    const z = (sys.coords && typeof sys.coords.z === 'number') ? sys.coords.z : 0.0;
+    var x = (xn - 0.5) * worldW;
+    var y = -(yn - 0.5) * worldH;
+    var z = (sys.coords && typeof sys.coords.z === 'number') ? sys.coords.z : 0;
     idToWorld.set(sys.id, [x, y, z]);
-  }
+  });
   rebuildStarsVBO();
 
-  // lanes
-  const lanes = data.lanes || [];
-  lanesSet = new Set(lanes.map(([a,b]) => [a,b].sort().join('::')));
-  rebuildLinesVBOFromSet();
-
+  lanesSet = new Set((data.lanes || []).map(function(ab) { return [ab[0],ab[1]].sort().join('::'); }));
+  rebuildLinesVBO();
   updateHUD();
 
-  // Update status bar
-  const sbSys = document.getElementById('sb-sys');
-  const sbLanes = document.getElementById('sb-lanes-ct');
-  if (sbSys) sbSys.textContent = `${systems.length} NODES ACTIVE`;
-  if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
-
-  console.log(`[SGN] Initialized: ${systems.length} systems, ${lanesSet.size} lanes`);
+  var sbSys   = document.getElementById('sb-sys');
+  var sbLanes = document.getElementById('sb-lanes-ct');
+  if (sbSys)   sbSys.textContent   = systems.length + ' NODES ACTIVE';
+  if (sbLanes) sbLanes.textContent = lanesSet.size  + ' LANES MAPPED';
+  console.log('[SGN] loaded: ' + systems.length + ' systems, ' + lanesSet.size + ' lanes');
 }
 
-// CLICK handler — uses hoveredId stored by the render loop each frame
-// This is reliable because hover detection already works correctly
-canvas.addEventListener('mousedown', e => {
-  if (e.button !== 0) return;
-  _clickDownId = hoveredId; // capture which system is under cursor at mousedown
-  _clickMoved  = false;
+// ── Keyboard shortcuts ────────────────────────────────────────
+window.addEventListener('keydown', function(e) {
+  var k = e.key.toLowerCase();
+  if (k === 'e') {
+    if (!requireEditor()) return;
+    editMode = !editMode; if (editMode) addMode = false;
+    lanePickA = null; updateHUD(); return;
+  }
+  if (k === 'a') {
+    if (!requireEditor()) return;
+    addMode = !addMode; if (addMode) editMode = false;
+    updateHUD(); return;
+  }
+  if (k === 'escape') {
+    closePanel(); closeOrrery(); return;
+  }
+  if (k === 'enter' && selectedId) {
+    ensureDetails(selectedId).then(function(d) { renderPanel(selectedId, d); });
+    return;
+  }
+  if (!editMode) return;
+  if (k === 'c' && editorOK) { lanesSet.clear(); rebuildLinesVBO(); }
+  if (k === 'x' && editorOK) exportJSON();
 });
 
-canvas.addEventListener('mouseup', async e => {
-  if (e.button !== 0) return;
-  if (_clickMoved) return;            // was a drag, not a click
-  if (!_clickDownId) {
-    // clicked empty space — handle addMode world-placement
-    if (addMode) {
-      const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-      const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-      const view = mat4Translate(-panX, -panY, -dist);
-      const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-      const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
-      if (!world) return;
-      const [wx, wy] = world;
-      let xn = Math.max(0, Math.min(1, (wx / worldW) + 0.5));
-      let yn = Math.max(0, Math.min(1, 0.5 - (wy / worldH)));
-      const base = "SYS_";
-      let n = systems.length + 1;
-      while (systems.some(s=>s.id === base+n)) n++;
-      const newId = base + n;
-      const defaultName = prompt('Name for new system:', `New System ${n}`) || `New System ${n}`;
-      const sys = { id:newId, name:defaultName, coords:{x_norm:xn, y_norm:yn, z:0}, tags:["installation"] };
-      systems.push(sys);
-      idToWorld.set(newId, [wx, wy, 0]);
-      rebuildStarsVBO();
-      selectedId = newId;
-      const det = await ensureSystemDetails(newId);
-      renderPanel(newId, det);
-    }
-    return;
-  }
-
-  const id = _clickDownId;
-  _clickDownId = null;
-
-  if (editMode) {
-    // Lane editor: click two systems to toggle a lane
-    if (!window._lanePickA) {
-      window._lanePickA = id;
-      console.log('[SGN] Lane pick A:', id);
-    } else {
-      const key = [window._lanePickA, id].sort().join('::');
-      if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
-      window._lanePickA = null;
-      rebuildLinesVBOFromSet();
-    }
-    return;
-  }
-
-  if (addMode) {
-    // Clicked an existing system in addMode — just select it
-    selectedId = id;
-    updateHUD();
-    const det = await ensureSystemDetails(id);
-    renderPanel(id, det);
-    return;
-  }
-
-  // Normal mode — select and open panel
-  selectedId = id;
-  updateHUD();
-  const det = await ensureSystemDetails(id);
-  renderPanel(id, det);
-});
-
-let _clickDownId = null;
-let _clickMoved  = false;
-
-// Middle-click to delete nearest lane (edit mode)
-function mouseToCanvas(e){
-  const mx = e.clientX * (canvas.width  / canvas.clientWidth);
-  const my = e.clientY * (canvas.height / canvas.clientHeight);
-  return [mx, my];
-}
-function distPointToSeg(px,py, ax,ay, bx,by){
-  const abx = bx - ax, aby = by - ay;
-  const apx = px - ax, apy = py - ay;
-  const len2 = abx*abx + aby*aby || 1;
-  let t = (apx*abx + apy*aby) / len2;
-  t = Math.max(0, Math.min(1, t));
-  const cx = ax + t*abx, cy = ay + t*aby;
-  const dx = px - cx, dy = py - cy;
-  return Math.hypot(dx, dy);
-}
-function deleteNearestLane(mx, my, mvp){
-  let bestKey = null, bestD = 1e9;
-  for (const key of lanesSet){
-    const [a,b] = key.split('::');
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    const sa = projectToScreen(pa[0], pa[1], pa[2], mvp);
-    const sb = projectToScreen(pb[0], pb[1], pb[2], mvp);
-    if (!sa || !sb) continue;
-    const d = distPointToSeg(mx, my, sa[0], sa[1], sb[0], sb[1]);
+// ── Middle-click: delete nearest lane in edit mode ────────────
+canvas.addEventListener('auxclick', function(e) {
+  if (!editMode || e.button !== 1 || !editorOK) return;
+  var mvp = getMVP();
+  var mx = e.clientX, my = e.clientY;
+  var bestKey = null, bestD = 1e9;
+  lanesSet.forEach(function(key) {
+    var ab = key.split('::');
+    var pa = idToWorld.get(ab[0]), pb = idToWorld.get(ab[1]);
+    if (!pa || !pb) return;
+    var sa = projectToScreen(pa[0],pa[1],pa[2],mvp);
+    var sb = projectToScreen(pb[0],pb[1],pb[2],mvp);
+    if (!sa || !sb) return;
+    var d = distToSeg(mx,my, sa[0],sa[1], sb[0],sb[1]);
     if (d < bestD) { bestD = d; bestKey = key; }
-  }
-  if (bestKey && bestD < 20){
-    lanesSet.delete(bestKey);
-    rebuildLinesVBOFromSet();
-    console.log('Deleted lane:', bestKey);
-  } else {
-    console.log('No lane near cursor to delete.');
-  }
+  });
+  if (bestKey && bestD < 20) { lanesSet.delete(bestKey); rebuildLinesVBO(); }
+});
+
+function distToSeg(px,py, ax,ay, bx,by) {
+  var abx=bx-ax,aby=by-ay, apx=px-ax,apy=py-ay;
+  var t=Math.max(0,Math.min(1,(apx*abx+apy*aby)/(abx*abx+aby*aby||1)));
+  return Math.hypot(px-(ax+t*abx), py-(ay+t*aby));
 }
-canvas.addEventListener('auxclick', (e)=>{
-  if (!editMode || e.button !== 1) return;
-  if (!editorOK) return;
-  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(-panX, -panY, -dist);
-  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-  const [mx,my] = mouseToCanvas(e);
-  deleteNearestLane(mx, my, mvp);
-});
 
-// Panel — already in index.html as #sidePanel
-const panel      = document.getElementById('sidePanel');
-const spTitle    = document.getElementById('sp-title');
-const spBody     = document.getElementById('sp-body');
-const spSysId    = document.getElementById('sp-sys-id');
-const spOwner    = document.getElementById('sp-owner');
-const spStarOrb  = document.getElementById('sp-star-orb');
-const spStarAbbr = document.getElementById('sp-star-abbr');
-
-// Tab switching
-document.getElementById('sp-tabs').addEventListener('click', e => {
-  const tab = e.target.closest('.tab');
-  if (!tab) return;
-  const name = tab.dataset.tab;
-  document.querySelectorAll('#sp-tabs .tab').forEach(t => t.classList.toggle('active', t===tab));
-  document.querySelectorAll('#sp-body .tab-pane').forEach(p => p.classList.toggle('active', p.id === `pane-${name}`));
-});
-
-document.getElementById('sp-close').onclick = () => hidePanel();
-document.getElementById('sp-gen').onclick    = async () => {
-  if (!selectedId) return;
-  const d = await ensureSystemDetails(selectedId, true); // force regen
-  renderPanel(selectedId, d);
-};
-document.getElementById('sp-exp').onclick    = () => { if (selectedId) exportSystemDetails(selectedId); };
-document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
-
-// ── Orrery Modal ──────────────────────────────────────────────────────────
-const orreryModal  = document.getElementById('orrery-modal');
-const orreryCanvas = document.getElementById('orrery-canvas');
-const orreryCtx    = orreryCanvas.getContext('2d');
-const orreryClose  = document.getElementById('orrery-close');
-const orreryHover  = document.getElementById('orrery-hover');
-
-let orreryRAF    = null;
-let orreryData   = null;   // { sys, details, planets, star, sm }
-let orrerySpeed  = 1;
-let orreryT      = 0;      // simulation time (years)
-let lastTS       = null;
-const YEAR_SECS  = 8;      // real seconds per sim-year at 1x
-
-orreryClose.onclick = closeOrrery;
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && orreryModal.classList.contains('open')) closeOrrery(); });
-
-// Speed buttons
-document.querySelectorAll('.speed-btn').forEach(btn => {
-  btn.onclick = () => {
-    orrerySpeed = parseFloat(btn.dataset.speed);
-    document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b === btn));
+// ── Export ────────────────────────────────────────────────────
+function exportJSON() {
+  var out = {
+    image_size: { width: imgW, height: imgH },
+    systems: systems,
+    lanes: Array.from(lanesSet).map(function(k){ return k.split('::'); })
   };
+  var blob = new Blob([JSON.stringify(out,null,2)], { type:'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'systems.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── System details cache + generator ─────────────────────────
+var SYSGEN_VER = 'v2';
+function sysKey(id) { return 'sysgen:' + SYSGEN_VER + ':' + id; }
+function getCached(id) { try { var r=localStorage.getItem(sysKey(id)); return r?JSON.parse(r):null; } catch(e){ return null; } }
+function putCached(id, d) { try { localStorage.setItem(sysKey(id), JSON.stringify(d)); } catch(e){} }
+
+function ensureDetails(id, force) {
+  var d = force ? null : getCached(id);
+  if (!d) { d = generateSystem(id); putCached(id, d); }
+  return Promise.resolve(d);
+}
+
+function exportSystemDetails(id) {
+  var d = getCached(id); if (!d) return;
+  var blob = new Blob([JSON.stringify(d,null,2)], { type:'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'system_' + id + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── PRNG ──────────────────────────────────────────────────────
+function prng(str) {
+  var h = 2166136261 >>> 0;
+  for (var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); }
+  var s = h || 0xdeadbeef;
+  return function(){ s^=s<<13; s^=s>>>17; s^=s<<5; return (s>>>0)/4294967296; };
+}
+
+// ── Star / Planet metadata ────────────────────────────────────
+var STAR_META = {
+  'M-Dwarf':       { abbr:'M',  bg:'#4a1a1a', glow:'#ff6666', text:'#ff6666' },
+  'K-Dwarf':       { abbr:'K',  bg:'#4a2e10', glow:'#e8832a', text:'#e8832a' },
+  'G-Dwarf':       { abbr:'G',  bg:'#4a3a10', glow:'#f5c542', text:'#f5c542' },
+  'Main Sequence': { abbr:'MS', bg:'#2a4a1a', glow:'#7ed44a', text:'#7ed44a' },
+  'F-Dwarf':       { abbr:'F',  bg:'#3a3a1a', glow:'#fff0a0', text:'#ffe060' },
+  'Subgiant':      { abbr:'SG', bg:'#3a2a10', glow:'#ffaa44', text:'#ffaa44' },
+  'Giant':         { abbr:'GI', bg:'#2a1a40', glow:'#cc88ff', text:'#cc88ff' },
+  'Neutron':       { abbr:'NS', bg:'#102030', glow:'#38e8ff', text:'#38e8ff' },
+  'Black Hole':    { abbr:'BH', bg:'#080808', glow:'#9955ff', text:'#9955ff' }
+};
+
+var PLANET_META = {
+  'Rocky':        { icon:'&#9675;', color:'#aa8866' },
+  'Ice':          { icon:'&#10052;', color:'#88ccee' },
+  'Gas':          { icon:'&#9679;', color:'#8866bb' },
+  'Ocean':        { icon:'&#9675;', color:'#3388cc' },
+  'Desert':       { icon:'&#9675;', color:'#cc9944' },
+  'Shield World': { icon:'&#11041;', color:'#33ccaa' },
+  'Ecumenopolis': { icon:'&#11041;', color:'#ffcc44' },
+  'Installation': { icon:'&#9672;', color:'#38e8ff' },
+  'Habitat':      { icon:'&#9672;', color:'#88ff88' }
+};
+
+function getStarMeta(kind) { return STAR_META[kind] || { abbr:'?', bg:'#1a2a3a', glow:'#38e8ff', text:'#38e8ff' }; }
+function getPlanetMeta(t)  { return PLANET_META[t]   || { icon:'&#9675;', color:'#888' }; }
+
+// ── Deterministic system generator ───────────────────────────
+function generateSystem(id) {
+  var rnd = prng(id);
+
+  var starTable = [
+    { kind:'M-Dwarf',       w:34, hz:[0.1,0.4],   innerEdge:0.05, outerEdge:8,  starR:3 },
+    { kind:'K-Dwarf',       w:22, hz:[0.4,0.9],   innerEdge:0.08, outerEdge:15, starR:4 },
+    { kind:'G-Dwarf',       w:18, hz:[0.8,1.6],   innerEdge:0.15, outerEdge:20, starR:5 },
+    { kind:'Main Sequence', w:10, hz:[0.9,1.8],   innerEdge:0.15, outerEdge:20, starR:5 },
+    { kind:'F-Dwarf',       w:8,  hz:[1.2,2.5],   innerEdge:0.2,  outerEdge:25, starR:6 },
+    { kind:'Subgiant',      w:4,  hz:[2.0,5.0],   innerEdge:0.3,  outerEdge:40, starR:7 },
+    { kind:'Giant',         w:2,  hz:[5.0,12.0],  innerEdge:0.5,  outerEdge:60, starR:9 },
+    { kind:'Neutron',       w:1,  hz:[0.02,0.08], innerEdge:0.01, outerEdge:5,  starR:2 },
+    { kind:'Black Hole',    w:1,  hz:[0.0,0.0],   innerEdge:0.3,  outerEdge:50, starR:2 }
+  ];
+  var tw = starTable.reduce(function(s,e){ return s+e.w; }, 0);
+  var pick = rnd() * tw;
+  var se = starTable[2];
+  for (var i=0;i<starTable.length;i++){ pick-=starTable[i].w; if(pick<=0){se=starTable[i];break;} }
+
+  var kind = se.kind;
+  var hzIn = se.hz[0], hzOut = se.hz[1];
+  var planetCount = 2 + Math.floor(rnd() * 9);
+  var planets = [];
+  var au = se.innerEdge * (1 + rnd() * 2);
+
+  function zone(a) {
+    if (a < se.innerEdge*1.5) return 'inner';
+    if (a >= hzIn*0.7 && a <= hzOut*1.3) return 'habitable';
+    if (a > hzOut*1.3 && a < se.outerEdge*0.4) return 'outer';
+    return 'fringe';
+  }
+
+  function pickType(z) {
+    var r = rnd();
+    if (kind==='Neutron')    return ['Rocky','Installation','Habitat','Ice'][Math.floor(rnd()*4)];
+    if (kind==='Black Hole') return ['Rocky','Desert','Installation'][Math.floor(rnd()*3)];
+    if (z==='inner')     return r<0.50?'Rocky':r<0.75?'Desert':r<0.88?'Ocean':'Installation';
+    if (z==='habitable') return r<0.30?'Ocean':r<0.55?'Rocky':r<0.70?'Desert':r<0.82?'Ecumenopolis':r<0.90?'Shield World':'Installation';
+    if (z==='outer')     return r<0.45?'Gas':r<0.70?'Ice':r<0.85?'Rocky':'Habitat';
+    return r<0.55?'Ice':r<0.80?'Gas':'Rocky';
+  }
+
+  var TR = { Rocky:0.9,Desert:0.85,Ocean:1.0,Ice:0.8,Gas:2.2,Ecumenopolis:1.1,'Shield World':1.0,Installation:0.6,Habitat:0.5 };
+  var pfx = ['Aryn','Vel','Cor','Sith','Eld','Myr','Tar','Keth','Vor','Sev','Nox','Cal'];
+  var sfx = ['is','os','ax','en','ar','ia','um','on','eth','el'];
+  var used = {};
+  function genName() {
+    var n, tries=0;
+    do { n=pfx[Math.floor(rnd()*pfx.length)]+sfx[Math.floor(rnd()*sfx.length)]; tries++; } while(used[n]&&tries<50);
+    used[n]=true; return n;
+  }
+
+  for (var i=0;i<planetCount;i++) {
+    var z = zone(au);
+    var type = pickType(z);
+    planets.push({
+      name: genName(),
+      semi_major_AU: +au.toFixed(3),
+      type: type, zone: z,
+      radius_hint: +((TR[type]||1)*(0.85+rnd()*0.3)).toFixed(2),
+      ecc: +(rnd()*0.18).toFixed(3),
+      angle_deg: +(rnd()*360).toFixed(1),
+      notes: (i>0 && rnd()<0.12) ? 'Orbital resonance detected' : ''
+    });
+    au *= (1.45+rnd()*0.75)*(0.9+rnd()*0.2);
+    if (au > se.outerEdge) break;
+  }
+
+  return {
+    version: SYSGEN_VER, system_id: id, seeded: true,
+    generated_at: new Date().toISOString(),
+    star: { kind:kind, hz:se.hz, inner_edge:se.innerEdge, outer_edge:se.outerEdge, radius_hint:se.starR },
+    planets: planets
+  };
+}
+
+// ── Orbit SVG diagram ─────────────────────────────────────────
+function buildOrbitSVG(planets, starColor, sm, starData) {
+  var cx=110, cy=110, maxR=100;
+  var allAU = planets.map(function(p){ return p.semi_major_AU||0.1; });
+  var minAU = Math.max(0.01, (starData&&starData.inner_edge||0.05)*0.5);
+  var maxAU = Math.max.apply(null, allAU.concat([1]))*1.15;
+  var logMin=Math.log(minAU), logMax=Math.log(maxAU);
+
+  function auToR(au) {
+    var t=(Math.log(Math.max(au,0.001))-logMin)/(logMax-logMin);
+    return 8+t*(maxR-8);
+  }
+
+  var hz = (starData&&starData.hz)||[0.8,1.6];
+  var hzR1=auToR(hz[0]), hzR2=auToR(hz[1]);
+  var hzVis = hz[0]>0 && hzR1<maxR && hzR2>8;
+  var sR = Math.min(7, 3+(starData&&starData.radius_hint||5)*0.6);
+
+  var defs = '<defs>'
+    +'<filter id="gs" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+    +'<filter id="gp" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+    +'<radialGradient id="sg" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="50%" stop-color="'+starColor+'" stop-opacity="0.9"/><stop offset="100%" stop-color="'+starColor+'" stop-opacity="0.5"/></radialGradient>'
+    +'</defs>';
+
+  var bg = '<circle cx="'+cx+'" cy="'+cy+'" r="108" fill="rgba(4,7,14,.85)" stroke="rgba(56,232,255,.06)" stroke-width="1"/>';
+  var grid='';
+  for(var r=20;r<=maxR;r+=20) grid+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="rgba(56,232,255,.05)" stroke-width="0.5"/>';
+
+  var hzSvg='';
+  if(hzVis){
+    hzSvg='<circle cx="'+cx+'" cy="'+cy+'" r="'+hzR2.toFixed(1)+'" fill="rgba(80,255,120,.06)" stroke="rgba(80,255,120,.18)" stroke-width="0.8" stroke-dasharray="3 4"/>'
+          +'<circle cx="'+cx+'" cy="'+cy+'" r="'+hzR1.toFixed(1)+'" fill="none" stroke="rgba(80,255,120,.12)" stroke-width="0.6" stroke-dasharray="2 5"/>';
+  }
+
+  var orbits='', dots='', labels='';
+  planets.forEach(function(p){
+    var a=auToR(p.semi_major_AU||0.1);
+    var ecc=p.ecc||0, b=a*Math.sqrt(1-ecc*ecc), off=a*ecc;
+    var rot=p.angle_deg||0;
+    orbits+='<ellipse cx="'+(cx+off*0.3).toFixed(1)+'" cy="'+cy+'" rx="'+a.toFixed(1)+'" ry="'+b.toFixed(1)+'" fill="none" stroke="rgba(56,232,255,.16)" stroke-width="0.7" transform="rotate('+rot+' '+cx+' '+cy+')" />';
+
+    var ang=((p.angle_deg||0)*Math.PI)/180;
+    var px=cx+off*0.3+Math.cos(ang)*a;
+    var py=cy+Math.sin(ang)*b;
+    var pr=Math.max(2.2,Math.min(5.5,(p.radius_hint||1)*2.2));
+    var pm=getPlanetMeta(p.type);
+    if(p.zone==='habitable') dots+='<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="'+(pr+3).toFixed(1)+'" fill="none" stroke="rgba(80,255,120,.3)" stroke-width="0.8"/>';
+    dots+='<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="'+pr.toFixed(1)+'" fill="'+pm.color+'" opacity=".92" filter="url(#gp)"><title>'+p.name+' \u00B7 '+p.type+' \u00B7 '+p.semi_major_AU+' AU</title></circle>';
+
+    var ld=Math.hypot(px-cx,py-cy);
+    if(ld>14&&ld<104){
+      var lxp=cx+(px-cx)/ld*(ld+pr+5);
+      var lyp=cy+(py-cy)/ld*(ld+pr+5);
+      labels+='<text x="'+lxp.toFixed(1)+'" y="'+(lyp+3).toFixed(1)+'" font-family="\'Share Tech Mono\',monospace" font-size="7" fill="rgba(180,210,255,.55)" text-anchor="'+(lxp>cx?'start':'end')+'" letter-spacing="0.5">'+p.name+'</text>';
+    }
+  });
+
+  var star='<circle cx="'+cx+'" cy="'+cy+'" r="'+(sR*3.5).toFixed(1)+'" fill="'+starColor+'" opacity=".08"/>'
+           +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(sR*1.8).toFixed(1)+'" fill="'+starColor+'" opacity=".15"/>'
+           +'<circle cx="'+cx+'" cy="'+cy+'" r="'+sR.toFixed(1)+'" fill="url(#sg)" filter="url(#gs)"/>';
+
+  var ticks='';
+  [0.5,1,5,10,20].forEach(function(v){
+    var tr=auToR(v);
+    if(v>=minAU&&v<=maxAU&&tr>10&&tr<maxR-2)
+      ticks+='<text x="'+(cx+tr+2).toFixed(1)+'" y="'+(cy+3).toFixed(1)+'" font-family="\'Share Tech Mono\',monospace" font-size="6" fill="rgba(56,232,255,.3)">'+v+'AU</text>';
+  });
+
+  var hzLabel = '';
+  if(hzVis){ var mR=(hzR1+hzR2)/2; hzLabel='<text x="'+(cx+mR+2).toFixed(1)+'" y="'+(cy-3).toFixed(1)+'" font-family="\'Share Tech Mono\',monospace" font-size="6" fill="rgba(80,255,120,.45)">HZ</text>'; }
+
+  return '<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">'+defs+bg+grid+hzSvg+orbits+labels+ticks+hzLabel+star+dots+'</svg>';
+}
+
+// ── Panel ─────────────────────────────────────────────────────
+var panel      = document.getElementById('sidePanel');
+var spTitle    = document.getElementById('sp-title');
+var spSysId    = document.getElementById('sp-sys-id');
+var spOwner    = document.getElementById('sp-owner');
+var spStarOrb  = document.getElementById('sp-star-orb');
+var spStarAbbr = document.getElementById('sp-star-abbr');
+
+function openPanel()  { panel.classList.add('open'); }
+function closePanel() { panel.classList.remove('open'); }
+
+document.getElementById('sp-close').addEventListener('click', closePanel);
+document.getElementById('sp-tabs').addEventListener('click', function(e) {
+  var tab = e.target.closest('.tab');
+  if (!tab) return;
+  var name = tab.dataset.tab;
+  document.querySelectorAll('#sp-tabs .tab').forEach(function(t){ t.classList.toggle('active', t===tab); });
+  document.querySelectorAll('#sp-body .tab-pane').forEach(function(p){ p.classList.toggle('active', p.id==='pane-'+name); });
+});
+
+document.getElementById('sp-gen').addEventListener('click', function() {
+  if (!selectedId) return;
+  ensureDetails(selectedId, true).then(function(d){ renderPanel(selectedId, d); });
+});
+document.getElementById('sp-exp').addEventListener('click', function() {
+  if (selectedId) exportSystemDetails(selectedId);
+});
+document.getElementById('sp-orrery').addEventListener('click', function() {
+  if (selectedId) openOrrery(selectedId);
+});
+
+function renderPanel(id, details) {
+  var sys     = systems.find(function(s){ return s.id===id; });
+  var star    = (details && details.star)    || {};
+  var planets = (details && details.planets) || [];
+  var sm      = getStarMeta(star.kind);
+
+  spTitle.textContent         = (sys && sys.name) || id;
+  spSysId.textContent         = id;
+  spOwner.textContent         = (sys && sys.owner) ? ('\u25C8 ' + sys.owner) : '';
+  spStarAbbr.textContent      = sm.abbr;
+  spStarOrb.style.background  = 'radial-gradient(circle at 35% 35%, ' + sm.glow + '44, ' + sm.bg + ')';
+  spStarOrb.style.boxShadow   = '0 0 12px ' + sm.glow + '44, inset 0 0 8px ' + sm.glow + '22';
+  spStarOrb.style.color       = sm.text;
+
+  // Overview pane
+  var pov = document.getElementById('pane-overview');
+  var tags = (sys && Array.isArray(sys.tags) && sys.tags.length)
+    ? sys.tags.map(function(t){ return '<span class="tag-chip">'+t+'</span>'; }).join('')
+    : '';
+  var innerAU = planets.length ? planets.reduce(function(a,b){ return (a.semi_major_AU||99)<(b.semi_major_AU||99)?a:b; }).semi_major_AU : '—';
+  var outerAU = planets.length ? planets.reduce(function(a,b){ return (a.semi_major_AU||0)>(b.semi_major_AU||0)?a:b; }).semi_major_AU : '—';
+
+  pov.innerHTML =
+    (planets.length ? '<div class="orbit-diagram">'+buildOrbitSVG(planets, sm.glow, sm, details&&details.star)+'</div>' : '') +
+    '<div class="stats-grid">' +
+      '<div class="stat-cell"><div class="stat-key">Star Class</div><div class="stat-val" style="color:'+sm.text+';font-size:16px;">'+(star.kind||'&#8212;')+'</div><div class="stat-sub">'+sm.abbr+' TYPE</div></div>' +
+      '<div class="stat-cell"><div class="stat-key">Bodies</div><div class="stat-val cyan">'+planets.length+'</div><div class="stat-sub">ORBITAL OBJECTS</div></div>' +
+      '<div class="stat-cell"><div class="stat-key">Nearest</div><div class="stat-val gold" style="font-size:15px;">'+innerAU+'</div><div class="stat-sub">AU INNER ORBIT</div></div>' +
+      '<div class="stat-cell"><div class="stat-key">Farthest</div><div class="stat-val" style="font-size:15px;">'+outerAU+'</div><div class="stat-sub">AU OUTER ORBIT</div></div>' +
+    '</div>' +
+    '<div class="meta-row"><span class="mk">ID</span><span class="mv hi">'+id+'</span></div>' +
+    '<div class="meta-row"><span class="mk">Name</span><span class="mv">'+((sys&&sys.name)||'&#8212;')+'</span></div>' +
+    ((sys&&sys.owner) ? '<div class="meta-row"><span class="mk">Owner</span><span class="mv go">'+sys.owner+'</span></div>' : '') +
+    (tags ? '<div class="meta-row"><span class="mk">Tags</span><span class="mv">'+tags+'</span></div>' : '') +
+    '<div class="meta-row"><span class="mk">Record</span><span class="mv" style="font-size:13px;color:var(--text-muted);">'+(details&&details.version||'&#8212;')+' &middot; '+(details&&details.generated_at?new Date(details.generated_at).toLocaleDateString():'unscanned')+'</span></div>';
+
+  // Bodies pane
+  var pbod = document.getElementById('pane-bodies');
+  if (!planets.length) {
+    pbod.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9678;</div><div class="empty-state-text">// NO ORBITAL DATA<br>// PRESS &#x27F3; SCAN SYSTEM</div></div>';
+  } else {
+    var sorted = planets.slice().sort(function(a,b){ return (a.semi_major_AU||0)-(b.semi_major_AU||0); });
+    pbod.innerHTML = '<div class="bodies-header"><span class="bodies-count">'+planets.length+' ORBITAL OBJECT'+(planets.length!==1?'S':'')+' DETECTED</span></div>'
+      + sorted.map(function(p){
+          var pm=getPlanetMeta(p.type);
+          return '<div class="planet-card">'
+            +'<div class="p-icon" style="background:'+pm.color+'22;color:'+pm.color+';">'+pm.icon+'</div>'
+            +'<div class="p-info"><div class="p-name">'+p.name+'</div><div class="p-type-badge">'+(p.type||'UNKNOWN')+'</div>'+(p.notes?'<div class="p-notes-line">'+p.notes+'</div>':'')+'</div>'
+            +'<div class="p-orbit-val">'+(p.semi_major_AU||'?')+'<br><span style="font-size:7px;color:var(--text-muted);">AU</span></div>'
+            +'</div>';
+        }).join('');
+  }
+
+  // Edit pane
+  renderEditPane(id, details, sys);
+
+  // Switch to overview tab and show panel
+  document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
+  openPanel();
+}
+
+function renderEditPane(id, details, sys) {
+  if (!sys) sys = systems.find(function(s){ return s.id===id; });
+  var star    = (details&&details.star)||{};
+  var planets = (details&&details.planets)||[];
+  var starKinds = ['Main Sequence','K-Dwarf','G-Dwarf','F-Dwarf','M-Dwarf','Subgiant','Giant','Neutron','Black Hole'];
+  var opts = starKinds.map(function(k){ return '<option value="'+k+'"'+(star.kind===k?' selected':'')+'>'+k+'</option>'; }).join('');
+
+  var pedit = document.getElementById('pane-edit');
+  pedit.innerHTML =
+    '<div class="edit-section">'
+    +'<div class="edit-section-title">System Identity</div>'
+    +'<div class="form-row"><span class="fl">ID</span><span style="font-family:\'Share Tech Mono\',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:1px;">'+id+'</span></div>'
+    +'<div class="form-row"><label class="fl" for="sysName">Name</label><input id="sysName" class="sci-input" type="text" value="'+(sys&&sys.name||'').replace(/"/g,'&quot;')+'"/></div>'
+    +'<div class="form-row"><label class="fl" for="starKind">Star</label><select id="starKind" class="sci-select">'+opts+'</select></div>'
+    +'</div>'
+    +'<div class="edit-section">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    +'<div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Orbital Bodies</div>'
+    +'<button id="btnAddPlanet" type="button" class="pbtn primary" style="margin-left:10px;">+ ADD</button>'
+    +'</div>'
+    +'<div id="planetList">'+planets.map(function(p,i){ return planetRow(p,i); }).join('')+'</div>'
+    +'</div>'
+    +'<div class="edit-actions">'
+    +'<button id="btnSaveEdit" class="pbtn success" style="flex:1;padding:8px;">&#10003; SAVE CHANGES</button>'
+    +'<button id="btnCancelEdit" class="pbtn danger" style="padding:8px 12px;">&#x2715;</button>'
+    +'</div>';
+
+  pedit.querySelector('#btnAddPlanet').addEventListener('click', function() {
+    var listEl = pedit.querySelector('#planetList');
+    var idx = listEl.querySelectorAll('.planetRow').length;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = planetRow({ name:'P'+(idx+1), type:'Rocky', semi_major_AU:1.0, notes:'' }, idx);
+    listEl.appendChild(tmp.firstElementChild);
+  });
+
+  pedit.querySelector('#planetList').addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('delPlanet')) {
+      e.target.closest('.planetRow').remove();
+    }
+  });
+
+  pedit.querySelector('#btnSaveEdit').addEventListener('click', function() {
+    if (!requireEditor()) return;
+    var newName = pedit.querySelector('#sysName').value.trim();
+    var newKind = pedit.querySelector('#starKind').value;
+    var rows    = Array.from(pedit.querySelectorAll('.planetRow'));
+    var newPlanets = rows.map(function(row){
+      return {
+        name:          row.querySelector('.pName').value.trim()||'Body',
+        type:          row.querySelector('.pType').value,
+        semi_major_AU: parseFloat(row.querySelector('.pSMA').value)||null,
+        notes:         row.querySelector('.pNotes').value.trim()
+      };
+    });
+    var updated = Object.assign({}, getCached(id)||{ version:SYSGEN_VER, system_id:id }, { star:{ kind:newKind }, planets:newPlanets });
+    putCached(id, updated);
+    if (newName) { var s=systems.find(function(s){ return s.id===id; }); if(s) s.name=newName; }
+    renderPanel(id, updated);
+  });
+
+  pedit.querySelector('#btnCancelEdit').addEventListener('click', function() {
+    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
+  });
+}
+
+function planetRow(p, i) {
+  var pm = getPlanetMeta(p.type);
+  var o = function(v){ return '<option value="'+v+'"'+(p.type===v?' selected':'')+'>'+v+'</option>'; };
+  return '<div class="planetRow planet-row">'
+    +'<div class="planet-row-head">'
+    +'<span class="p-idx" style="display:flex;align-items:center;gap:6px;"><span style="color:'+pm.color+';font-size:14px;">'+pm.icon+'</span>BODY '+(i+1)+'</span>'
+    +'<button type="button" class="delPlanet pbtn danger" style="padding:3px 8px;">REMOVE</button>'
+    +'</div>'
+    +'<div class="planet-row-body">'
+    +'<div class="form-row"><span class="fl">Name</span><input class="pName sci-input" type="text" value="'+(p.name||'').replace(/"/g,'&quot;')+'"/></div>'
+    +'<div class="form-row"><span class="fl">Type</span><select class="pType sci-select">'+o('Rocky')+o('Ice')+o('Gas')+o('Ocean')+o('Desert')+o('Shield World')+o('Ecumenopolis')+o('Installation')+o('Habitat')+'</select></div>'
+    +'<div class="form-row"><span class="fl">Orbit AU</span><input class="pSMA sci-input" type="number" step="0.01" min="0.01" value="'+(p.semi_major_AU||1)+'"/></div>'
+    +'<div class="form-row"><span class="fl">Notes</span><input class="pNotes sci-input" type="text" value="'+(p.notes||'').replace(/"/g,'&quot;')+'"/></div>'
+    +'</div></div>';
+}
+
+// ── Orrery ────────────────────────────────────────────────────
+var orreryModal  = document.getElementById('orrery-modal');
+var orreryCanvas = document.getElementById('orrery-canvas');
+var orreryCtx    = orreryCanvas.getContext('2d');
+var orreryRAF    = null;
+var orreryData   = null;
+var orrerySpeed  = 1;
+var orreryT      = 0;
+var orreryLastTS = null;
+var YEAR_SECS    = 8;
+
+document.getElementById('orrery-close').addEventListener('click', closeOrrery);
+window.addEventListener('keydown', function(e){ if(e.key==='Escape') closeOrrery(); });
+
+document.querySelectorAll('.speed-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    orrerySpeed = parseFloat(btn.dataset.speed);
+    document.querySelectorAll('.speed-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+  });
 });
 
 function openOrrery(id) {
-  const det = getCachedSystem(id);
-  if (!det) return;
-  const sys  = systems.find(s => s.id === id) || { name: id };
-  const star = det.star || {};
-  const sm   = getStarMeta(star.kind);
-  const planets = (det.planets || []).slice().sort((a, b) => (a.semi_major_AU||0) - (b.semi_major_AU||0));
-
-  orreryData = { sys, details: det, planets, star, sm };
-  orreryT    = 0;
-  lastTS     = null;
-
-  // Title
+  var det = getCached(id); if (!det) return;
+  var sys = systems.find(function(s){ return s.id===id; }) || { name: id };
+  var star = det.star||{};
+  var sm   = getStarMeta(star.kind);
+  var planets = (det.planets||[]).slice().sort(function(a,b){ return (a.semi_major_AU||0)-(b.semi_major_AU||0); });
+  orreryData = { sys:sys, planets:planets, star:star, sm:sm };
+  orreryT = 0; orreryLastTS = null;
   document.getElementById('orrery-name').textContent = sys.name || id;
-  document.getElementById('orrery-sub').textContent  =
-    `${star.kind || '—'} · ${planets.length} ORBITAL OBJECT${planets.length !== 1 ? 'S' : ''}`;
-
-  // Legend
+  document.getElementById('orrery-sub').textContent  = (star.kind||'—') + ' \u00B7 ' + planets.length + ' BODY' + (planets.length!==1?'S':'');
   buildOrreryLegend(planets, star.hz);
-
   orreryModal.classList.add('open');
   resizeOrreryCanvas();
   if (orreryRAF) cancelAnimationFrame(orreryRAF);
@@ -584,1011 +967,156 @@ function closeOrrery() {
 }
 
 function resizeOrreryCanvas() {
-  const frame = orreryCanvas.parentElement;
-  const rect  = frame.getBoundingClientRect();
-  orreryCanvas.width  = rect.width  * devicePixelRatio;
-  orreryCanvas.height = rect.height * devicePixelRatio;
+  var rect = orreryCanvas.parentElement.getBoundingClientRect();
+  orreryCanvas.width  = rect.width;
+  orreryCanvas.height = rect.height;
 }
-
-window.addEventListener('resize', () => { if (orreryModal.classList.contains('open')) resizeOrreryCanvas(); });
+window.addEventListener('resize', function(){ if(orreryModal.classList.contains('open')) resizeOrreryCanvas(); });
 
 function buildOrreryLegend(planets, hz) {
-  const leg = document.getElementById('orrery-legend');
-  const types = [...new Set(planets.map(p => p.type))];
-  let html = '';
-  if (hz && hz[0] > 0) {
-    html += `<div class="orrery-legend-item"><div class="orrery-legend-ring"></div>HABITABLE ZONE</div>`;
-  }
-  types.forEach(t => {
-    const pm = getPlanetMeta(t);
-    html += `<div class="orrery-legend-item"><div class="orrery-legend-dot" style="background:${pm.color}"></div>${t.toUpperCase()}</div>`;
+  var leg = document.getElementById('orrery-legend');
+  var types = [];
+  planets.forEach(function(p){ if(types.indexOf(p.type)<0) types.push(p.type); });
+  var html = '';
+  if (hz && hz[0]>0) html += '<div class="orrery-legend-item"><div class="orrery-legend-ring"></div>HABITABLE ZONE</div>';
+  types.forEach(function(t){
+    var pm = getPlanetMeta(t);
+    html += '<div class="orrery-legend-item"><div class="orrery-legend-dot" style="background:'+pm.color+'"></div>'+t.toUpperCase()+'</div>';
   });
   leg.innerHTML = html;
 }
 
 function orreryTick(ts) {
-  if (!orreryData) return;
-  if (lastTS !== null) {
-    const dt = Math.min((ts - lastTS) / 1000, 0.1); // cap at 100ms
+  if (orreryLastTS !== null) {
+    var dt = Math.min((ts - orreryLastTS)/1000, 0.1);
     orreryT += dt * orrerySpeed / YEAR_SECS;
   }
-  lastTS = ts;
+  orreryLastTS = ts;
   drawOrrery();
   orreryRAF = requestAnimationFrame(orreryTick);
 }
 
 function drawOrrery() {
-  const cvs = orreryCanvas;
-  const ctx = orreryCtx;
-  const W = cvs.width, H = cvs.height;
-  const cx = W / 2, cy = H / 2;
-  const dpr = devicePixelRatio;
-
-  ctx.clearRect(0, 0, W, H);
-
+  var W = orreryCanvas.width, H = orreryCanvas.height;
+  var cx = W/2, cy = H/2;
+  orreryCtx.clearRect(0,0,W,H);
   if (!orreryData) return;
-  const { planets, star, sm } = orreryData;
+  var planets=orreryData.planets, star=orreryData.star, sm=orreryData.sm;
   if (!planets.length) return;
 
-  // ── Sizing ──
-  // Use log scale matching the static diagram
-  const allAU  = planets.map(p => p.semi_major_AU || 0.1);
-  const minAU  = Math.max(0.01, (star.inner_edge || 0.05) * 0.5);
-  const maxAU  = Math.max(...allAU) * 1.2;
-  const margin = 60 * dpr;
-  const maxR   = Math.min(cx, cy) - margin;
-  const logMin = Math.log(minAU), logMax = Math.log(maxAU);
+  var allAU = planets.map(function(p){ return p.semi_major_AU||0.1; });
+  var minAU = Math.max(0.01,(star.inner_edge||0.05)*0.5);
+  var maxAU = Math.max.apply(null,allAU)*1.2;
+  var margin = 60;
+  var maxR   = Math.min(cx,cy)-margin;
+  var logMin=Math.log(minAU), logMax=Math.log(maxAU);
+  function auToR(au){ var t=(Math.log(Math.max(au,0.001))-logMin)/(logMax-logMin); return 12+t*(maxR-12); }
 
-  function auToR(au) {
-    const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
-    return 12 * dpr + t * (maxR - 12 * dpr);
+  // Radial grid
+  for(var gr=maxR*0.25;gr<=maxR;gr+=maxR*0.25){
+    orreryCtx.beginPath(); orreryCtx.arc(cx,cy,gr,0,Math.PI*2);
+    orreryCtx.strokeStyle='rgba(56,232,255,0.04)'; orreryCtx.lineWidth=1; orreryCtx.stroke();
   }
 
-  // ── Subtle radial grid ──
-  ctx.save();
-  for (let r = maxR * 0.25; r <= maxR; r += maxR * 0.25) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(56,232,255,0.04)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // ── Habitable zone ──
-  const hz = star.hz || [0, 0];
-  if (hz[0] > 0 && hz[1] > hz[0]) {
-    const r1 = auToR(hz[0]), r2 = auToR(hz[1]);
-    ctx.save();
-    const grad = ctx.createRadialGradient(cx, cy, r1, cx, cy, r2);
-    grad.addColorStop(0,   'rgba(60,220,100,0.00)');
-    grad.addColorStop(0.3, 'rgba(60,220,100,0.06)');
-    grad.addColorStop(0.7, 'rgba(60,220,100,0.06)');
-    grad.addColorStop(1,   'rgba(60,220,100,0.00)');
-    ctx.beginPath();
-    ctx.arc(cx, cy, r2, 0, Math.PI * 2);
-    ctx.arc(cx, cy, r1, 0, Math.PI * 2, true);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    // HZ border rings (dashed)
-    ctx.setLineDash([4 * dpr, 6 * dpr]);
-    ctx.lineWidth = 0.8;
-    ctx.strokeStyle = 'rgba(60,220,100,0.22)';
-    ctx.beginPath(); ctx.arc(cx, cy, r1, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, r2, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
+  // Habitable zone
+  var hz=star.hz||[0,0];
+  if(hz[0]>0&&hz[1]>hz[0]){
+    var r1=auToR(hz[0]),r2=auToR(hz[1]);
+    var grad=orreryCtx.createRadialGradient(cx,cy,r1,cx,cy,r2);
+    grad.addColorStop(0,'rgba(60,220,100,0)'); grad.addColorStop(0.3,'rgba(60,220,100,0.06)');
+    grad.addColorStop(0.7,'rgba(60,220,100,0.06)'); grad.addColorStop(1,'rgba(60,220,100,0)');
+    orreryCtx.beginPath(); orreryCtx.arc(cx,cy,r2,0,Math.PI*2); orreryCtx.arc(cx,cy,r1,0,Math.PI*2,true);
+    orreryCtx.fillStyle=grad; orreryCtx.fill();
+    orreryCtx.setLineDash([4,6]); orreryCtx.lineWidth=0.8; orreryCtx.strokeStyle='rgba(60,220,100,0.22)';
+    orreryCtx.beginPath(); orreryCtx.arc(cx,cy,r1,0,Math.PI*2); orreryCtx.stroke();
+    orreryCtx.beginPath(); orreryCtx.arc(cx,cy,r2,0,Math.PI*2); orreryCtx.stroke();
+    orreryCtx.setLineDash([]);
   }
 
-  // ── Orbit ellipses ──
-  ctx.save();
-  planets.forEach(p => {
-    const a   = auToR(p.semi_major_AU || 0.1);
-    const ecc = p.ecc || 0;
-    const b   = a * Math.sqrt(1 - ecc * ecc);
-    const off = a * ecc * 0.3;
-    const rot = ((p.angle_deg || 0) * Math.PI) / 180;
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rot);
-    ctx.translate(off, 0);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(56,232,255,0.18)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-    ctx.restore();
-  });
-  ctx.restore();
-
-  // ── Star ──
-  const starR = Math.max(6, (star.radius_hint || 5) * dpr * 1.2);
-  const starColor = sm.glow || '#38e8ff';
-  // Outer glow
-  const sg1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, starR * 5);
-  sg1.addColorStop(0,   hexToRgba(starColor, 0.35));
-  sg1.addColorStop(0.3, hexToRgba(starColor, 0.12));
-  sg1.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.beginPath(); ctx.arc(cx, cy, starR * 5, 0, Math.PI * 2);
-  ctx.fillStyle = sg1; ctx.fill();
-  // Core
-  const sg2 = ctx.createRadialGradient(cx - starR * 0.3, cy - starR * 0.3, 0, cx, cy, starR);
-  sg2.addColorStop(0, '#ffffff');
-  sg2.addColorStop(0.4, starColor);
-  sg2.addColorStop(1, hexToRgba(starColor, 0.6));
-  ctx.beginPath(); ctx.arc(cx, cy, starR, 0, Math.PI * 2);
-  ctx.fillStyle = sg2; ctx.fill();
-
-  // ── Planets ──
-  const planetPositions = []; // for hover detection
-  planets.forEach(p => {
-    const a     = auToR(p.semi_major_AU || 0.1);
-    const ecc   = p.ecc || 0;
-    const b     = a * Math.sqrt(1 - ecc * ecc);
-    const off   = a * ecc * 0.3;
-    const rot   = ((p.angle_deg || 0) * Math.PI) / 180;
-    // Orbital period ~ sqrt(AU^3) years (Kepler's 3rd law)
-    const period  = Math.sqrt(Math.pow(p.semi_major_AU || 1, 3));
-    const angle   = (orreryT / period) * Math.PI * 2;
-    // Position on ellipse
-    const lx = Math.cos(angle) * a - off;
-    const ly = Math.sin(angle) * b;
-    // Rotate by orbit orientation
-    const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
-    const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
-
-    const pm   = getPlanetMeta(p.type);
-    const pr   = Math.max(3 * dpr, Math.min(9 * dpr, (p.radius_hint || 1) * 3.2 * dpr));
-    const isHz = p.zone === 'habitable';
-
-    // Habitable zone glow ring
-    if (isHz) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(px, py, pr + 4 * dpr, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(80,255,120,0.4)';
-      ctx.lineWidth = 1; ctx.stroke();
-      ctx.restore();
-    }
-
-    // Planet glow
-    const pg = ctx.createRadialGradient(px, py, 0, px, py, pr * 2.5);
-    pg.addColorStop(0, hexToRgba(pm.color, 0.5));
-    pg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.beginPath(); ctx.arc(px, py, pr * 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = pg; ctx.fill();
-
-    // Planet body (radial shaded sphere)
-    const pb = ctx.createRadialGradient(px - pr * 0.3, py - pr * 0.3, 0, px, py, pr);
-    pb.addColorStop(0, lightenHex(pm.color, 60));
-    pb.addColorStop(0.5, pm.color);
-    pb.addColorStop(1, darkenHex(pm.color, 50));
-    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2);
-    ctx.fillStyle = pb; ctx.fill();
-
-    // Name label
-    ctx.save();
-    ctx.font = `${11 * dpr}px 'Share Tech Mono', monospace`;
-    ctx.fillStyle = 'rgba(180,210,255,0.65)';
-    ctx.textAlign = px > cx ? 'left' : 'right';
-    ctx.fillText(p.name, px + (px > cx ? pr + 4 * dpr : -(pr + 4 * dpr)), py + 4 * dpr);
-    ctx.restore();
-
-    planetPositions.push({ p, px, py, pr });
-  });
-
-  // Store for hover
-  orreryCanvas._planets = planetPositions;
-}
-
-// Hover detection
-orreryCanvas.addEventListener('mousemove', e => {
-  if (!orreryCanvas._planets) return;
-  const rect = orreryCanvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) * devicePixelRatio;
-  const my = (e.clientY - rect.top)  * devicePixelRatio;
-  const hover = document.getElementById('orrery-hover');
-  let hit = null;
-  for (const { p, px, py, pr } of orreryCanvas._planets) {
-    if (Math.hypot(mx - px, my - py) < pr + 8 * devicePixelRatio) { hit = p; break; }
-  }
-  if (hit) {
-    document.getElementById('ohl-name').textContent = hit.name;
-    document.getElementById('ohl-sub').textContent  = `${hit.type} · ${hit.semi_major_AU} AU`;
-    hover.style.display = 'block';
-    hover.style.left = (e.clientX - orreryModal.getBoundingClientRect().left + 14) + 'px';
-    hover.style.top  = (e.clientY - orreryModal.getBoundingClientRect().top  - 14) + 'px';
-    orreryCanvas.style.cursor = 'crosshair';
-  } else {
-    hover.style.display = 'none';
-    orreryCanvas.style.cursor = 'default';
-  }
-});
-orreryCanvas.addEventListener('mouseleave', () => {
-  document.getElementById('orrery-hover').style.display = 'none';
-});
-
-// Colour helpers
-function hexToRgba(hex, a) {
-  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-function lightenHex(hex, amt) {
-  const r = Math.min(255,parseInt(hex.slice(1,3),16)+amt),
-        g = Math.min(255,parseInt(hex.slice(3,5),16)+amt),
-        b = Math.min(255,parseInt(hex.slice(5,7),16)+amt);
-  return `rgb(${r},${g},${b})`;
-}
-function darkenHex(hex, amt) {
-  const r = Math.max(0,parseInt(hex.slice(1,3),16)-amt),
-        g = Math.max(0,parseInt(hex.slice(3,5),16)-amt),
-        b = Math.max(0,parseInt(hex.slice(5,7),16)-amt);
-  return `rgb(${r},${g},${b})`;
-}
-function showPanel(){ panel.style.transform = 'translateX(0)'; }
-function hidePanel(){ panel.style.transform = 'translateX(100%)'; }
-
-// system details cache/generator
-const SYSGEN_VERSION = "v2";
-function sysKey(id){ return `sysgen:${SYSGEN_VERSION}:${id}`; }
-function getCachedSystem(id){ try { const raw = localStorage.getItem(sysKey(id)); return raw ? JSON.parse(raw) : null; } catch { return null; } }
-function setCachedSystem(id, details){ try { localStorage.setItem(sysKey(id), JSON.stringify(details)); } catch {} }
-function prngSeed(str){
-  let h = 2166136261 >>> 0;
-  for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  let s = h || 0xdeadbeef;
-  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s>>>0) / 4294967296); };
-}
-async function ensureSystemDetails(id, forceRegen=false){
-  let det = forceRegen ? null : getCachedSystem(id);
-  if (!det){ det = generateDeterministic(id); setCachedSystem(id, det); }
-  return det;
-}
-function exportSystemDetails(id){
-  const det = getCachedSystem(id);
-  if (!det) return;
-  const blob = new Blob([JSON.stringify(det, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `system_${id}_${SYSGEN_VERSION}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-// ── Star type metadata ──
-const STAR_META = {
-  'Main Sequence': { abbr:'MS',  bg:'#2a4a1a', glow:'#7ed44a', text:'#7ed44a' },
-  'K-Dwarf':       { abbr:'K',   bg:'#4a2e10', glow:'#e8832a', text:'#e8832a' },
-  'G-Dwarf':       { abbr:'G',   bg:'#4a3a10', glow:'#f5c542', text:'#f5c542' },
-  'F-Dwarf':       { abbr:'F',   bg:'#3a3a1a', glow:'#fff0a0', text:'#ffe060' },
-  'M-Dwarf':       { abbr:'M',   bg:'#4a1a1a', glow:'#ff6666', text:'#ff6666' },
-  'Subgiant':      { abbr:'SG',  bg:'#3a2a10', glow:'#ffaa44', text:'#ffaa44' },
-  'Giant':         { abbr:'GI',  bg:'#2a1a40', glow:'#cc88ff', text:'#cc88ff' },
-  'Neutron':       { abbr:'NS',  bg:'#102030', glow:'#38e8ff', text:'#38e8ff' },
-  'Black Hole':    { abbr:'BH',  bg:'#080808', glow:'#9955ff', text:'#9955ff' },
-};
-
-// ── Planet type metadata ──
-const PLANET_META = {
-  'Rocky':         { icon:'◉', color:'#aa8866' },
-  'Ice':           { icon:'❄', color:'#88ccee' },
-  'Gas':           { icon:'⬤', color:'#8866bb' },
-  'Ocean':         { icon:'◉', color:'#3388cc' },
-  'Desert':        { icon:'◉', color:'#cc9944' },
-  'Shield World':  { icon:'⬡', color:'#33ccaa' },
-  'Ecumenopolis':  { icon:'⬡', color:'#ffcc44' },
-  'Installation':  { icon:'◈', color:'#38e8ff' },
-  'Habitat':       { icon:'◈', color:'#88ff88' },
-};
-
-function getPlanetMeta(type){ return PLANET_META[type] || { icon:'◉', color:'#888' }; }
-function getStarMeta(kind){ return STAR_META[kind] || { abbr:'?', bg:'#1a2a3a', glow:'#38e8ff', text:'#38e8ff' }; }
-
-// ── Deterministic system generator — realistic orbital mechanics ──
-function generateDeterministic(id){
-  const rnd = prngSeed(id);
-
-  // Star class with weighted probability (M-dwarfs most common, black holes rare)
-  const starTable = [
-    { kind:'M-Dwarf',       w:34, hz:[0.1,0.4],  innerEdge:0.05, outerEdge:8,  starR:3  },
-    { kind:'K-Dwarf',       w:22, hz:[0.4,0.9],  innerEdge:0.08, outerEdge:15, starR:4  },
-    { kind:'G-Dwarf',       w:18, hz:[0.8,1.6],  innerEdge:0.15, outerEdge:20, starR:5  },
-    { kind:'Main Sequence', w:10, hz:[0.9,1.8],  innerEdge:0.15, outerEdge:20, starR:5  },
-    { kind:'F-Dwarf',       w:8,  hz:[1.2,2.5],  innerEdge:0.2,  outerEdge:25, starR:6  },
-    { kind:'Subgiant',      w:4,  hz:[2.0,5.0],  innerEdge:0.3,  outerEdge:40, starR:7  },
-    { kind:'Giant',         w:2,  hz:[5.0,12.0], innerEdge:0.5,  outerEdge:60, starR:9  },
-    { kind:'Neutron',       w:1,  hz:[0.02,0.08],innerEdge:0.01, outerEdge:5,  starR:2  },
-    { kind:'Black Hole',    w:1,  hz:[0.0,0.0],  innerEdge:0.3,  outerEdge:50, starR:2  },
-  ];
-  const totalW = starTable.reduce((s,e)=>s+e.w, 0);
-  let pick = rnd() * totalW;
-  const starEntry = starTable.find(e=>{ pick-=e.w; return pick<=0; }) || starTable[2];
-  const kind = starEntry.kind;
-
-  // Titius-Bode inspired cascade: each orbit = prev * (1.4–2.2) with jitter
-  // Starting orbit randomised per inner edge of the star type
-  const planetCount = 2 + Math.floor(rnd() * 9); // 2–10
-  const planets = [];
-  let au = starEntry.innerEdge * (1 + rnd() * 2); // first orbit
-  const [hzIn, hzOut] = starEntry.hz;
-
-  // Zone classifier
-  function classifyZone(a){
-    if (a < starEntry.innerEdge * 1.5)            return 'inner';
-    if (a >= hzIn * 0.7 && a <= hzOut * 1.3)      return 'habitable';
-    if (a > hzOut * 1.3 && a < starEntry.outerEdge * 0.4) return 'outer';
-    return 'fringe';
-  }
-
-  // Type probabilities per zone
-  function pickType(zone){
-    const r = rnd();
-    if (kind === 'Neutron'){
-      const t = ['Rocky','Installation','Habitat','Ice'];
-      return t[Math.floor(rnd()*t.length)];
-    }
-    if (kind === 'Black Hole'){
-      const t = ['Rocky','Desert','Installation'];
-      return t[Math.floor(rnd()*t.length)];
-    }
-    switch(zone){
-      case 'inner':     return r<0.50?'Rocky' : r<0.75?'Desert' : r<0.88?'Ocean' : 'Installation';
-      case 'habitable': return r<0.30?'Ocean'  : r<0.55?'Rocky'  : r<0.70?'Desert': r<0.82?'Ecumenopolis': r<0.90?'Shield World':'Installation';
-      case 'outer':     return r<0.45?'Gas'    : r<0.70?'Ice'    : r<0.85?'Rocky': 'Habitat';
-      case 'fringe':    return r<0.55?'Ice'    : r<0.80?'Gas'    : 'Rocky';
-    }
-  }
-
-  // Planet radius hint for visual sizing (AU-relative, not real)
-  const TYPE_RADIUS = {
-    'Rocky':0.9,'Desert':0.85,'Ocean':1.0,'Ice':0.8,'Gas':2.2,'Ecumenopolis':1.1,
-    'Shield World':1.0,'Installation':0.6,'Habitat':0.5
-  };
-
-  const usedNames = new Set();
-  const prefixes  = ['Aryn','Vel','Cor','Sith','Eld','Myr','Tar','Keth','Vor','Sev','Nox','Cal'];
-  const suffixes  = ['is','os','ax','en','ar','ia','um','on','eth','el'];
-  function genName(){
-    let n;
-    do {
-      n = prefixes[Math.floor(rnd()*prefixes.length)] + suffixes[Math.floor(rnd()*suffixes.length)];
-    } while(usedNames.has(n));
-    usedNames.add(n);
-    return n;
-  }
-
-  for (let i=0; i<planetCount; i++){
-    const zone = classifyZone(au);
-    const type = pickType(zone);
-    const eccFactor = 0.85 + rnd()*0.30; // slight eccentricity variation for rendering
-    const resonanceChance = i > 0 && rnd() < 0.12;
-    planets.push({
-      name:          genName(),
-      semi_major_AU: +au.toFixed(3),
-      type,
-      zone,
-      radius_hint:   +(TYPE_RADIUS[type] || 1) * (0.85 + rnd()*0.3),
-      ecc:           +((rnd()*0.18)).toFixed(3),   // 0–0.18 eccentricity
-      angle_deg:     +((rnd()*360)).toFixed(1),     // current orbital position
-      notes:         resonanceChance ? 'Orbital resonance detected' : ''
-    });
-    // Next orbit: Titius-Bode-style spacing with randomness
-    const spacing = 1.45 + rnd() * 0.75;
-    au = au * spacing * (0.9 + rnd()*0.2);
-    if (au > starEntry.outerEdge) break;
-  }
-
-  return {
-    version: SYSGEN_VERSION,
-    system_id: id,
-    seeded: true,
-    generated_at: new Date().toISOString(),
-    star: { kind, hz: starEntry.hz, inner_edge: starEntry.innerEdge, outer_edge: starEntry.outerEdge, radius_hint: starEntry.starR },
-    planets
-  };
-}
-
-// ── Orbit diagram — logarithmic scale, habitable zone, per-planet sizing ──
-function buildOrbitSVG(planets, starColor, starMeta, starData){
-  const cx = 110, cy = 110, maxR = 100;
-
-  // log scale: map AU -> radius in SVG units
-  const allAU  = planets.map(p=>p.semi_major_AU||0.1);
-  const minAU  = Math.max(0.01, (starData?.inner_edge||0.05) * 0.5);
-  const maxAU  = Math.max(...allAU, 1) * 1.15;
-  const logMin = Math.log(minAU), logMax = Math.log(maxAU);
-
-  function auToR(au){
-    const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
-    return 8 + t * (maxR - 8);
-  }
-
-  // Habitable zone ring
-  const [hzIn, hzOut] = starData?.hz || [0.8, 1.6];
-  const hzR1 = auToR(hzIn), hzR2 = auToR(hzOut);
-  const hzVisible = hzR1 < maxR && hzR2 > 8 && hzIn > 0;
-
-  // Star radius visual (scaled by star type)
-  const starVisR = Math.min(7, 3 + (starData?.radius_hint||5) * 0.6);
-
-  let defs = `
-    <defs>
-      <filter id="glow-s" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur stdDeviation="3" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="glow-p" x="-80%" y="-80%" width="260%" height="260%">
-        <feGaussianBlur stdDeviation="1.5" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <radialGradient id="star-grad" cx="40%" cy="35%" r="60%">
-        <stop offset="0%" stop-color="#fff" stop-opacity="0.9"/>
-        <stop offset="50%" stop-color="${starColor}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="${starColor}" stop-opacity="0.5"/>
-      </radialGradient>
-    </defs>`;
-
-  // Background
-  let bg = `<circle cx="${cx}" cy="${cy}" r="108" fill="rgba(4,7,14,.85)" stroke="rgba(56,232,255,.06)" stroke-width="1"/>`;
-
-  // Subtle radial grid lines (every ~20 SVG units)
-  let grid = '';
-  for (let r = 20; r <= maxR; r += 20){
-    grid += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(56,232,255,.05)" stroke-width="0.5"/>`;
-  }
-
-  // Habitable zone band
-  let hz = '';
-  if (hzVisible){
-    hz = `<circle cx="${cx}" cy="${cy}" r="${hzR2.toFixed(1)}" fill="rgba(80,255,120,.06)" stroke="rgba(80,255,120,.18)" stroke-width="0.8" stroke-dasharray="3 4"/>
-          <circle cx="${cx}" cy="${cy}" r="${hzR1.toFixed(1)}" fill="rgba(4,7,14,.0)" stroke="rgba(80,255,120,.12)" stroke-width="0.6" stroke-dasharray="2 5"/>`;
-  }
-
-  // Orbit ellipses — slightly elliptical using ecc
-  let orbits = '';
-  planets.forEach(p => {
-    const a   = auToR(p.semi_major_AU || 0.1);
-    const ecc = p.ecc || 0;
-    const b   = a * Math.sqrt(1 - ecc*ecc);       // semi-minor axis
-    const off = a * ecc;                            // focus offset
-    // Rotate ellipse by planet's angle_deg for variety
-    const rot = p.angle_deg || 0;
-    orbits += `<ellipse cx="${(cx + off * 0.3).toFixed(1)}" cy="${cy}" rx="${a.toFixed(1)}" ry="${b.toFixed(1)}"
-      fill="none" stroke="rgba(56,232,255,.16)" stroke-width="0.7"
-      transform="rotate(${rot} ${cx} ${cy})"/>`;
-  });
-
-  // Planet dots — sized by radius_hint, positioned at angle_deg on orbit
-  let dots = '';
-  let labels = '';
-  planets.forEach(p => {
-    const a    = auToR(p.semi_major_AU || 0.1);
-    const ecc  = p.ecc || 0;
-    const b    = a * Math.sqrt(1 - ecc*ecc);
-    const off  = a * ecc * 0.3;
-    const ang  = ((p.angle_deg || 0) * Math.PI) / 180;
-    // Position on the ellipse at angle
-    const px   = cx + off + Math.cos(ang) * a;
-    const py   = cy + Math.sin(ang) * b;
-    const pr   = Math.max(2.2, Math.min(5.5, (p.radius_hint||1) * 2.2));
-    const pm   = getPlanetMeta(p.type);
-    const isHz = p.zone === 'habitable';
-
-    // Glow ring for habitable-zone planets
-    if (isHz){
-      dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(pr+3).toFixed(1)}" fill="none" stroke="rgba(80,255,120,.3)" stroke-width="0.8"/>`;
-    }
-    dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${pr.toFixed(1)}"
-      fill="${pm.color}" opacity=".92" filter="url(#glow-p)">
-      <title>${p.name} · ${p.type} · ${p.semi_major_AU} AU</title>
-    </circle>`;
-
-    // Label: only if enough room (not too close to edge/center)
-    const labelDist = Math.hypot(px - cx, py - cy);
-    if (labelDist > 14 && labelDist < 104){
-      // Push label radially outward from center
-      const lx = cx + (px-cx)/labelDist * (labelDist + pr + 5);
-      const ly = cy + (py-cy)/labelDist * (labelDist + pr + 5);
-      const anchor = lx > cx ? 'start' : 'end';
-      labels += `<text x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}"
-        font-family="'Share Tech Mono',monospace" font-size="7" fill="rgba(180,210,255,.55)"
-        text-anchor="${anchor}" letter-spacing="0.5">${p.name}</text>`;
-    }
+  // Orbit ellipses
+  planets.forEach(function(p){
+    var a=auToR(p.semi_major_AU||0.1), ecc=p.ecc||0, b=a*Math.sqrt(1-ecc*ecc), off=a*ecc*0.3;
+    var rot=((p.angle_deg||0)*Math.PI)/180;
+    orreryCtx.save(); orreryCtx.translate(cx,cy); orreryCtx.rotate(rot); orreryCtx.translate(off,0);
+    orreryCtx.beginPath(); orreryCtx.ellipse(0,0,a,b,0,0,Math.PI*2);
+    orreryCtx.strokeStyle='rgba(56,232,255,0.18)'; orreryCtx.lineWidth=0.8; orreryCtx.stroke();
+    orreryCtx.restore();
   });
 
   // Star
-  const starGlow = `<circle cx="${cx}" cy="${cy}" r="${(starVisR*3.5).toFixed(1)}" fill="${starColor}" opacity=".08"/>
-    <circle cx="${cx}" cy="${cy}" r="${(starVisR*1.8).toFixed(1)}" fill="${starColor}" opacity=".15"/>
-    <circle cx="${cx}" cy="${cy}" r="${starVisR.toFixed(1)}" fill="url(#star-grad)" filter="url(#glow-s)"/>`;
+  var starColor=sm.glow||'#38e8ff';
+  var starR=Math.max(6,(star.radius_hint||5)*1.2);
+  var sg1=orreryCtx.createRadialGradient(cx,cy,0,cx,cy,starR*5);
+  sg1.addColorStop(0,hexRgba(starColor,0.35)); sg1.addColorStop(0.3,hexRgba(starColor,0.12)); sg1.addColorStop(1,'rgba(0,0,0,0)');
+  orreryCtx.beginPath(); orreryCtx.arc(cx,cy,starR*5,0,Math.PI*2); orreryCtx.fillStyle=sg1; orreryCtx.fill();
+  var sg2=orreryCtx.createRadialGradient(cx-starR*0.3,cy-starR*0.3,0,cx,cy,starR);
+  sg2.addColorStop(0,'#ffffff'); sg2.addColorStop(0.4,starColor); sg2.addColorStop(1,hexRgba(starColor,0.6));
+  orreryCtx.beginPath(); orreryCtx.arc(cx,cy,starR,0,Math.PI*2); orreryCtx.fillStyle=sg2; orreryCtx.fill();
 
-  // AU scale tick
-  const tickAUs = [0.5, 1, 5, 10, 20].filter(v => v >= minAU && v <= maxAU);
-  let ticks = '';
-  tickAUs.forEach(v => {
-    const tr = auToR(v);
-    if (tr > 10 && tr < maxR - 2){
-      ticks += `<text x="${(cx + tr + 2).toFixed(1)}" y="${(cy + 3).toFixed(1)}"
-        font-family="'Share Tech Mono',monospace" font-size="6" fill="rgba(56,232,255,.3)"
-        letter-spacing="0">${v}AU</text>`;
+  // Planets
+  var planetPos=[];
+  planets.forEach(function(p){
+    var a=auToR(p.semi_major_AU||0.1), ecc=p.ecc||0, b=a*Math.sqrt(1-ecc*ecc), off=a*ecc*0.3;
+    var rot=((p.angle_deg||0)*Math.PI)/180;
+    var period=Math.sqrt(Math.pow(p.semi_major_AU||1,3));
+    var angle=(orreryT/period)*Math.PI*2;
+    var lxp=Math.cos(angle)*a-off, lyp=Math.sin(angle)*b;
+    var px=cx+lxp*Math.cos(rot)-lyp*Math.sin(rot);
+    var py=cy+lxp*Math.sin(rot)+lyp*Math.cos(rot);
+    var pm=getPlanetMeta(p.type);
+    var pr=Math.max(3,Math.min(9,(p.radius_hint||1)*3.2));
+
+    if(p.zone==='habitable'){
+      orreryCtx.beginPath(); orreryCtx.arc(px,py,pr+4,0,Math.PI*2);
+      orreryCtx.strokeStyle='rgba(80,255,120,0.4)'; orreryCtx.lineWidth=1; orreryCtx.stroke();
     }
+    var pg=orreryCtx.createRadialGradient(px,py,0,px,py,pr*2.5);
+    pg.addColorStop(0,hexRgba(pm.color,0.5)); pg.addColorStop(1,'rgba(0,0,0,0)');
+    orreryCtx.beginPath(); orreryCtx.arc(px,py,pr*2.5,0,Math.PI*2); orreryCtx.fillStyle=pg; orreryCtx.fill();
+
+    var pb=orreryCtx.createRadialGradient(px-pr*0.3,py-pr*0.3,0,px,py,pr);
+    pb.addColorStop(0,lighten(pm.color,60)); pb.addColorStop(0.5,pm.color); pb.addColorStop(1,darken(pm.color,50));
+    orreryCtx.beginPath(); orreryCtx.arc(px,py,pr,0,Math.PI*2); orreryCtx.fillStyle=pb; orreryCtx.fill();
+
+    orreryCtx.font="11px 'Share Tech Mono',monospace";
+    orreryCtx.fillStyle='rgba(180,210,255,0.65)';
+    orreryCtx.textAlign=px>cx?'left':'right';
+    orreryCtx.fillText(p.name, px+(px>cx?pr+4:-(pr+4)), py+4);
+
+    planetPos.push({ p:p, px:px, py:py, pr:pr });
   });
-
-  // HZ label
-  let hzLabel = '';
-  if (hzVisible){
-    const midR = (hzR1 + hzR2) / 2;
-    hzLabel = `<text x="${(cx + midR + 2).toFixed(1)}" y="${(cy - 3).toFixed(1)}"
-      font-family="'Share Tech Mono',monospace" font-size="6" fill="rgba(80,255,120,.45)"
-      letter-spacing="0.5">HZ</text>`;
-  }
-
-  return `<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-    ${defs}${bg}${grid}${hz}${orbits}${labels}${ticks}${hzLabel}${starGlow}${dots}
-  </svg>`;
+  orreryCanvas._planets = planetPos;
 }
 
-// Renders the panel for given id
-function renderPanel(id, details){
-  const sys    = systems.find(s=>s.id===id);
-  const star   = details?.star || {};
-  const planets= details?.planets || [];
-  const sm     = getStarMeta(star.kind);
-
-  // ── Header ──
-  spTitle.textContent       = sys?.name || id;
-  spSysId.textContent       = id;
-  spOwner.textContent       = sys?.owner ? `◈ ${sys.owner}` : '';
-  spStarAbbr.textContent    = sm.abbr;
-  spStarOrb.style.background= `radial-gradient(circle at 35% 35%, ${sm.glow}44, ${sm.bg})`;
-  spStarOrb.style.boxShadow = `0 0 12px ${sm.glow}44, inset 0 0 8px ${sm.glow}22`;
-  spStarOrb.style.color     = sm.text;
-
-  // ── OVERVIEW pane ──
-  const pov = document.getElementById('pane-overview');
-  const tags = Array.isArray(sys?.tags) && sys.tags.length
-    ? sys.tags.map(t=>`<span class="tag-chip">${t}</span>`).join('')
-    : '';
-
-  const orbitSVG = planets.length
-    ? `<div class="orbit-diagram">${buildOrbitSVG(planets, sm.glow, sm, details?.star)}</div>`
-    : '';
-
-  pov.innerHTML = `
-    ${orbitSVG}
-    <div class="stats-grid">
-      <div class="stat-cell">
-        <div class="stat-key">Star Class</div>
-        <div class="stat-val" style="color:${sm.text};font-size:16px;">${star.kind || '—'}</div>
-        <div class="stat-sub">${sm.abbr} TYPE</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Bodies</div>
-        <div class="stat-val cyan">${planets.length}</div>
-        <div class="stat-sub">ORBITAL OBJECTS</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Nearest</div>
-        <div class="stat-val gold" style="font-size:15px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||99)<(b.semi_major_AU||99)?a:b).semi_major_AU ?? '?') : '—'}</div>
-        <div class="stat-sub">AU INNER ORBIT</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Farthest</div>
-        <div class="stat-val" style="font-size:15px;">${planets.length ? (planets.reduce((a,b)=>(a.semi_major_AU||0)>(b.semi_major_AU||0)?a:b).semi_major_AU ?? '?') : '—'}</div>
-        <div class="stat-sub">AU OUTER ORBIT</div>
-      </div>
-    </div>
-
-    <div class="meta-row"><span class="mk">System ID</span><span class="mv hi">${id}</span></div>
-    <div class="meta-row"><span class="mk">Name</span><span class="mv">${sys?.name || '—'}</span></div>
-    ${sys?.owner ? `<div class="meta-row"><span class="mk">Owner</span><span class="mv go">${sys.owner}</span></div>` : ''}
-    ${sys?.source ? `<div class="meta-row"><span class="mk">Source</span><span class="mv" style="font-size:13px;color:var(--text-muted);">${sys.source}</span></div>` : ''}
-    ${tags ? `<div class="meta-row"><span class="mk">Tags</span><span class="mv">${tags}</span></div>` : ''}
-    <div class="meta-row"><span class="mk">Record</span><span class="mv" style="font-size:13px;color:var(--text-muted);">${details?.version || '—'} · ${details?.generated_at ? new Date(details.generated_at).toLocaleDateString() : 'unscanned'}</span></div>
-  `;
-
-  // ── BODIES pane ──
-  const pbod = document.getElementById('pane-bodies');
-  if (!planets.length){
-    pbod.innerHTML = `<div class="empty-state">
-      <div class="empty-state-icon">◎</div>
-      <div class="empty-state-text">// NO ORBITAL DATA<br>// PRESS ⟳ SCAN SYSTEM</div>
-    </div>`;
+// Orrery hover
+orreryCanvas.addEventListener('mousemove', function(e) {
+  if (!orreryCanvas._planets) return;
+  var rect=orreryCanvas.getBoundingClientRect();
+  var mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  var hover=document.getElementById('orrery-hover');
+  var hit=null;
+  for(var i=0;i<orreryCanvas._planets.length;i++){
+    var pp=orreryCanvas._planets[i];
+    if(Math.hypot(mx-pp.px,my-pp.py)<pp.pr+8){ hit=pp.p; break; }
+  }
+  if(hit){
+    document.getElementById('ohl-name').textContent=hit.name;
+    document.getElementById('ohl-sub').textContent=hit.type+' \u00B7 '+hit.semi_major_AU+' AU';
+    hover.style.display='block';
+    var mr=orreryModal.getBoundingClientRect();
+    hover.style.left=(e.clientX-mr.left+14)+'px';
+    hover.style.top=(e.clientY-mr.top-14)+'px';
+    orreryCanvas.style.cursor='crosshair';
   } else {
-    const sorted = [...planets].sort((a,b)=>(a.semi_major_AU||0)-(b.semi_major_AU||0));
-    pbod.innerHTML = `
-      <div class="bodies-header">
-        <span class="bodies-count">${planets.length} ORBITAL OBJECT${planets.length!==1?'S':''} DETECTED</span>
-      </div>
-      ${sorted.map(p=>{
-        const pm = getPlanetMeta(p.type);
-        return `<div class="planet-card">
-          <div class="p-icon" style="background:${pm.color}22;color:${pm.color};">${pm.icon}</div>
-          <div class="p-info">
-            <div class="p-name">${p.name}</div>
-            <div class="p-type-badge">${p.type ?? 'UNKNOWN'}</div>
-            ${p.notes ? `<div class="p-notes-line">${p.notes}</div>` : ''}
-          </div>
-          <div class="p-orbit-val">${p.semi_major_AU ?? '?'}<br><span style="font-size:7px;color:var(--text-muted);">AU</span></div>
-        </div>`;
-      }).join('')}
-    `;
-  }
-
-  // ── EDIT pane ──
-  renderEditPane(id, details, sys);
-
-  showPanel();
-}
-
-function renderEditPane(id, details, sys){
-  if (!sys) sys = systems.find(s=>s.id===id);
-  const star   = details?.star || {};
-  const planets= details?.planets || [];
-  const starKinds = ["Main Sequence","K-Dwarf","G-Dwarf","F-Dwarf","M-Dwarf","Subgiant","Giant","Neutron","Black Hole"];
-  const options = starKinds.map(k=>`<option value="${k}" ${star.kind===k?'selected':''}>${k}</option>`).join('');
-
-  const pedit = document.getElementById('pane-edit');
-  pedit.innerHTML = `
-    <form id="sys-edit">
-      <div class="edit-section">
-        <div class="edit-section-title">System Identity</div>
-        <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
-        <div class="form-row">
-          <label class="fl" for="sysName">Name</label>
-          <input id="sysName" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
-        </div>
-        <div class="form-row">
-          <label class="fl" for="starKind">Star Class</label>
-          <select id="starKind" class="sci-select">${options}</select>
-        </div>
-      </div>
-
-      <div class="edit-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Orbital Bodies</div>
-          <button id="addPlanet" type="button" class="pbtn primary" style="margin-bottom:10px;">+ ADD BODY</button>
-        </div>
-        <div id="planetList" style="margin-top:8px;">
-          ${planets.map((p,i)=>planetEditorRow(p,i)).join('')}
-        </div>
-      </div>
-
-      <div class="edit-actions">
-        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">&#10003; SAVE CHANGES</button>
-        <button id="cancelEdit" type="button" class="pbtn danger"  style="padding:8px 12px;">✕</button>
-      </div>
-    </form>
-  `;
-
-  const form  = pedit.querySelector('#sys-edit');
-  const btnAdd= pedit.querySelector('#addPlanet');
-  const listEl= pedit.querySelector('#planetList');
-
-  btnAdd.onclick = () => {
-    const idx = listEl.querySelectorAll('.planetRow').length;
-    const tmp = document.createElement('div');
-    tmp.innerHTML = planetEditorRow({name:`P${idx+1}`, type:'Rocky', semi_major_AU:1.0, notes:''}, idx);
-    listEl.appendChild(tmp.firstElementChild);
-  };
-
-  listEl.addEventListener('click', e => {
-    if (e.target?.matches('.delPlanet')) {
-      e.target.closest('.planetRow').remove();
-      listEl.querySelectorAll('.planetRow .p-idx').forEach((el,i)=>{ el.textContent=`BODY ${i+1}`; });
-    }
-  });
-
-  form.onsubmit = ev => {
-    ev.preventDefault();
-    if (!requireEditor()) return;
-    const newName = pedit.querySelector('#sysName').value.trim();
-    const newKind = pedit.querySelector('#starKind').value;
-    const rows    = Array.from(listEl.querySelectorAll('.planetRow'));
-    const newPlanets = rows.map(row=>({
-      name:          row.querySelector('.pName').value.trim() || 'Body',
-      type:          row.querySelector('.pType').value,
-      semi_major_AU: +parseFloat(row.querySelector('.pSMA').value).toFixed(2) || null,
-      notes:         row.querySelector('.pNotes').value.trim()
-    }));
-    const updated = { ...(getCachedSystem(id)||{version:SYSGEN_VERSION,system_id:id,seeded:true}), star:{kind:newKind}, planets:newPlanets };
-    setCachedSystem(id, updated);
-    if (newName){ const s=systems.find(s=>s.id===id); if(s) s.name=newName; }
-    renderPanel(id, updated);
-    // switch to overview after save
-    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
-  };
-
-  pedit.querySelector('#cancelEdit').onclick = () => {
-    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
-  };
-}
-function planetEditorRow(p,i){
-  const opt = (v,sel)=> `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
-  const pm  = getPlanetMeta(p.type);
-  return `
-  <div class="planetRow planet-row">
-    <div class="planet-row-head">
-      <span class="p-idx pIndex" style="display:flex;align-items:center;gap:6px;">
-        <span style="color:${pm.color};font-size:14px;">${pm.icon}</span>
-        BODY ${i+1}
-      </span>
-      <button type="button" class="delPlanet pbtn danger" style="padding:3px 8px;">REMOVE</button>
-    </div>
-    <div class="planet-row-body">
-      <div class="form-row">
-        <span class="fl">Name</span>
-        <input class="pName sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/>
-      </div>
-      <div class="form-row">
-        <span class="fl">Type</span>
-        <select class="pType sci-select">
-          ${opt('Rocky',p.type)}${opt('Ice',p.type)}${opt('Gas',p.type)}${opt('Ocean',p.type)}
-          ${opt('Desert',p.type)}${opt('Shield World',p.type)}${opt('Ecumenopolis',p.type)}
-          ${opt('Installation',p.type)}${opt('Habitat',p.type)}
-        </select>
-      </div>
-      <div class="form-row">
-        <span class="fl">Orbit (AU)</span>
-        <input class="pSMA sci-input" type="number" step="0.01" min="0.01" value="${p.semi_major_AU ?? 1}"/>
-      </div>
-      <div class="form-row">
-        <span class="fl">Notes</span>
-        <input class="pNotes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}"/>
-      </div>
-    </div>
-  </div>`;
-}
-
-// Projection helper reused for hover/picking
-function projectToScreen(x, y, z, mvp){
-  const v = new Float32Array([x,y,z,1]);
-  const m = mvp;
-  const cx = v[0]*m[0] + v[1]*m[4] + v[2]*m[8]  + v[3]*m[12];
-  const cy = v[0]*m[1] + v[1]*m[5] + v[2]*m[9]  + v[3]*m[13];
-  const cz = v[0]*m[2] + v[1]*m[6] + v[2]*m[10] + v[3]*m[14];
-  const cw = v[0]*m[3] + v[1]*m[7] + v[2]*m[11] + v[3]*m[15];
-  if (!cw) return null;
-  const ndcX = cx/cw, ndcY = cy/cw;
-  return [
-    Math.round((ndcX*0.5+0.5)*canvas.width),
-    Math.round((-ndcY*0.5+0.5)*canvas.height),
-    cz/cw
-  ];
-}
-
-// Unproject: screen (client) -> world on z=0 plane
-function screenToWorldOnZ0(clientX, clientY, mvp){
-  const inv = mat4Invert(mvp);
-  if (!inv) return null;
-  const x = (clientX / canvas.clientWidth) * 2 - 1;
-  const y = -((clientY / canvas.clientHeight) * 2 - 1);
-
-  const p0 = vec4MulMat(inv, new Float32Array([x, y, -1, 1]));
-  const p1 = vec4MulMat(inv, new Float32Array([x, y,  1, 1]));
-  for (const p of [p0,p1]){ p[0]/=p[3]; p[1]/=p[3]; p[2]/=p[3]; p[3]=1; }
-
-  const dir = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
-  if (Math.abs(dir[2]) < 1e-6) return null;
-  const t = -p0[2]/dir[2];
-  return [ p0[0] + dir[0]*t, p0[1] + dir[1]*t, 0 ];
-}
-
-// Find nearest system id to given client coords (within r pixels)
-function findNearestSystemId(clientX, clientY, mvp, r=32){
-  const dpr = window.devicePixelRatio || 1;
-  const mx = clientX * (canvas.width  / canvas.clientWidth);
-  const my = clientY * (canvas.height / canvas.clientHeight);
-  let best = null, bestId = null, r2 = (r * dpr) * (r * dpr);
-  for (const sys of systems){
-    const p = idToWorld.get(sys.id);
-    if (!p) continue;
-    const s = projectToScreen(p[0], p[1], p[2], mvp);
-    if (!s) continue;
-    const dx = s[0] - mx, dy = s[1] - my;
-    const d2 = dx*dx + dy*dy;
-    if (d2 < r2 && (best===null || d2 < best)){ best = d2; bestId = sys.id; }
-  }
-  return bestId;
-}
-
-// Rebuild star buffer from current systems/idToWorld
-function rebuildStarsVBO(){
-  const stars = [];
-  for (const sys of systems){
-    const p = idToWorld.get(sys.id);
-    if (!p) continue;
-    stars.push(p[0], p[1], p[2]);
-  }
-  starCount = stars.length/3;
-  if (!starsVBO) starsVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
-}
-
-// Rebuild line buffer from lanesSet/idToWorld
-function rebuildLinesVBOFromSet() {
-  const lanesArr = Array.from(lanesSet).map(s => s.split('::'));
-  const verts = [];
-  for (const [a, b] of lanesArr) {
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    verts.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
-  }
-  lineVertCount = verts.length / 3;
-  if (!linesVBO) linesVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-}
-
-// --- render loop ---
-function loop() {
-  gl.clearColor(0.020, 0.031, 0.063, 1);  // deep void #050810
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(-panX, -panY, -dist);
-  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-
-  // lanes first — cyan with low opacity for sci-fi look
-  if (linesVBO && lineVertCount > 0) {
-    gl.useProgram(progLines);
-    gl.uniformMatrix4fv(uMVP_lines, false, mvp);
-    gl.uniform3f(uColorLines, 0.15, 0.65, 0.78);  // muted cyan
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-    gl.enableVertexAttribArray(aPos_lines);
-    gl.vertexAttribPointer(aPos_lines, 3, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.LINES, 0, lineVertCount);
-  }
-
-  // stars — cool blue-white points
-  if (starsVBO && starCount > 0) {
-    gl.useProgram(progPoints);
-    gl.uniformMatrix4fv(uMVP_points, false, mvp);
-    gl.uniform1f(uSize, 7.0 * (window.devicePixelRatio || 1));
-    gl.uniform3f(uColorPts, 0.78, 0.90, 1.0);  // blue-white
-    gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-    gl.enableVertexAttribArray(aPos_points);
-    gl.vertexAttribPointer(aPos_points, 3, gl.FLOAT, false, 0, 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.POINTS, 0, starCount);
-  }
-
-  // hover tooltip
-  let hoveredNow = null;
-  if (systems.length){
-    hoveredNow = (function(){
-      const mx = mouseX * (canvas.width  / canvas.clientWidth);
-      const my = mouseY * (canvas.height / canvas.clientHeight);
-      let best=null,bestId=null,r2=(32*(window.devicePixelRatio||1))**2;
-      for (const sys of systems){
-        const p = idToWorld.get(sys.id); if(!p) continue;
-        const s = projectToScreen(p[0], p[1], p[2], mvp); if(!s) continue;
-        const dx = s[0]-mx, dy = s[1]-my; const d2=dx*dx+dy*dy;
-        if (d2<r2 && (best===null || d2<best)){best=d2;bestId=sys.id;}
-      }
-      return bestId;
-    })();
-    hoveredId = hoveredNow || null;
-    if (hoveredNow){
-      const sys = systems.find(s => s.id === hoveredNow);
-      if (tipName)  tipName.textContent  = sys.name || sys.id;
-      if (tipId)    tipId.textContent    = sys.id;
-      if (tipOwner) tipOwner.textContent = sys.owner ? `◈ ${sys.owner}` : '';
-      tip.style.left    = mouseX + 'px';
-      tip.style.top     = mouseY + 'px';
-      tip.style.display = 'block';
-    } else {
-      tip.style.display = 'none';
-    }
-  }
-
-  // halos
-  if (!haloVBO) haloVBO = gl.createBuffer();
-  function drawHalo(id, pix, t, glow, core){
-    const p = idToWorld.get(id); if(!p) return;
-    gl.useProgram(progHalo);
-    gl.uniformMatrix4fv(uMVP_halo, false, mvp);
-    gl.uniform1f(uPix_halo, pix);
-    gl.uniform1f(uTime_halo, t);
-    gl.uniform3f(uColGlow, glow[0], glow[1], glow[2]);
-    gl.uniform3f(uColCore, core[0], core[1], core[2]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(aPos_halo);
-    gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.drawArrays(gl.POINTS, 0, 1);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-  }
-  if (hoveredNow) drawHalo(hoveredNow, 34.0, (performance.now()-t0)*0.001, [0.35,0.95,1.0], [1.0,0.95,0.50]);
-  if (selectedId) drawHalo(selectedId, 42.0, (performance.now()-t0)*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.7]);
-
-  requestAnimationFrame(loop);
-}
-
-// === Double-click to open panel / rename ===
-canvas.addEventListener('dblclick', async (e)=>{
-  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(-panX, -panY, -dist);
-  const mvp  = mat4Mul(rot, mat4Mul(view, proj));
-  const id = findNearestSystemId(e.clientX, e.clientY, mvp, 18);
-  if (!id) return;
-
-  if (selectedId === id){
-    const details = await ensureSystemDetails(id);
-    renderPanel(id, details);
-    return;
-  }
-  if (!requireEditor()) return; // guard rename
-  const sys = systems.find(s => s.id === id);
-  const curr = sys?.name || id;
-  const nn = prompt('Rename system:', curr);
-  if (nn && nn.trim()){
-    sys.name = nn.trim();
-    console.log(`Renamed ${id} -> ${sys.name}`);
+    hover.style.display='none'; orreryCanvas.style.cursor='default';
   }
 });
+orreryCanvas.addEventListener('mouseleave', function(){ document.getElementById('orrery-hover').style.display='none'; });
 
-// Keyboard controls
-window.addEventListener('keydown', async (e) => {
-  const k = e.key.toLowerCase();
-  if (k === 'e') {
-    if (!requireEditor()) return;
-    editMode = !editMode;
-    if (editMode) addMode = false;
-    updateHUD();
-    console.log(`Edit Mode (lanes): ${editMode ? 'ON' : 'OFF'}`);
-    return;
-  }
-  if (k === 'a') {
-    if (!requireEditor()) return;
-    addMode = !addMode;
-    if (addMode) editMode = false;
-    updateHUD();
-    console.log(`Add System Mode: ${addMode ? 'ON' : 'OFF'}`);
-    return;
-  }
-  if (k === 'enter' && selectedId){
-    const details = await ensureSystemDetails(selectedId);
-    renderPanel(selectedId, details);
-    return;
-  }
-
-  if (!editMode) return;
-
-  if (k === 'c') { // clear all lanes
-    if (!editorOK) return;
-    lanesSet.clear();
-    rebuildLinesVBOFromSet();
-    console.log('Cleared all lanes.');
-  }
-  if (k === 'r') { // restore original JSON lanes
-    if (!editorOK) return;
-    lanesSet.clear();
-    (DEFAULT_DATA.lanes || []).forEach(([a,b]) => lanesSet.add([a,b].sort().join('::')));
-    rebuildLinesVBOFromSet();
-    console.log('Restored lanes (default).');
-  }
-  if (k === 'x') { // export
-    if (!editorOK) { alert('Editor lock: enter password first.'); return; }
-    const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
-    const out = {
-      image_size: { width: imgW, height: imgH },
-      systems: systems,
-      lanes: lanesOut
-    };
-    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'systems.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    console.log(`Exported ${lanesOut.length} lanes, ${systems.length} systems`);
-  }
-});
+// Colour helpers
+function hexRgba(hex, a) {
+  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+function lighten(hex,amt){ return 'rgb('+[1,3,5].map(function(o){ return Math.min(255,parseInt(hex.slice(o,o+2),16)+amt); }).join(',')+')'; }
+function darken(hex,amt){ return 'rgb('+[1,3,5].map(function(o){ return Math.max(0,parseInt(hex.slice(o,o+2),16)-amt); }).join(',')+')'; }
