@@ -93,20 +93,29 @@ function makeProgram(vsSrc, fsSrc) {
 
 const VS_POINTS = `
 attribute vec3 position;
+attribute vec3 aColor;
+attribute float aSize;
 uniform mat4 uMVP;
-uniform float uPointSize;
+varying vec3 vColor;
 void main(){
   gl_Position = uMVP * vec4(position, 1.0);
-  gl_PointSize = uPointSize;
+  gl_PointSize = aSize;
+  vColor = aColor;
 }`;
 const FS_POINTS = `
 precision mediump float;
-uniform vec3 uColor;
+varying vec3 vColor;
 void main(){
-  vec2 uv = gl_PointCoord*2.0 - 1.0;
-  float d = dot(uv,uv);
-  float alpha = smoothstep(1.0, 0.8, 1.0 - d);
-  gl_FragColor = vec4(uColor, alpha);
+  vec2 uv = gl_PointCoord * 2.0 - 1.0;
+  float r = length(uv);
+  float core  = smoothstep(0.18, 0.0,  r);
+  float inner = smoothstep(0.55, 0.10, r) * 0.6;
+  float glow  = smoothstep(1.0,  0.0,  r) * 0.25;
+  float spike1 = smoothstep(0.04, 0.0, abs(uv.x)) * smoothstep(1.0, 0.1, r) * 0.35;
+  float spike2 = smoothstep(0.04, 0.0, abs(uv.y)) * smoothstep(1.0, 0.1, r) * 0.35;
+  float alpha = clamp(core + inner + glow + spike1 + spike2, 0.0, 1.0);
+  vec3 col = mix(vec3(1.0), vColor, 0.55) * (core * 2.5 + 1.0);
+  gl_FragColor = vec4(col, alpha);
 }`;
 const VS_LINES = `
 attribute vec3 position;
@@ -120,13 +129,13 @@ void main(){ gl_FragColor = vec4(uColor, 1.0); }`;
 const progPoints = makeProgram(VS_POINTS, FS_POINTS);
 const progLines  = makeProgram(VS_LINES,  FS_LINES);
 
-const aPos_points = gl.getAttribLocation(progPoints, 'position');
-const uMVP_points = gl.getUniformLocation(progPoints, 'uMVP');
-const uSize       = gl.getUniformLocation(progPoints, 'uPointSize');
-const uColorPts   = gl.getUniformLocation(progPoints, 'uColor');
-const aPos_lines  = gl.getAttribLocation(progLines,  'position');
-const uMVP_lines  = gl.getUniformLocation(progLines, 'uMVP');
-const uColorLines = gl.getUniformLocation(progLines, 'uColor');
+const aPos_points   = gl.getAttribLocation(progPoints, 'position');
+const aColor_points = gl.getAttribLocation(progPoints, 'aColor');
+const aSize_points  = gl.getAttribLocation(progPoints, 'aSize');
+const uMVP_points   = gl.getUniformLocation(progPoints, 'uMVP');
+const aPos_lines    = gl.getAttribLocation(progLines,  'position');
+const uMVP_lines    = gl.getUniformLocation(progLines, 'uMVP');
+const uColorLines   = gl.getUniformLocation(progLines, 'uColor');
 
 const VS_HALO = `
 attribute vec3 position;
@@ -617,17 +626,9 @@ function drawOrrery() {
 
   ctx.save();
   planets.forEach(p => {
-    const a   = auToR(p.semi_major_AU || 0.1), ecc = p.ecc || 0;
-    const b   = a * Math.sqrt(1 - ecc * ecc);
-    const foc = a * ecc;
-    const rot = ((p.angle_deg || 0) * Math.PI) / 180;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rot);
-    ctx.translate(-foc, 0);
-    ctx.beginPath(); ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2);
+    const a = auToR(p.semi_major_AU || 0.1);
+    ctx.beginPath(); ctx.arc(cx, cy, a, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(56,232,255,0.18)'; ctx.lineWidth = 0.8; ctx.stroke();
-    ctx.restore();
   });
   ctx.restore();
 
@@ -642,16 +643,12 @@ function drawOrrery() {
 
   const planetPositions = [];
   planets.forEach(p => {
-    const a      = auToR(p.semi_major_AU || 0.1), ecc = p.ecc || 0;
-    const b      = a * Math.sqrt(1 - ecc * ecc);
-    const foc    = a * ecc;
-    const rot    = ((p.angle_deg || 0) * Math.PI) / 180;
+    const a      = auToR(p.semi_major_AU || 0.1);
     const period = Math.sqrt(Math.pow(p.semi_major_AU || 1, 3));
-    const angle  = (orreryT / period) * Math.PI * 2;
-    const ex = Math.cos(angle) * a - foc;
-    const ey = Math.sin(angle) * b;
-    const px = cx + ex * Math.cos(rot) - ey * Math.sin(rot);
-    const py = cy + ex * Math.sin(rot) + ey * Math.cos(rot);
+    const phase  = ((p.angle_deg || 0) * Math.PI) / 180;
+    const angle  = phase + (orreryT / period) * Math.PI * 2;
+    const px = cx + Math.cos(angle) * a;
+    const py = cy + Math.sin(angle) * a;
     const pm = getPlanetMeta(p.type);
     const pr = Math.max(3*dpr, Math.min(9*dpr, (p.radius_hint||1) * 3.2 * dpr));
 
@@ -1023,6 +1020,7 @@ function renderPanel(id, details) {
   }
 
   renderEditPane(id, details, sys);
+  rebuildStarsVBO();
   showPanel();
 }
 
@@ -1177,16 +1175,46 @@ function buildMVP() {
   return mat4Mul(rot, mat4Mul(view, proj));
 }
 
+const STAR_COLORS = {
+  'M-Dwarf':       [1.0,  0.38, 0.28],
+  'K-Dwarf':       [1.0,  0.65, 0.25],
+  'G-Dwarf':       [1.0,  0.92, 0.55],
+  'Main Sequence': [0.95, 1.0,  0.85],
+  'F-Dwarf':       [0.95, 0.97, 1.0 ],
+  'Subgiant':      [1.0,  0.72, 0.35],
+  'Giant':         [0.85, 0.58, 1.0 ],
+  'Neutron':       [0.40, 0.95, 1.0 ],
+  'Black Hole':    [0.65, 0.35, 1.0 ],
+};
+const STAR_SIZES = {
+  'M-Dwarf':3.5,'K-Dwarf':4.5,'G-Dwarf':5.5,'Main Sequence':5.5,
+  'F-Dwarf':6.5,'Subgiant':7.5,'Giant':9.0,'Neutron':3.0,'Black Hole':4.0
+};
+
+function getStarVisuals(id) {
+  const det = getCachedSystem(id);
+  const kind = det?.star?.kind;
+  if (kind && STAR_COLORS[kind]) {
+    return { color: STAR_COLORS[kind], size: STAR_SIZES[kind] || 5.0 };
+  }
+  const rnd = prngSeed(id);
+  const keys = Object.keys(STAR_COLORS);
+  const k = keys[Math.floor(rnd() * keys.length)];
+  return { color: STAR_COLORS[k], size: STAR_SIZES[k] || 5.0 };
+}
+
 function rebuildStarsVBO() {
-  const stars = [];
+  const dpr  = window.devicePixelRatio || 1;
+  const verts = [];
   for (const sys of systems) {
     const p = idToWorld.get(sys.id); if (!p) continue;
-    stars.push(p[0], p[1], p[2]);
+    const { color, size } = getStarVisuals(sys.id);
+    verts.push(p[0], p[1], p[2], color[0], color[1], color[2], size * dpr * 2.8);
   }
-  starCount = stars.length / 3;
+  starCount = verts.length / 7;
   if (!starsVBO) starsVBO = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
 }
 
 function rebuildLinesVBOFromSet() {
@@ -1224,14 +1252,20 @@ function loop() {
   if (starsVBO && starCount > 0) {
     gl.useProgram(progPoints);
     gl.uniformMatrix4fv(uMVP_points, false, mvp);
-    gl.uniform1f(uSize, 7.0 * (window.devicePixelRatio || 1));
-    gl.uniform3f(uColorPts, 0.78, 0.90, 1.0);
     gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
+    const stride = 7 * 4;
     gl.enableVertexAttribArray(aPos_points);
-    gl.vertexAttribPointer(aPos_points, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(aPos_points,   3, gl.FLOAT, false, stride, 0);
+    gl.enableVertexAttribArray(aColor_points);
+    gl.vertexAttribPointer(aColor_points, 3, gl.FLOAT, false, stride, 3 * 4);
+    gl.enableVertexAttribArray(aSize_points);
+    gl.vertexAttribPointer(aSize_points,  1, gl.FLOAT, false, stride, 6 * 4);
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     gl.drawArrays(gl.POINTS, 0, starCount);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disableVertexAttribArray(aColor_points);
+    gl.disableVertexAttribArray(aSize_points);
   }
 
   let hoveredNow = null;
