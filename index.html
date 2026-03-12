@@ -876,6 +876,297 @@
       gap: 6px;
       margin-top: 6px;
     }
+
+    /* ── FLEET STYLES ── */
+    .fleet-list-item {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      background: rgba(8,13,24,.6);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      cursor: pointer;
+      transition: border-color .12s, background .12s;
+    }
+    .fleet-list-item::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--border);
+      transition: background .12s;
+    }
+    .fleet-list-item:hover { border-color: var(--border2); background: rgba(56,232,255,.04); }
+    .fleet-list-item:hover::before { background: var(--gold); }
+    .fleet-list-item.active { border-color: var(--gold-dim); background: rgba(245,197,66,.06); }
+    .fleet-list-item.active::before { background: var(--gold); }
+
+    .fleet-emblem {
+      width: 36px; height: 36px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      background: rgba(245,197,66,.08);
+      border: 1px solid rgba(245,197,66,.2);
+      color: var(--gold);
+    }
+
+    .fleet-info { flex: 1; min-width: 0; }
+    .fleet-name {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: .5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .fleet-subtitle {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    .fleet-ship-count {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--gold-dim);
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .fleet-detail-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .fleet-detail-emblem {
+      width: 48px; height: 48px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      background: rgba(245,197,66,.08);
+      border: 1px solid rgba(245,197,66,.25);
+      color: var(--gold);
+      flex-shrink: 0;
+    }
+    .fleet-detail-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--text);
+      letter-spacing: 1px;
+    }
+    .fleet-detail-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .fleet-section {
+      margin-bottom: 14px;
+    }
+    .fleet-section-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .ship-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(26,45,70,.25);
+    }
+    .ship-line:last-child { border-bottom: none; }
+    .ship-class-name {
+      font-family: 'Exo 2', sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ship-qty {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--gold);
+      min-width: 28px;
+      text-align: right;
+    }
+    .ship-tier-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      background: rgba(56,232,255,.06);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 1px 5px;
+      flex-shrink: 0;
+    }
+
+    .fleet-notes-box {
+      background: rgba(5,8,16,.8);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 10px 12px;
+      font-family: 'Exo 2', sans-serif;
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      min-height: 40px;
+    }
+    .fleet-notes-box:empty::after {
+      content: '// No notes recorded';
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .fleet-edit-ship-row {
+      display: grid;
+      grid-template-columns: 1fr 60px 40px;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .fleet-edit-ship-row select { font-size: 12px; }
+    .fleet-edit-ship-row input[type="number"] { text-align: center; }
+    .fleet-edit-ship-row .del-ship-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 4px;
+      transition: all .12s;
+    }
+    .fleet-edit-ship-row .del-ship-btn:hover { border-color: var(--red-alert); color: var(--red-alert); }
+
+    .fleet-location-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(245,197,66,.06);
+      border: 1px solid rgba(245,197,66,.2);
+      border-radius: 2px;
+      padding: 3px 8px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--gold);
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .12s;
+    }
+    .fleet-location-chip:hover {
+      background: rgba(245,197,66,.12);
+      border-color: var(--gold);
+    }
+
+    .fleet-status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .fleet-status-badge.stationed { background: rgba(56,232,255,.08); border: 1px solid rgba(56,232,255,.2); color: var(--cyan); }
+    .fleet-status-badge.in-transit { background: rgba(245,197,66,.08); border: 1px solid rgba(245,197,66,.2); color: var(--gold); }
+    .fleet-status-badge.combat { background: rgba(255,59,59,.08); border: 1px solid rgba(255,59,59,.2); color: var(--red-alert); }
+    .fleet-status-badge.patrol { background: rgba(80,255,120,.08); border: 1px solid rgba(80,255,120,.2); color: #5cdb7a; }
+
+    .fleet-map-icon {
+      position: fixed;
+      pointer-events: all;
+      cursor: pointer;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -100%);
+      transition: opacity .15s;
+    }
+    .fleet-map-icon .fmi-diamond {
+      width: 14px; height: 14px;
+      background: var(--gold);
+      transform: rotate(45deg);
+      border: 1px solid rgba(0,0,0,.4);
+      box-shadow: 0 0 8px rgba(245,197,66,.5), 0 0 16px rgba(245,197,66,.2);
+      transition: all .15s;
+    }
+    .fleet-map-icon:hover .fmi-diamond {
+      box-shadow: 0 0 12px rgba(245,197,66,.8), 0 0 24px rgba(245,197,66,.4);
+      transform: rotate(45deg) scale(1.2);
+    }
+    .fleet-map-icon .fmi-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--gold);
+      margin-top: 3px;
+      white-space: nowrap;
+      text-shadow: 0 0 4px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,.9);
+      text-transform: uppercase;
+    }
+    .fleet-map-icon .fmi-count {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--gold-dim);
+      text-shadow: 0 0 4px rgba(0,0,0,.9);
+    }
+    .fleet-map-icon.in-transit .fmi-diamond {
+      animation: fleet-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes fleet-pulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(245,197,66,.5), 0 0 16px rgba(245,197,66,.2); }
+      50% { box-shadow: 0 0 14px rgba(245,197,66,.8), 0 0 28px rgba(245,197,66,.4); }
+    }
+
+    .fleet-textarea {
+      background: rgba(5,8,16,.9);
+      color: var(--text);
+      border: 1px solid var(--border2);
+      border-radius: 2px;
+      padding: 8px;
+      font-family: 'Exo 2', sans-serif;
+      font-size: 13px;
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
+      outline: none;
+      transition: border-color .12s, box-shadow .12s;
+    }
+    .fleet-textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(56,232,255,.08);
+    }
   </style>
 </head>
 <body>
@@ -899,9 +1190,12 @@
     <div class="hud-hint">DRAG · SCROLL · RMB PAN</div>
   </div>
 
+  <div id="fleet-icons-layer" style="position:fixed;inset:0;z-index:10;pointer-events:none;"></div>
+
   <div id="statusBar">
     <div class="sb-item"><div class="sb-dot" id="dot-sys"></div><span id="sb-sys">INITIALIZING</span></div>
     <div class="sb-item"><div class="sb-dot gold" id="dot-lanes"></div><span id="sb-lanes-ct">— LANES</span></div>
+    <div class="sb-item"><div class="sb-dot gold" id="dot-fleets"></div><span id="sb-fleets-ct">0 FLEETS</span></div>
     <div class="sb-spacer"></div>
     <div class="sb-item"><div class="sb-dot off"></div>E=LANES · A=ADD · ENTER=INSPECT</div>
   </div>
@@ -932,6 +1226,7 @@
       <div class="tab-bar" id="sp-tabs">
         <div class="tab active" data-tab="overview">OVERVIEW</div>
         <div class="tab" data-tab="bodies">BODIES</div>
+        <div class="tab" data-tab="fleets">FLEETS</div>
         <div class="tab" data-tab="edit">EDIT</div>
       </div>
     </div>
@@ -947,6 +1242,12 @@
         <div class="empty-state">
           <div class="empty-state-icon">◎</div>
           <div class="empty-state-text">// SELECT A NODE FIRST</div>
+        </div>
+      </div>
+      <div class="tab-pane" id="pane-fleets">
+        <div class="empty-state">
+          <div class="empty-state-icon">⬡</div>
+          <div class="empty-state-text">// NO FLEETS REGISTERED<br>// SELECT A SYSTEM TO VIEW OR ADD FLEETS</div>
         </div>
       </div>
       <div class="tab-pane" id="pane-edit">
