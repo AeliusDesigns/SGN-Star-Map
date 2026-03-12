@@ -1033,7 +1033,7 @@ function darkenHex(hex, amt) {
 }
 
 function showPanel() { panel.style.transform = 'translateX(0)'; }
-function hidePanel()  { panel.style.transform = 'translateX(100%)'; }
+function hidePanel()  { panel.style.transform = 'translateX(100%)'; selectedId = null; }
 
 const SYSGEN_VERSION = 'v2';
 function sysKey(id)             { return `sysgen:${SYSGEN_VERSION}:${id}`; }
