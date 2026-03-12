@@ -30,6 +30,8 @@
       --purple-dim: #4a2e80;
       --amber:      #ff9e44;
       --amber-dim:  #6e3f10;
+      --slate:      #8faabe;
+      --slate-dim:  #3a5060;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html,body{height:100%;background:var(--void);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;}
@@ -84,6 +86,7 @@
     .post-item-cat.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
     .post-item-cat.technology{border-color:rgba(179,136,255,.3);color:var(--purple-dim);}
     .post-item-cat.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
+    .post-item-cat.doctrine{border-color:rgba(143,170,190,.3);color:var(--slate-dim);}
     .post-item-cat.freeform{border-color:rgba(90,122,153,.4);color:var(--text-dim);}
 
     .sb-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;}
@@ -159,6 +162,7 @@
     .dossier-class-tag.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
     .dossier-class-tag.technology{border-color:rgba(179,136,255,.3);color:var(--purple-dim);}
     .dossier-class-tag.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
+    .dossier-class-tag.doctrine{border-color:rgba(143,170,190,.3);color:var(--slate-dim);}
     .dossier-class-tag.freeform{border-color:var(--border2);color:var(--text-muted);}
 
     .dossier-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:32px;letter-spacing:2px;color:var(--text);line-height:1.15;margin-bottom:4px;}
@@ -167,6 +171,7 @@
     .dossier-divider{height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent 80%);margin:20px 0;opacity:.5;}
     .dossier-divider.gold{background:linear-gradient(90deg,var(--gold-dim),transparent 80%);}
     .dossier-divider.purple{background:linear-gradient(90deg,var(--purple-dim),transparent 80%);}
+    .dossier-divider.slate{background:linear-gradient(90deg,var(--slate-dim),transparent 80%);}
 
     .dossier-section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
 
@@ -258,6 +263,7 @@
         <button class="sb-filter" data-cat="soldier">SOLDIERS</button>
         <button class="sb-filter" data-cat="technology">TECH</button>
         <button class="sb-filter" data-cat="lore">LORE</button>
+        <button class="sb-filter" data-cat="doctrine">DOCTRINE</button>
         <button class="sb-filter" data-cat="freeform">OTHER</button>
       </div>
     </div>
@@ -385,11 +391,11 @@ function viewEntry(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
   const cat = e.category || 'freeform';
-  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',lore:'LORE & HISTORY',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
+  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',lore:'LORE & HISTORY',doctrine:'DOCTRINE & ORGANIZATION',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
 
   let statsHTML = '';
   if (e.stats && e.stats.length) {
-    const statsLabel = {technology:'Technical Summary',ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance'}[cat] || 'Specifications';
+    const statsLabel = {technology:'Technical Summary',ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance',doctrine:'Key Parameters'}[cat] || 'Specifications';
     statsHTML = `<div class="dossier-section-label">${statsLabel}</div>
       <div class="dossier-stats">${e.stats.map(s => `
         <div class="dossier-stat">
@@ -399,14 +405,20 @@ function viewEntry(id) {
       </div>`;
   }
 
-  /* ── Structured metadata header (tech + ship/vehicle/soldier) ── */
+  /* ── Structured metadata header (tech + ship/vehicle/soldier/doctrine) ── */
   let metaHeaderHTML = '';
-  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
+  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') {
     const fields = [
       e.opStatus   ? ['Operational Status', e.opStatus] : null,
       e.accessLevel? ['Access Level', e.accessLevel] : null,
       e.origin     ? ['Origin', e.origin] : null,
     ].filter(Boolean);
+    /* doctrine has extra fields: distribution, scope, authority */
+    if (cat === 'doctrine') {
+      if (e.distribution) fields.splice(2, 0, ['Distribution', e.distribution]);
+      if (e.scope) fields.push(['Scope', e.scope]);
+      if (e.authority) fields.push(['Authority', e.authority]);
+    }
     if (fields.length) {
       metaHeaderHTML = `<div class="dossier-tech-meta">
         ${fields.map(([k,v]) => `<div class="dossier-tech-row"><span class="dossier-tech-key">${esc(k)}</span><span class="dossier-tech-val">${esc(v)}</span></div>`).join('')}
@@ -414,9 +426,9 @@ function viewEntry(id) {
     }
   }
 
-  /* ── Document classification footer (tech + ship/vehicle/soldier) ── */
+  /* ── Document classification footer (tech + ship/vehicle/soldier/doctrine) ── */
   let docFooterHTML = '';
-  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier') && (e.docClass || e.revision)) {
+  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') && (e.docClass || e.revision)) {
     docFooterHTML = `<div class="dossier-doc-footer">
       ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
       ${e.revision ? `<div class="dossier-doc-rev">Revision: ${esc(e.revision)}</div>` : ''}
@@ -439,7 +451,7 @@ function viewEntry(id) {
   }
 
   /* ── Divider accent by category ── */
-  const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : '');
+  const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : (cat==='doctrine' ? ' slate' : ''));
 
   main.innerHTML = `
     <div class="dossier">
@@ -513,6 +525,11 @@ function showNewEntryPicker() {
           <div style="font-size:28px;margin-bottom:8px;">📜</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--amber);">Lore & History</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Factions, events, mythology, culture, places, timelines.</div>
+        </div>
+        <div class="template-card" data-tpl="doctrine">
+          <div style="font-size:28px;margin-bottom:8px;">📋</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--slate);">Doctrine & Org</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Rank structures, formations, SOPs, fleet manuals, codex directives.</div>
         </div>
         <div class="template-card" data-tpl="freeform">
           <div style="font-size:28px;margin-bottom:8px;">✦</div>
@@ -619,7 +636,8 @@ function editEntry(id, tpl) {
     id:genId(), category:tpl||'freeform', title:'', designation:'', classification:'',
     role:'', stats:[], body:'', updated:Date.now(),
     /* tech-specific */ opStatus:'', accessLevel:'', origin:'', docClass:'', revision:'',
-    /* lore-specific */ era:'', region:'', summary:''
+    /* lore-specific */ era:'', region:'', summary:'',
+    /* doctrine-specific */ distribution:'', scope:'', authority:''
   };
   const cat = e.category || 'freeform';
 
@@ -661,6 +679,25 @@ function editEntry(id, tpl) {
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-summary" class="sci-textarea" style="min-height:80px;" placeholder="Brief overview — the essential facts before the full account...">${esc(e.summary||'')}</textarea></div>
       </div>
     `;
+  } else if (cat === 'doctrine') {
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">Document Header</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. Doctrine, Structure & Fleet Operating Manual"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
+        <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${esc(e.distribution||'')}" placeholder="e.g. Restricted — AEN Command, Fleet Staff, Authorized Personnel Only"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Purpose</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="What this document provides — executive summary of its function...">${esc(e.role||'')}</textarea></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Scope</span><textarea id="ed-scope" class="sci-textarea" style="min-height:60px;" placeholder="What areas this document covers...">${esc(e.scope||'')}</textarea></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Authority</span><textarea id="ed-authority" class="sci-textarea" style="min-height:40px;" placeholder="Issuing authority and binding status...">${esc(e.authority||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Prepared By</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Doctrine & Fleet Employment Office, Anorvalas Naval Command"/></div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. AEN-DOCTRINE-OVR-001-A"/></div>
+      </div>
+    `;
   } else if (cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
     const detailLabel = {ship:'Ship Identification',vehicle:'Vehicle Identification',soldier:'Unit Identification'}[cat];
     const desigPlaceholder = {ship:'e.g. Thalasrën-Class Light Frigate — Troop Transport & Close-Support Frigate',vehicle:'e.g. Velendril "Wardancer" — Tracked IFV / Mechanized Assault Carrier',soldier:'e.g. Caelyndor Marinyr Clone Trooper Corps (CM-CTC)'}[cat];
@@ -697,6 +734,7 @@ function editEntry(id, tpl) {
     technology:'System Overview / Capabilities / Security',
     lore:'Full Account',
     freeform:'Content',
+    doctrine:'Ranks / Formations / Procedures / Tables',
     ship:'Purpose / Armament / Armor / Systems / Complement',
     vehicle:'Purpose / Armament / Armor / Defensive Systems / Crew Support',
     soldier:'Overview / Enhancements / Equipment / Safeguards'
@@ -761,7 +799,11 @@ function editEntry(id, tpl) {
       /* lore fields */
       era: document.getElementById('ed-era')?.value.trim() || '',
       region: document.getElementById('ed-region')?.value.trim() || '',
-      summary: document.getElementById('ed-summary')?.value.trim() || ''
+      summary: document.getElementById('ed-summary')?.value.trim() || '',
+      /* doctrine fields */
+      distribution: document.getElementById('ed-distribution')?.value.trim() || '',
+      scope: document.getElementById('ed-scope')?.value.trim() || '',
+      authority: document.getElementById('ed-authority')?.value.trim() || ''
     };
     if (isNew) { entries.push(updated); } else { const idx=entries.findIndex(x=>x.id===e.id); if(idx>=0) entries[idx]=updated; }
     save(); activeId = updated.id; renderList(); viewEntry(updated.id); toast(isNew?'Entry created':'Entry saved');
