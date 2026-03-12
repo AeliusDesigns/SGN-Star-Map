@@ -270,7 +270,7 @@
     <div id="post-list"></div>
     <div class="sb-footer">
       <button class="pbtn gold" id="btn-new">+ NEW ENTRY</button>
-      <button class="pbtn" id="btn-export-all">↓ JSON</button>
+      <button class="pbtn" id="btn-save-repo" style="border-color:var(--gold-dim);color:var(--gold);">↓ SAVE TO REPO</button>
     </div>
   </div>
   <div id="main">
@@ -295,7 +295,23 @@ let filterCat = 'all';
 let _editorPW = null;
 let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 
-function load()  { try { entries = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { entries = []; } }
+async function load() {
+  /* try localStorage first */
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) { entries = JSON.parse(raw) || []; return; }
+  } catch {}
+  /* fall back to codex.json file in repo */
+  try {
+    const r = await fetch('./codex.json', { cache: 'no-store' });
+    if (r.ok) {
+      entries = await r.json();
+      save(); /* cache into localStorage */
+      return;
+    }
+  } catch {}
+  entries = [];
+}
 function save()  { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); updateCount(); }
 function genId() { return 'CX_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,5).toUpperCase(); }
 
@@ -374,10 +390,11 @@ document.getElementById('btn-new').addEventListener('click', () => {
   showNewEntryPicker();
 });
 
-document.getElementById('btn-export-all').addEventListener('click', () => {
+document.getElementById('btn-save-repo').addEventListener('click', () => {
   if (!requireEditor()) return;
   const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sgn_codex.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'codex.json'; a.click(); URL.revokeObjectURL(a.href);
+  toast('codex.json downloaded — drop it in your repo');
 });
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -906,9 +923,11 @@ function statRow(key, val, idx) {
 /* ══════════════════════════════════════════
    BOOT
    ══════════════════════════════════════════ */
-load();
-renderList();
-updateCount();
+(async function boot() {
+  await load();
+  renderList();
+  updateCount();
+})();
 </script>
 </body>
 </html>
