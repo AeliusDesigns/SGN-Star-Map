@@ -119,6 +119,9 @@
 
     .hud-item b { color: var(--gold); font-weight: 400; }
     .hud-item.mode-active b { color: var(--cyan); text-shadow: 0 0 8px rgba(56,232,255,.7); }
+    .hud-nav { transition: color .12s; }
+    .hud-nav:hover { color: var(--cyan) !important; }
+    .hud-nav.active { color: var(--cyan) !important; text-shadow: 0 0 8px rgba(56,232,255,.5); }
     .hud-spacer { flex: 1; }
 
     .hud-hint {
@@ -1339,7 +1342,9 @@
   <div id="hud">
     <div class="hud-logo">SGN</div>
     <div class="hud-sep"></div>
-    <div class="hud-item" style="color:var(--text-dim);letter-spacing:2px;">STAR CHART</div>
+    <a href="./index.html" class="hud-item hud-nav active" style="pointer-events:all;text-decoration:none;cursor:pointer;">STAR CHART</a>
+    <div class="hud-sep"></div>
+    <a href="./wiki.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;cursor:pointer;">CODEX</a>
     <div class="hud-sep"></div>
     <span class="hud-item" id="hud-lanes">LANES &nbsp;<b>OFF</b></span>
     <span style="color:var(--text-muted);margin:0 8px;font-family:monospace;font-size:13px;">/</span>
