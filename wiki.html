@@ -347,6 +347,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
 });
 
 document.getElementById('btn-export-all').addEventListener('click', () => {
+  if (!requireEditor()) return;
   const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sgn_codex.json'; a.click(); URL.revokeObjectURL(a.href);
 });
