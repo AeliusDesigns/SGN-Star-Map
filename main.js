@@ -491,7 +491,7 @@ let orreryData  = null;
 let orrerySpeed = 1;
 let orreryT     = 0;
 let lastTS      = null;
-const YEAR_SECS = 40;
+const YEAR_SECS = 80;
 
 orreryClose.onclick = closeOrrery;
 document.addEventListener('keydown', e => {
