@@ -617,12 +617,15 @@ function drawOrrery() {
 
   ctx.save();
   planets.forEach(p => {
-    const a = auToR(p.semi_major_AU || 0.1), ecc = p.ecc || 0;
-    const b = a * Math.sqrt(1 - ecc*ecc), off = a * ecc * 0.3;
+    const a   = auToR(p.semi_major_AU || 0.1), ecc = p.ecc || 0;
+    const b   = a * Math.sqrt(1 - ecc * ecc);
+    const foc = a * ecc;
     const rot = ((p.angle_deg || 0) * Math.PI) / 180;
     ctx.save();
-    ctx.translate(cx, cy); ctx.rotate(rot); ctx.translate(off, 0);
-    ctx.beginPath(); ctx.ellipse(0, 0, a, b, 0, 0, Math.PI*2);
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    ctx.translate(-foc, 0);
+    ctx.beginPath(); ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(56,232,255,0.18)'; ctx.lineWidth = 0.8; ctx.stroke();
     ctx.restore();
   });
@@ -640,13 +643,15 @@ function drawOrrery() {
   const planetPositions = [];
   planets.forEach(p => {
     const a      = auToR(p.semi_major_AU || 0.1), ecc = p.ecc || 0;
-    const b      = a * Math.sqrt(1 - ecc*ecc), off = a * ecc * 0.3;
+    const b      = a * Math.sqrt(1 - ecc * ecc);
+    const foc    = a * ecc;
     const rot    = ((p.angle_deg || 0) * Math.PI) / 180;
     const period = Math.sqrt(Math.pow(p.semi_major_AU || 1, 3));
     const angle  = (orreryT / period) * Math.PI * 2;
-    const lx = Math.cos(angle) * a - off, ly = Math.sin(angle) * b;
-    const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
-    const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
+    const ex = Math.cos(angle) * a - foc;
+    const ey = Math.sin(angle) * b;
+    const px = cx + ex * Math.cos(rot) - ey * Math.sin(rot);
+    const py = cy + ex * Math.sin(rot) + ey * Math.cos(rot);
     const pm = getPlanetMeta(p.type);
     const pr = Math.max(3*dpr, Math.min(9*dpr, (p.radius_hint||1) * 3.2 * dpr));
 
