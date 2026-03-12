@@ -482,7 +482,7 @@ let orreryData  = null;
 let orrerySpeed = 1;
 let orreryT     = 0;
 let lastTS      = null;
-const YEAR_SECS = 8;
+const YEAR_SECS = 40;
 
 orreryClose.onclick = closeOrrery;
 document.addEventListener('keydown', e => {
@@ -514,9 +514,11 @@ function openOrrery(id) {
 
   buildOrreryLegend(planets, star.hz);
   orreryModal.classList.add('open');
-  resizeOrreryCanvas();
-  if (orreryRAF) cancelAnimationFrame(orreryRAF);
-  orreryRAF = requestAnimationFrame(orreryTick);
+  requestAnimationFrame(() => {
+    resizeOrreryCanvas();
+    if (orreryRAF) cancelAnimationFrame(orreryRAF);
+    orreryRAF = requestAnimationFrame(orreryTick);
+  });
 }
 
 function closeOrrery() {
@@ -566,13 +568,13 @@ function drawOrrery() {
   const allAU  = planets.map(p => p.semi_major_AU || 0.1);
   const minAU  = Math.max(0.01, (star.inner_edge || 0.05) * 0.5);
   const maxAU  = Math.max(...allAU) * 1.2;
-  const margin = 60 * dpr;
+  const margin = 90 * dpr;
   const maxR   = Math.min(cx, cy) - margin;
   const logMin = Math.log(minAU), logMax = Math.log(maxAU);
 
   function auToR(au) {
     const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
-    return 12 * dpr + t * (maxR - 12 * dpr);
+    return 16 * dpr + t * (maxR - 16 * dpr);
   }
 
   ctx.save();
