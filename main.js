@@ -464,7 +464,7 @@ document.getElementById('sp-gen').onclick    = async () => {
   if (!selectedId) return;
   renderPanel(selectedId, await ensureSystemDetails(selectedId, true));
 };
-document.getElementById('sp-exp').onclick    = () => { if (selectedId) exportSystemDetails(selectedId); };
+document.getElementById('sp-exp').onclick    = () => { if (selectedId && requireEditor()) exportSystemDetails(selectedId); };
 document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
 
 canvas.addEventListener('dblclick', async e => {
