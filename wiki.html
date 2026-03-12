@@ -26,6 +26,10 @@
       --glow-gold:  rgba(245,197,66,.18);
       --green:      #5cdb7a;
       --green-dim:  #1e4a28;
+      --purple:     #b388ff;
+      --purple-dim: #4a2e80;
+      --amber:      #ff9e44;
+      --amber-dim:  #6e3f10;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html,body{height:100%;background:var(--void);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;}
@@ -78,6 +82,8 @@
     .post-item-cat.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
     .post-item-cat.vehicle{border-color:rgba(245,197,66,.3);color:var(--gold-dim);}
     .post-item-cat.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .post-item-cat.technology{border-color:rgba(179,136,255,.3);color:var(--purple-dim);}
+    .post-item-cat.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
     .post-item-cat.freeform{border-color:rgba(90,122,153,.4);color:var(--text-dim);}
 
     .sb-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;}
@@ -150,6 +156,9 @@
     .dossier-class-tag.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
     .dossier-class-tag.vehicle{border-color:rgba(245,197,66,.3);color:var(--gold-dim);}
     .dossier-class-tag.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .dossier-class-tag.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .dossier-class-tag.technology{border-color:rgba(179,136,255,.3);color:var(--purple-dim);}
+    .dossier-class-tag.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
     .dossier-class-tag.freeform{border-color:var(--border2);color:var(--text-muted);}
 
     .dossier-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:32px;letter-spacing:2px;color:var(--text);line-height:1.15;margin-bottom:4px;}
@@ -225,6 +234,8 @@
         <button class="sb-filter" data-cat="ship">SHIPS</button>
         <button class="sb-filter" data-cat="vehicle">VEHICLES</button>
         <button class="sb-filter" data-cat="soldier">SOLDIERS</button>
+        <button class="sb-filter" data-cat="technology">TECH</button>
+        <button class="sb-filter" data-cat="lore">LORE</button>
         <button class="sb-filter" data-cat="freeform">OTHER</button>
       </div>
     </div>
@@ -351,7 +362,7 @@ function viewEntry(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
   const cat = e.category || 'freeform';
-  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
+  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',lore:'LORE & HISTORY',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
 
   let statsHTML = '';
   if (e.stats && e.stats.length) {
@@ -373,7 +384,7 @@ function viewEntry(id) {
       </div>
       <div class="dossier-title">${esc(e.title || 'Untitled')}</div>
       <div class="dossier-subtitle">${esc(e.designation || '')}</div>
-      <div class="dossier-divider${cat==='vehicle'?' gold':''}"></div>
+      <div class="dossier-divider${cat==='vehicle'||cat==='lore'?' gold':''}"></div>
       ${e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
       ${statsHTML}
       ${e.body ? `<div class="dossier-divider"></div><div class="dossier-body">${e.body}</div>` : ''}
@@ -408,26 +419,36 @@ function showNewEntryPicker() {
   main.innerHTML = `
     <div class="editor-page">
       <div class="editor-title">Create New Entry</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;">
         <div class="template-card" data-tpl="ship">
           <div style="font-size:28px;margin-bottom:8px;">⬡</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--cyan);">Ship Dossier</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Naval combat asset, with structured specs for armament, armor, propulsion, etc.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Naval combat asset with structured specs.</div>
         </div>
         <div class="template-card" data-tpl="vehicle">
           <div style="font-size:28px;margin-bottom:8px;">◈</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--gold);">Vehicle Dossier</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Ground, air, or orbital vehicle with structured specs.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Ground, air, or orbital vehicle.</div>
         </div>
         <div class="template-card" data-tpl="soldier">
           <div style="font-size:28px;margin-bottom:8px;">◉</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--green);">Soldier / Unit</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Personnel type, unit roster, or combat role dossier.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Personnel type or combat role.</div>
+        </div>
+        <div class="template-card" data-tpl="technology">
+          <div style="font-size:28px;margin-bottom:8px;">⚙</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--purple);">Technology</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Weapons, shields, propulsion, materials, sensors — any tech system.</div>
+        </div>
+        <div class="template-card" data-tpl="lore">
+          <div style="font-size:28px;margin-bottom:8px;">📜</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--amber);">Lore & History</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Factions, events, mythology, culture, places, timelines.</div>
         </div>
         <div class="template-card" data-tpl="freeform">
           <div style="font-size:28px;margin-bottom:8px;">✦</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--text);">Freeform Entry</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Full rich-text editor, no template — lore, doctrine, history, anything.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Full rich-text editor, no template.</div>
         </div>
       </div>
     </div>
@@ -530,10 +551,11 @@ function editEntry(id, tpl) {
 
   let templateFields = '';
   if (cat !== 'freeform') {
+    const detailLabel = {ship:'Ship',vehicle:'Vehicle',soldier:'Unit',technology:'Technology',lore:'Lore'}[cat] || 'Entry';
     const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
     templateFields = `
       <div class="edit-section">
-        <div class="edit-section-title">${cat==='ship'?'Ship':cat==='vehicle'?'Vehicle':'Unit'} Details</div>
+        <div class="edit-section-title">${detailLabel} Details</div>
         <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. Single-Seat Interceptor"/></div>
         <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Tactical Interceptor / Light Escort"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;">${esc(e.role||'')}</textarea></div>
