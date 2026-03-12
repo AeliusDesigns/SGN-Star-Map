@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SGN — Codex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@200;300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void:       #050810;
+      --deep:       #080d18;
+      --surface:    #0c1220;
+      --surface2:   #111b2e;
+      --border:     #1a2d46;
+      --border2:    #243d5e;
+      --cyan:       #38e8ff;
+      --cyan-dim:   #1a7090;
+      --gold:       #f5c542;
+      --gold-dim:   #7a6020;
+      --red-alert:  #ff3b3b;
+      --text:       #c8deff;
+      --text-dim:   #5a7a99;
+      --text-muted: #2e4a66;
+      --glow-cyan:  rgba(56,232,255,.18);
+      --glow-gold:  rgba(245,197,66,.18);
+      --green:      #5cdb7a;
+      --green-dim:  #1e4a28;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:var(--void);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;}
+
+    body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:100;}
+
+    /* ── HUD ── */
+    #hud{position:fixed;top:0;left:0;right:0;height:52px;z-index:50;display:flex;align-items:center;gap:0;background:linear-gradient(180deg,rgba(5,8,16,.97) 0%,rgba(5,8,16,.7) 100%);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);padding:0 20px;}
+    #hud::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,var(--cyan-dim) 15%,var(--cyan) 50%,var(--cyan-dim) 85%,transparent 100%);opacity:.4;}
+    .hud-logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;letter-spacing:6px;color:var(--cyan);text-transform:uppercase;white-space:nowrap;text-shadow:0 0 16px rgba(56,232,255,.7),0 0 32px rgba(56,232,255,.3);margin-right:20px;}
+    .hud-sep{width:1px;height:18px;background:var(--border2);margin:0 14px;flex-shrink:0;opacity:.6;}
+    .hud-item{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text-dim);white-space:nowrap;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;}
+    .hud-nav{transition:color .12s;cursor:pointer;}
+    .hud-nav:hover{color:var(--cyan) !important;}
+    .hud-nav.active{color:var(--cyan) !important;text-shadow:0 0 8px rgba(56,232,255,.5);}
+    .hud-spacer{flex:1;}
+
+    /* ── LAYOUT ── */
+    #app{display:flex;height:100vh;padding-top:52px;}
+
+    /* ── SIDEBAR ── */
+    #sidebar{width:300px;min-width:300px;background:rgba(5,8,16,.95);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10;position:relative;}
+    #sidebar::after{content:'';position:absolute;top:0;right:0;width:1px;height:100%;background:linear-gradient(180deg,var(--cyan) 0%,rgba(56,232,255,.15) 40%,transparent 100%);opacity:.4;pointer-events:none;}
+
+    .sb-header{padding:14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .sb-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;letter-spacing:3px;color:var(--text);text-transform:uppercase;margin-bottom:10px;}
+    .sb-search{width:100%;background:rgba(5,8,16,.9);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:7px 10px 7px 28px;font-family:'Exo 2',sans-serif;font-size:13px;outline:none;transition:border-color .12s;}
+    .sb-search:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.08);}
+    .sb-search-wrap{position:relative;}
+    .sb-search-wrap::before{content:'⌕';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-muted);pointer-events:none;}
+
+    .sb-filters{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;}
+    .sb-filter{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border);border-radius:2px;background:transparent;color:var(--text-muted);cursor:pointer;transition:all .12s;}
+    .sb-filter:hover{border-color:var(--border2);color:var(--text-dim);}
+    .sb-filter.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.06);}
+
+    #post-list{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+    #post-list::-webkit-scrollbar{width:3px;}
+    #post-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    .post-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;position:relative;}
+    .post-item::before{content:'';position:absolute;left:0;top:0;width:3px;height:100%;background:transparent;transition:background .12s;}
+    .post-item:hover{background:rgba(56,232,255,.03);}
+    .post-item:hover::before{background:var(--cyan-dim);}
+    .post-item.active{background:rgba(56,232,255,.06);}
+    .post-item.active::before{background:var(--cyan);}
+    .post-item-title{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:15px;color:var(--text);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .post-item-meta{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;display:flex;gap:8px;align-items:center;}
+    .post-item-cat{padding:1px 5px;border:1px solid var(--border);border-radius:2px;font-size:9px;}
+    .post-item-cat.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
+    .post-item-cat.vehicle{border-color:rgba(245,197,66,.3);color:var(--gold-dim);}
+    .post-item-cat.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .post-item-cat.freeform{border-color:rgba(90,122,153,.4);color:var(--text-dim);}
+
+    .sb-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;}
+    .sb-footer .pbtn{flex:1;}
+
+    /* ── MAIN ── */
+    #main{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;position:relative;}
+    #main::-webkit-scrollbar{width:4px;}
+    #main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    /* ── EMPTY STATE ── */
+    .empty-state{text-align:center;padding:80px 20px;}
+    .empty-state-icon{font-size:42px;opacity:.2;margin-bottom:14px;}
+    .empty-state-text{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text-muted);letter-spacing:1.5px;line-height:2;}
+
+    /* ── BUTTONS ── */
+    .pbtn{background:transparent;border:1px solid var(--border2);color:var(--text-dim);border-radius:2px;padding:6px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:all .12s;}
+    .pbtn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(56,232,255,.05);}
+    .pbtn.primary{border-color:var(--cyan-dim);color:var(--cyan);}
+    .pbtn.success{border-color:var(--green-dim);color:var(--green);}
+    .pbtn.success:hover{border-color:var(--green);background:rgba(92,219,122,.05);}
+    .pbtn.danger{border-color:#3a2020;color:#cc6666;}
+    .pbtn.danger:hover{border-color:var(--red-alert);color:var(--red-alert);background:rgba(255,59,59,.05);}
+    .pbtn.gold{border-color:var(--gold-dim);color:var(--gold);}
+    .pbtn.gold:hover{border-color:var(--gold);background:rgba(245,197,66,.06);}
+
+    /* ── FORM ── */
+    .sci-input,.sci-select,.sci-textarea{background:rgba(5,8,16,.9);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:7px 10px;font-family:'Exo 2',sans-serif;font-size:14px;width:100%;outline:none;transition:border-color .12s,box-shadow .12s;}
+    .sci-input:focus,.sci-select:focus,.sci-textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.08);}
+    .sci-select option{background:#080d18;}
+    .sci-textarea{min-height:120px;resize:vertical;font-size:13px;line-height:1.6;}
+
+    .form-row{display:grid;grid-template-columns:90px 1fr;gap:6px 10px;align-items:center;margin-bottom:8px;}
+    .fl{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
+    .edit-section{margin-bottom:18px;}
+    .edit-section-title{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+
+    /* ── TOOLBAR ── */
+    .toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;background:rgba(8,13,24,.8);border:1px solid var(--border);border-bottom:none;border-radius:3px 3px 0 0;}
+    .tb-btn{background:transparent;border:1px solid transparent;color:var(--text-dim);width:30px;height:28px;border-radius:2px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .1s;font-family:'Share Tech Mono',monospace;}
+    .tb-btn:hover{border-color:var(--border2);color:var(--cyan);background:rgba(56,232,255,.04);}
+    .tb-btn.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.08);}
+    .tb-sep{width:1px;height:20px;background:var(--border);margin:4px 4px;flex-shrink:0;}
+    .tb-btn[title]::after{content:attr(title);}
+
+    #editor-area{border:1px solid var(--border);border-radius:0 0 3px 3px;min-height:350px;padding:16px 20px;background:rgba(5,8,16,.8);color:var(--text);font-family:'Exo 2',sans-serif;font-size:14px;line-height:1.7;outline:none;overflow-y:auto;max-height:60vh;}
+    #editor-area:focus{border-color:var(--cyan-dim);}
+    #editor-area h1,#editor-area h2,#editor-area h3,#editor-area h4{font-family:'Rajdhani',sans-serif;color:var(--text);margin:16px 0 8px;line-height:1.3;}
+    #editor-area h1{font-size:26px;font-weight:700;letter-spacing:2px;color:var(--cyan);border-bottom:1px solid var(--border);padding-bottom:6px;}
+    #editor-area h2{font-size:20px;font-weight:600;letter-spacing:1px;color:var(--gold);}
+    #editor-area h3{font-size:16px;font-weight:600;color:var(--text);}
+    #editor-area h4{font-size:14px;font-weight:500;color:var(--text-dim);}
+    #editor-area table{border-collapse:collapse;width:100%;margin:12px 0;}
+    #editor-area th,#editor-area td{border:1px solid var(--border);padding:6px 10px;text-align:left;font-size:13px;}
+    #editor-area th{background:rgba(56,232,255,.06);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan-dim);letter-spacing:1px;text-transform:uppercase;}
+    #editor-area blockquote{border-left:3px solid var(--cyan-dim);margin:12px 0;padding:8px 14px;background:rgba(56,232,255,.03);color:var(--text-dim);font-style:italic;}
+    #editor-area code{font-family:'Share Tech Mono',monospace;background:rgba(56,232,255,.06);padding:1px 5px;border-radius:2px;font-size:12px;color:var(--cyan);}
+    #editor-area pre{background:rgba(5,8,16,.9);border:1px solid var(--border);border-radius:3px;padding:12px;margin:12px 0;overflow-x:auto;}
+    #editor-area pre code{background:none;padding:0;}
+    #editor-area ul,#editor-area ol{margin:8px 0;padding-left:24px;}
+    #editor-area li{margin-bottom:4px;}
+    #editor-area hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+    #editor-area img{max-width:100%;border-radius:3px;margin:8px 0;}
+    #editor-area a{color:var(--cyan);text-decoration:underline;}
+
+    /* ── DOSSIER VIEW ── */
+    .dossier{padding:32px 40px 40px;max-width:900px;margin:0 auto;}
+    .dossier-class-bar{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+    .dossier-class-tag{padding:2px 8px;border:1px solid var(--border2);border-radius:2px;}
+    .dossier-class-tag.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
+    .dossier-class-tag.vehicle{border-color:rgba(245,197,66,.3);color:var(--gold-dim);}
+    .dossier-class-tag.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .dossier-class-tag.freeform{border-color:var(--border2);color:var(--text-muted);}
+
+    .dossier-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:32px;letter-spacing:2px;color:var(--text);line-height:1.15;margin-bottom:4px;}
+    .dossier-subtitle{font-family:'Exo 2',sans-serif;font-size:14px;color:var(--text-dim);margin-bottom:20px;font-weight:300;}
+
+    .dossier-divider{height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent 80%);margin:20px 0;opacity:.5;}
+    .dossier-divider.gold{background:linear-gradient(90deg,var(--gold-dim),transparent 80%);}
+
+    .dossier-section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+
+    .dossier-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:20px;}
+    .dossier-stat{background:rgba(8,13,24,.6);border:1px solid var(--border);border-radius:3px;padding:10px 12px;position:relative;overflow:hidden;}
+    .dossier-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent);opacity:.4;}
+    .dossier-stat-key{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
+    .dossier-stat-val{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;color:var(--text);line-height:1.2;}
+
+    .dossier-body{font-size:14px;line-height:1.7;color:var(--text);}
+    .dossier-body h1,.dossier-body h2,.dossier-body h3,.dossier-body h4{font-family:'Rajdhani',sans-serif;margin:18px 0 8px;line-height:1.3;}
+    .dossier-body h1{font-size:24px;font-weight:700;letter-spacing:2px;color:var(--cyan);border-bottom:1px solid var(--border);padding-bottom:6px;}
+    .dossier-body h2{font-size:19px;font-weight:600;letter-spacing:1px;color:var(--gold);}
+    .dossier-body h3{font-size:15px;font-weight:600;color:var(--text);}
+    .dossier-body table{border-collapse:collapse;width:100%;margin:12px 0;}
+    .dossier-body th,.dossier-body td{border:1px solid var(--border);padding:6px 10px;text-align:left;font-size:13px;}
+    .dossier-body th{background:rgba(56,232,255,.06);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan-dim);letter-spacing:1px;text-transform:uppercase;}
+    .dossier-body blockquote{border-left:3px solid var(--cyan-dim);margin:12px 0;padding:8px 14px;background:rgba(56,232,255,.03);color:var(--text-dim);font-style:italic;}
+    .dossier-body code{font-family:'Share Tech Mono',monospace;background:rgba(56,232,255,.06);padding:1px 5px;border-radius:2px;font-size:12px;color:var(--cyan);}
+    .dossier-body pre{background:rgba(5,8,16,.9);border:1px solid var(--border);border-radius:3px;padding:12px;margin:12px 0;overflow-x:auto;}
+    .dossier-body pre code{background:none;padding:0;}
+    .dossier-body ul,.dossier-body ol{margin:8px 0;padding-left:24px;}
+    .dossier-body li{margin-bottom:4px;}
+    .dossier-body hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+    .dossier-body img{max-width:100%;border-radius:3px;margin:8px 0;}
+    .dossier-body a{color:var(--cyan);}
+
+    .dossier-actions{display:flex;gap:8px;margin-top:24px;padding-top:16px;border-top:1px solid var(--border);}
+
+    /* ── EDITOR PAGE ── */
+    .editor-page{padding:24px 32px 40px;max-width:860px;margin:0 auto;}
+    .editor-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;letter-spacing:2px;color:var(--text);margin-bottom:16px;}
+
+    /* template stat rows */
+    .stat-editor-row{display:grid;grid-template-columns:1fr 1fr 32px;gap:6px;margin-bottom:4px;align-items:center;}
+    .stat-editor-row .sci-input{font-size:12px;padding:5px 8px;}
+    .stat-del{background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:2px;cursor:pointer;font-size:11px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+    .stat-del:hover{border-color:var(--red-alert);color:var(--red-alert);}
+
+    /* toast */
+    .wiki-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);padding:10px 20px;background:rgba(92,219,122,.15);border:1px solid rgba(92,219,122,.3);border-radius:3px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:200;}
+    .wiki-toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
+  </style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hud-logo">SGN</div>
+  <div class="hud-sep"></div>
+  <a href="./index.html" class="hud-item hud-nav">STAR CHART</a>
+  <div class="hud-sep"></div>
+  <a href="./wiki.html" class="hud-item hud-nav active">CODEX</a>
+  <div class="hud-spacer"></div>
+  <span class="hud-item" id="hud-count" style="color:var(--text-muted);"></span>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="sb-header">
+      <div class="sb-title">Codex Index</div>
+      <div class="sb-search-wrap">
+        <input type="text" class="sb-search" id="search" placeholder="Search entries..."/>
+      </div>
+      <div class="sb-filters" id="filters">
+        <button class="sb-filter active" data-cat="all">ALL</button>
+        <button class="sb-filter" data-cat="ship">SHIPS</button>
+        <button class="sb-filter" data-cat="vehicle">VEHICLES</button>
+        <button class="sb-filter" data-cat="soldier">SOLDIERS</button>
+        <button class="sb-filter" data-cat="freeform">OTHER</button>
+      </div>
+    </div>
+    <div id="post-list"></div>
+    <div class="sb-footer">
+      <button class="pbtn gold" id="btn-new">+ NEW ENTRY</button>
+      <button class="pbtn" id="btn-export-all">↓ JSON</button>
+    </div>
+  </div>
+  <div id="main">
+    <div class="empty-state" id="empty-view">
+      <div class="empty-state-icon">◈</div>
+      <div class="empty-state-text">// SELECT AN ENTRY FROM THE INDEX<br>// OR CREATE A NEW ONE</div>
+    </div>
+  </div>
+</div>
+
+<div class="wiki-toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   DATA & STORAGE
+   ══════════════════════════════════════════ */
+const STORE_KEY  = 'sgn_codex_v1';
+const PW_SESSION = 'starmap_editor_ok';
+let entries = [];
+let activeId = null;
+let filterCat = 'all';
+let _editorPW = null;
+let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
+
+function load()  { try { entries = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { entries = []; } }
+function save()  { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); updateCount(); }
+function genId() { return 'CX_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,5).toUpperCase(); }
+
+(async function loadPW() {
+  try { const r = await fetch('./editor.json',{cache:'no-store'}); if(r.ok){ const d=await r.json(); if(typeof d.pw==='string'&&d.pw.length) _editorPW=d.pw; } } catch{}
+})();
+
+function requireEditor() {
+  if (editorOK) return true;
+  if (_editorPW === null) { alert('Editor not available.'); return false; }
+  const pw = prompt('Enter editor password:');
+  if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION,'1'); return true; }
+  alert('Incorrect password.');
+  return false;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 1800);
+}
+
+function updateCount() {
+  document.getElementById('hud-count').textContent = entries.length + ' ENTRIES';
+}
+
+/* ══════════════════════════════════════════
+   SIDEBAR
+   ══════════════════════════════════════════ */
+const postList = document.getElementById('post-list');
+const searchEl = document.getElementById('search');
+
+function renderList() {
+  const q = searchEl.value.trim().toLowerCase();
+  let items = entries.slice().sort((a,b) => (b.updated||0) - (a.updated||0));
+  if (filterCat !== 'all') items = items.filter(e => e.category === filterCat);
+  if (q) items = items.filter(e => (e.title||'').toLowerCase().includes(q) || (e.designation||'').toLowerCase().includes(q));
+
+  if (!items.length) {
+    postList.innerHTML = '<div class="empty-state" style="padding:30px 0;"><div class="empty-state-text">// NO ENTRIES FOUND</div></div>';
+    return;
+  }
+
+  postList.innerHTML = items.map(e => `
+    <div class="post-item${e.id===activeId?' active':''}" data-id="${e.id}">
+      <div class="post-item-title">${esc(e.title || 'Untitled')}</div>
+      <div class="post-item-meta">
+        <span class="post-item-cat ${e.category}">${(e.category||'freeform').toUpperCase()}</span>
+        <span>${e.designation ? esc(e.designation) : ''}</span>
+        <span>${e.updated ? new Date(e.updated).toLocaleDateString() : ''}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+postList.addEventListener('click', e => {
+  const item = e.target.closest('.post-item');
+  if (!item) return;
+  activeId = item.dataset.id;
+  renderList();
+  viewEntry(activeId);
+});
+
+searchEl.addEventListener('input', renderList);
+
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.sb-filter');
+  if (!btn) return;
+  filterCat = btn.dataset.cat;
+  document.querySelectorAll('.sb-filter').forEach(b => b.classList.toggle('active', b === btn));
+  renderList();
+});
+
+document.getElementById('btn-new').addEventListener('click', () => {
+  if (!requireEditor()) return;
+  showNewEntryPicker();
+});
+
+document.getElementById('btn-export-all').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sgn_codex.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+/* ══════════════════════════════════════════
+   VIEW ENTRY (DOSSIER)
+   ══════════════════════════════════════════ */
+const main = document.getElementById('main');
+
+function viewEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  const cat = e.category || 'freeform';
+  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
+
+  let statsHTML = '';
+  if (e.stats && e.stats.length) {
+    statsHTML = `<div class="dossier-section-label">Specifications</div>
+      <div class="dossier-stats">${e.stats.map(s => `
+        <div class="dossier-stat">
+          <div class="dossier-stat-key">${esc(s.key)}</div>
+          <div class="dossier-stat-val">${esc(s.val)}</div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  main.innerHTML = `
+    <div class="dossier">
+      <div class="dossier-class-bar">
+        <span class="dossier-class-tag ${cat}">${catLabel}</span>
+        <span>${esc(e.id)}</span>
+        <span>${e.classification ? '— ' + esc(e.classification) : ''}</span>
+      </div>
+      <div class="dossier-title">${esc(e.title || 'Untitled')}</div>
+      <div class="dossier-subtitle">${esc(e.designation || '')}</div>
+      <div class="dossier-divider${cat==='vehicle'?' gold':''}"></div>
+      ${e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
+      ${statsHTML}
+      ${e.body ? `<div class="dossier-divider"></div><div class="dossier-body">${e.body}</div>` : ''}
+      <div class="dossier-actions">
+        <button class="pbtn primary" id="d-edit">✎ EDIT</button>
+        <button class="pbtn" id="d-dup">⧉ DUPLICATE</button>
+        <button class="pbtn danger" id="d-del">✕ DELETE</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('d-edit').onclick = () => { if(requireEditor()) editEntry(id); };
+  document.getElementById('d-dup').onclick = () => {
+    if(!requireEditor()) return;
+    const clone = JSON.parse(JSON.stringify(e));
+    clone.id = genId(); clone.title += ' (Copy)'; clone.updated = Date.now();
+    entries.push(clone); save(); activeId = clone.id; renderList(); viewEntry(clone.id); toast('Entry duplicated');
+  };
+  document.getElementById('d-del').onclick = () => {
+    if(!requireEditor()) return;
+    if(!confirm('Delete "'+e.title+'"?')) return;
+    entries = entries.filter(x => x.id !== id); save(); activeId = null; renderList();
+    main.innerHTML = document.getElementById('empty-view')?.outerHTML || '';
+    toast('Entry deleted');
+  };
+}
+
+/* ══════════════════════════════════════════
+   NEW ENTRY PICKER
+   ══════════════════════════════════════════ */
+function showNewEntryPicker() {
+  main.innerHTML = `
+    <div class="editor-page">
+      <div class="editor-title">Create New Entry</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+        <div class="template-card" data-tpl="ship">
+          <div style="font-size:28px;margin-bottom:8px;">⬡</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--cyan);">Ship Dossier</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Naval combat asset, with structured specs for armament, armor, propulsion, etc.</div>
+        </div>
+        <div class="template-card" data-tpl="vehicle">
+          <div style="font-size:28px;margin-bottom:8px;">◈</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--gold);">Vehicle Dossier</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Ground, air, or orbital vehicle with structured specs.</div>
+        </div>
+        <div class="template-card" data-tpl="soldier">
+          <div style="font-size:28px;margin-bottom:8px;">◉</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--green);">Soldier / Unit</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Personnel type, unit roster, or combat role dossier.</div>
+        </div>
+        <div class="template-card" data-tpl="freeform">
+          <div style="font-size:28px;margin-bottom:8px;">✦</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--text);">Freeform Entry</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Full rich-text editor, no template — lore, doctrine, history, anything.</div>
+        </div>
+      </div>
+    </div>
+    <style>
+      .template-card{background:rgba(8,13,24,.6);border:1px solid var(--border);border-radius:4px;padding:20px;cursor:pointer;transition:all .15s;text-align:center;}
+      .template-card:hover{border-color:var(--border2);background:rgba(56,232,255,.03);transform:translateY(-2px);}
+    </style>
+  `;
+  main.querySelectorAll('.template-card').forEach(card => {
+    card.onclick = () => editEntry(null, card.dataset.tpl);
+  });
+}
+
+/* ══════════════════════════════════════════
+   RICH TEXT TOOLBAR + EDITOR
+   ══════════════════════════════════════════ */
+function buildToolbar() {
+  return `<div class="toolbar" id="toolbar">
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h1" title="">H1</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h2" title="">H2</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h3" title="">H3</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h4" title="">H4</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="p" title="">¶</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="bold" title=""><b>B</b></button>
+    <button class="tb-btn" data-cmd="italic" title=""><i>I</i></button>
+    <button class="tb-btn" data-cmd="underline" title=""><u>U</u></button>
+    <button class="tb-btn" data-cmd="strikeThrough" title="">S̶</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="insertUnorderedList" title="">•</button>
+    <button class="tb-btn" data-cmd="insertOrderedList" title="">1.</button>
+    <button class="tb-btn" data-action="blockquote" title="">❝</button>
+    <button class="tb-btn" data-action="code" title="">⟨⟩</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-action="table" title="">⊞</button>
+    <button class="tb-btn" data-action="hr" title="">―</button>
+    <button class="tb-btn" data-action="link" title="">🔗</button>
+    <button class="tb-btn" data-action="image" title="">🖼</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="removeFormat" title="">✕</button>
+  </div>`;
+}
+
+function wireToolbar() {
+  const tb = document.getElementById('toolbar');
+  if (!tb) return;
+  tb.addEventListener('mousedown', e => e.preventDefault());
+  tb.addEventListener('click', e => {
+    const btn = e.target.closest('.tb-btn');
+    if (!btn) return;
+    const ed = document.getElementById('editor-area');
+    ed.focus();
+    const cmd = btn.dataset.cmd;
+    const action = btn.dataset.action;
+    if (cmd === 'formatBlock') {
+      document.execCommand('formatBlock', false, '<' + btn.dataset.val + '>');
+    } else if (cmd) {
+      document.execCommand(cmd, false, null);
+    } else if (action === 'table') {
+      const cols = prompt('Columns:','3'), rows = prompt('Rows:','3');
+      if (!cols || !rows) return;
+      let html = '<table><thead><tr>';
+      for (let c=0;c<+cols;c++) html += '<th>Header</th>';
+      html += '</tr></thead><tbody>';
+      for (let r=0;r<+rows;r++) { html += '<tr>'; for(let c=0;c<+cols;c++) html += '<td>&nbsp;</td>'; html += '</tr>'; }
+      html += '</tbody></table><p><br></p>';
+      document.execCommand('insertHTML', false, html);
+    } else if (action === 'hr') {
+      document.execCommand('insertHTML', false, '<hr><p><br></p>');
+    } else if (action === 'link') {
+      const url = prompt('URL:','https://');
+      if (url) document.execCommand('createLink', false, url);
+    } else if (action === 'image') {
+      const url = prompt('Image URL:','https://');
+      if (url) document.execCommand('insertHTML', false, '<img src="'+url.replace(/"/g,'&quot;')+'" alt="image"/>');
+    } else if (action === 'blockquote') {
+      document.execCommand('formatBlock', false, '<blockquote>');
+    } else if (action === 'code') {
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        const text = range.toString();
+        if (text.includes('\n') || text.length > 60) {
+          document.execCommand('insertHTML', false, '<pre><code>'+esc(text)+'</code></pre><p><br></p>');
+        } else {
+          document.execCommand('insertHTML', false, '<code>'+esc(text)+'</code>');
+        }
+      }
+    }
+  });
+}
+
+/* ══════════════════════════════════════════
+   EDIT ENTRY
+   ══════════════════════════════════════════ */
+function editEntry(id, tpl) {
+  const isNew = !id;
+  const e = id ? entries.find(x => x.id === id) : { id:genId(), category:tpl||'freeform', title:'', designation:'', classification:'', role:'', stats:[], body:'', updated:Date.now() };
+  const cat = e.category || 'freeform';
+
+  let templateFields = '';
+  if (cat !== 'freeform') {
+    const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">${cat==='ship'?'Ship':cat==='vehicle'?'Vehicle':'Unit'} Details</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. Single-Seat Interceptor"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Tactical Interceptor / Light Escort"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;">${esc(e.role||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Specifications</div>
+          <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ STAT</button>
+        </div>
+        <div id="stat-list">${statsHTML}</div>
+      </div>
+    `;
+  }
+
+  main.innerHTML = `
+    <div class="editor-page">
+      <div class="editor-title">${isNew ? 'NEW ' + cat.toUpperCase() + ' ENTRY' : 'EDIT ENTRY'}</div>
+      <div class="edit-section">
+        <div class="edit-section-title">Identity</div>
+        <div class="form-row"><span class="fl">Title</span><input id="ed-title" class="sci-input" type="text" value="${esc(e.title||'')}" placeholder="Entry title..."/></div>
+        ${cat==='freeform' ? `<div class="form-row"><span class="fl">Subtitle</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="Optional subtitle..."/></div>` : ''}
+      </div>
+      ${templateFields}
+      <div class="edit-section">
+        <div class="edit-section-title">${cat==='freeform'?'Content':'Extended Content'}</div>
+        ${buildToolbar()}
+        <div contenteditable="true" id="editor-area">${e.body||'<p><br></p>'}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="pbtn success" id="ed-save" style="flex:1;padding:8px;">✓ ${isNew?'CREATE':'SAVE'}</button>
+        <button class="pbtn" id="ed-cancel" style="padding:8px 14px;">CANCEL</button>
+      </div>
+    </div>
+  `;
+
+  wireToolbar();
+
+  // stat rows
+  const statList = document.getElementById('stat-list');
+  document.getElementById('add-stat')?.addEventListener('click', () => {
+    const idx = statList?.querySelectorAll('.stat-editor-row').length || 0;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = statRow('','',idx);
+    statList.appendChild(tmp.firstElementChild);
+  });
+  statList?.addEventListener('click', ev => {
+    if (ev.target.closest('.stat-del')) ev.target.closest('.stat-editor-row').remove();
+  });
+
+  // save
+  document.getElementById('ed-save').onclick = () => {
+    const updated = {
+      id: e.id,
+      category: cat,
+      title: document.getElementById('ed-title').value.trim() || 'Untitled',
+      designation: document.getElementById('ed-desig')?.value.trim() || '',
+      classification: document.getElementById('ed-class')?.value.trim() || '',
+      role: document.getElementById('ed-role')?.value.trim() || '',
+      stats: statList ? Array.from(statList.querySelectorAll('.stat-editor-row')).map(row => ({
+        key: row.querySelector('.sk').value.trim(),
+        val: row.querySelector('.sv').value.trim()
+      })).filter(s => s.key || s.val) : (e.stats || []),
+      body: document.getElementById('editor-area').innerHTML,
+      updated: Date.now()
+    };
+    if (isNew) { entries.push(updated); } else { const idx=entries.findIndex(x=>x.id===e.id); if(idx>=0) entries[idx]=updated; }
+    save(); activeId = updated.id; renderList(); viewEntry(updated.id); toast(isNew?'Entry created':'Entry saved');
+  };
+
+  document.getElementById('ed-cancel').onclick = () => {
+    if (activeId) viewEntry(activeId);
+    else { main.innerHTML = ''; activeId = null; }
+  };
+
+  // Prevent toolbar clicks from losing editor selection
+  document.getElementById('editor-area').addEventListener('paste', ev => {
+    ev.preventDefault();
+    const text = ev.clipboardData.getData('text/html') || ev.clipboardData.getData('text/plain');
+    document.execCommand('insertHTML', false, text);
+  });
+}
+
+function statRow(key, val, idx) {
+  return `<div class="stat-editor-row">
+    <input class="sk sci-input" type="text" value="${esc(key)}" placeholder="Stat name (e.g. Length)"/>
+    <input class="sv sci-input" type="text" value="${esc(val)}" placeholder="Value (e.g. 18 meters)"/>
+    <button type="button" class="stat-del" title="Remove">✕</button>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════ */
+load();
+renderList();
+updateCount();
+</script>
+</body>
+</html>
