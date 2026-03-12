@@ -43,18 +43,21 @@
       position: fixed;
       inset: 0;
       z-index: 0;
-      cursor: none;
     }
+
+    body.map-cursor, body.map-cursor * { cursor: none !important; }
 
     /* ── Custom cursor reticle ── */
     #cursor-reticle {
       position: fixed;
       pointer-events: none;
-      z-index: 99;
+      z-index: 999;
       width: 28px; height: 28px;
       transform: translate(-50%, -50%);
       transition: width .15s, height .15s, opacity .15s;
       opacity: 0.6;
+      display: none;
+      left: 0; top: 0;
     }
     #cursor-reticle.hovering {
       width: 36px; height: 36px;
@@ -136,10 +139,7 @@
       backdrop-filter: blur(10px);
       padding: 0 20px;
       pointer-events: none;
-      cursor: auto;
     }
-
-    #sidePanel, #statusBar, #orrery-modal, #tooltip { cursor: auto; }
 
     #hud::after {
       content: '';
