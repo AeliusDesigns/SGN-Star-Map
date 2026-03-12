@@ -541,7 +541,7 @@ let orreryData   = null;   // { sys, details, planets, star, sm }
 let orrerySpeed  = 1;
 let orreryT      = 0;      // simulation time (years)
 let lastTS       = null;
-const YEAR_SECS  = 120;    // real seconds per sim-year at 1x (inner planets still move visibly)
+const YEAR_SECS  = 120;    // real seconds per sim-year at 1x
 
 orreryClose.onclick = closeOrrery;
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && orreryModal.classList.contains('open')) closeOrrery(); });
