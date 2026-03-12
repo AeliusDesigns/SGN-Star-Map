@@ -166,8 +166,30 @@
 
     .dossier-divider{height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent 80%);margin:20px 0;opacity:.5;}
     .dossier-divider.gold{background:linear-gradient(90deg,var(--gold-dim),transparent 80%);}
+    .dossier-divider.purple{background:linear-gradient(90deg,var(--purple-dim),transparent 80%);}
 
     .dossier-section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+
+    /* ── Technology dossier ── */
+    .dossier-tech-meta{margin-bottom:18px;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+    .dossier-tech-row{display:flex;border-bottom:1px solid var(--border);padding:0;}
+    .dossier-tech-row:last-child{border-bottom:none;}
+    .dossier-tech-key{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;padding:8px 12px;width:160px;flex-shrink:0;background:rgba(8,13,24,.5);border-right:1px solid var(--border);}
+    .dossier-tech-val{font-family:'Exo 2',sans-serif;font-size:13px;color:var(--text);padding:8px 12px;flex:1;}
+
+    .dossier-doc-footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--border);}
+    .dossier-doc-class{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--purple-dim);margin-bottom:3px;}
+    .dossier-doc-rev{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;color:var(--text-muted);}
+
+    /* ── Lore dossier ── */
+    .dossier-lore-context{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+    .dossier-lore-field{display:flex;flex-direction:column;gap:2px;flex:1;min-width:160px;background:rgba(255,158,68,.04);border:1px solid rgba(255,158,68,.15);border-radius:3px;padding:10px 14px;}
+    .dossier-lore-key{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber-dim);}
+    .dossier-lore-val{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:600;color:var(--text);line-height:1.3;}
+
+    .dossier-lore-summary{margin-bottom:20px;background:rgba(255,158,68,.03);border-left:3px solid var(--amber-dim);padding:14px 18px;border-radius:0 3px 3px 0;}
+    .dossier-lore-summary-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--amber-dim);margin-bottom:6px;}
+    .dossier-lore-summary p{font-size:14px;color:var(--text-dim);line-height:1.7;margin:0;}
 
     .dossier-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:20px;}
     .dossier-stat{background:rgba(8,13,24,.6);border:1px solid var(--border);border-radius:3px;padding:10px 12px;position:relative;overflow:hidden;}
@@ -367,7 +389,8 @@ function viewEntry(id) {
 
   let statsHTML = '';
   if (e.stats && e.stats.length) {
-    statsHTML = `<div class="dossier-section-label">Specifications</div>
+    const statsLabel = cat === 'technology' ? 'Technical Summary' : 'Specifications';
+    statsHTML = `<div class="dossier-section-label">${statsLabel}</div>
       <div class="dossier-stats">${e.stats.map(s => `
         <div class="dossier-stat">
           <div class="dossier-stat-key">${esc(s.key)}</div>
@@ -375,6 +398,48 @@ function viewEntry(id) {
         </div>`).join('')}
       </div>`;
   }
+
+  /* ── Technology-specific header fields ── */
+  let techHeaderHTML = '';
+  if (cat === 'technology') {
+    const fields = [
+      e.opStatus   ? ['Operational Status', e.opStatus] : null,
+      e.accessLevel? ['Access Level', e.accessLevel] : null,
+      e.origin     ? ['Origin', e.origin] : null,
+    ].filter(Boolean);
+    if (fields.length) {
+      techHeaderHTML = `<div class="dossier-tech-meta">
+        ${fields.map(([k,v]) => `<div class="dossier-tech-row"><span class="dossier-tech-key">${esc(k)}</span><span class="dossier-tech-val">${esc(v)}</span></div>`).join('')}
+      </div>`;
+    }
+  }
+
+  /* ── Technology document footer ── */
+  let techFooterHTML = '';
+  if (cat === 'technology' && (e.docClass || e.revision)) {
+    techFooterHTML = `<div class="dossier-doc-footer">
+      ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
+      ${e.revision ? `<div class="dossier-doc-rev">Revision: ${esc(e.revision)}</div>` : ''}
+    </div>`;
+  }
+
+  /* ── Lore-specific header ── */
+  let loreHeaderHTML = '';
+  if (cat === 'lore') {
+    const ctx = [
+      e.era    ? ['Era / Period', e.era] : null,
+      e.region ? ['Region / Domain', e.region] : null,
+    ].filter(Boolean);
+    loreHeaderHTML = `
+      ${ctx.length ? `<div class="dossier-lore-context">
+        ${ctx.map(([k,v]) => `<div class="dossier-lore-field"><span class="dossier-lore-key">${esc(k)}</span><span class="dossier-lore-val">${esc(v)}</span></div>`).join('')}
+      </div>` : ''}
+      ${e.summary ? `<div class="dossier-lore-summary"><div class="dossier-lore-summary-label">Summary</div><p>${esc(e.summary)}</p></div>` : ''}
+    `;
+  }
+
+  /* ── Divider accent by category ── */
+  const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : '');
 
   main.innerHTML = `
     <div class="dossier">
@@ -385,10 +450,13 @@ function viewEntry(id) {
       </div>
       <div class="dossier-title">${esc(e.title || 'Untitled')}</div>
       <div class="dossier-subtitle">${esc(e.designation || '')}</div>
-      <div class="dossier-divider${cat==='vehicle'||cat==='lore'?' gold':''}"></div>
+      <div class="dossier-divider${divAccent}"></div>
+      ${techHeaderHTML}
+      ${loreHeaderHTML}
       ${e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
       ${statsHTML}
-      ${e.body ? `<div class="dossier-divider"></div><div class="dossier-body">${e.body}</div>` : ''}
+      ${e.body ? `<div class="dossier-divider${divAccent}"></div><div class="dossier-body">${e.body}</div>` : ''}
+      ${techFooterHTML}
       <div class="dossier-actions">
         <button class="pbtn primary" id="d-edit">✎ EDIT</button>
         <button class="pbtn" id="d-dup">⧉ DUPLICATE</button>
@@ -547,12 +615,54 @@ function wireToolbar() {
    ══════════════════════════════════════════ */
 function editEntry(id, tpl) {
   const isNew = !id;
-  const e = id ? entries.find(x => x.id === id) : { id:genId(), category:tpl||'freeform', title:'', designation:'', classification:'', role:'', stats:[], body:'', updated:Date.now() };
+  const e = id ? entries.find(x => x.id === id) : {
+    id:genId(), category:tpl||'freeform', title:'', designation:'', classification:'',
+    role:'', stats:[], body:'', updated:Date.now(),
+    /* tech-specific */ opStatus:'', accessLevel:'', origin:'', docClass:'', revision:'',
+    /* lore-specific */ era:'', region:'', summary:''
+  };
   const cat = e.category || 'freeform';
 
   let templateFields = '';
-  if (cat !== 'freeform') {
-    const detailLabel = {ship:'Ship',vehicle:'Vehicle',soldier:'Unit',technology:'Technology',lore:'Lore'}[cat] || 'Entry';
+
+  if (cat === 'technology') {
+    const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">System Identification</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. ICAS-AURION — Shipborne AI Command Model"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Strategic AI / Integrated Command Assistant"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${esc(e.opStatus||'')}" placeholder="e.g. Active Service — Fleetwide Standard"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Vanyamar Orbital Research Foundry"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Primary function and operational purpose...">${esc(e.role||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Technical Summary</div>
+          <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ SPEC</button>
+        </div>
+        <div id="stat-list">${statsHTML}</div>
+      </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — CYBERNETICS DIVISION"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. ICAS-AURION-SYS-013-B"/></div>
+      </div>
+    `;
+  } else if (cat === 'lore') {
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">Context</div>
+        <div class="form-row"><span class="fl">Subject</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. The Sundering of Calandorë"/></div>
+        <div class="form-row"><span class="fl">Era / Period</span><input id="ed-era" class="sci-input" type="text" value="${esc(e.era||'')}" placeholder="e.g. Second Age of Stars / Pre-Expansion"/></div>
+        <div class="form-row"><span class="fl">Region</span><input id="ed-region" class="sci-input" type="text" value="${esc(e.region||'')}" placeholder="e.g. Arandorë Eldainë / Vanyamar System"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Historical Event / Mythology / Cultural Tradition"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-summary" class="sci-textarea" style="min-height:80px;" placeholder="Brief overview — the essential facts before the full account...">${esc(e.summary||'')}</textarea></div>
+      </div>
+    `;
+  } else if (cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
+    const detailLabel = {ship:'Ship',vehicle:'Vehicle',soldier:'Unit'}[cat] || 'Entry';
     const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
     templateFields = `
       <div class="edit-section">
@@ -571,6 +681,8 @@ function editEntry(id, tpl) {
     `;
   }
 
+  const bodyLabel = {technology:'System Overview / Capabilities / Security',lore:'Full Account',freeform:'Content'}[cat] || 'Extended Content';
+
   main.innerHTML = `
     <div class="editor-page">
       <div class="editor-title">${isNew ? 'NEW ' + cat.toUpperCase() + ' ENTRY' : 'EDIT ENTRY'}</div>
@@ -581,7 +693,7 @@ function editEntry(id, tpl) {
       </div>
       ${templateFields}
       <div class="edit-section">
-        <div class="edit-section-title">${cat==='freeform'?'Content':'Extended Content'}</div>
+        <div class="edit-section-title">${bodyLabel}</div>
         ${buildToolbar()}
         <div contenteditable="true" id="editor-area">${e.body||'<p><br></p>'}</div>
       </div>
@@ -594,7 +706,7 @@ function editEntry(id, tpl) {
 
   wireToolbar();
 
-  // stat rows
+  // stat rows (ship/vehicle/soldier/technology)
   const statList = document.getElementById('stat-list');
   document.getElementById('add-stat')?.addEventListener('click', () => {
     const idx = statList?.querySelectorAll('.stat-editor-row').length || 0;
@@ -620,7 +732,17 @@ function editEntry(id, tpl) {
         val: row.querySelector('.sv').value.trim()
       })).filter(s => s.key || s.val) : (e.stats || []),
       body: document.getElementById('editor-area').innerHTML,
-      updated: Date.now()
+      updated: Date.now(),
+      /* tech fields */
+      opStatus: document.getElementById('ed-opstatus')?.value.trim() || '',
+      accessLevel: document.getElementById('ed-access')?.value.trim() || '',
+      origin: document.getElementById('ed-origin')?.value.trim() || '',
+      docClass: document.getElementById('ed-docclass')?.value.trim() || '',
+      revision: document.getElementById('ed-revision')?.value.trim() || '',
+      /* lore fields */
+      era: document.getElementById('ed-era')?.value.trim() || '',
+      region: document.getElementById('ed-region')?.value.trim() || '',
+      summary: document.getElementById('ed-summary')?.value.trim() || ''
     };
     if (isNew) { entries.push(updated); } else { const idx=entries.findIndex(x=>x.id===e.id); if(idx>=0) entries[idx]=updated; }
     save(); activeId = updated.id; renderList(); viewEntry(updated.id); toast(isNew?'Entry created':'Entry saved');
@@ -631,7 +753,6 @@ function editEntry(id, tpl) {
     else { main.innerHTML = ''; activeId = null; }
   };
 
-  // Prevent toolbar clicks from losing editor selection
   document.getElementById('editor-area').addEventListener('paste', ev => {
     ev.preventDefault();
     const text = ev.clipboardData.getData('text/html') || ev.clipboardData.getData('text/plain');
