@@ -322,26 +322,25 @@ const tipId    = document.getElementById('tip-id');
 const tipOwner = document.getElementById('tip-owner');
 const cursorEl = document.getElementById('cursor-reticle');
 let mouseX = 0, mouseY = 0;
-let cursorOnCanvas = false;
+let cursorVisible = false;
+
 addEventListener('mousemove', e => {
   mouseX = e.clientX; mouseY = e.clientY;
   if (cursorEl) {
     cursorEl.style.left = e.clientX + 'px';
     cursorEl.style.top  = e.clientY + 'px';
   }
+  /* show reticle only when NOT over a UI panel */
+  const overUI = e.target.closest('#sidePanel, #hud, #statusBar, #orrery-modal, .hud-nav, .sb-save-btn, .fleet-map-icon');
+  const shouldShow = !overUI;
+  if (shouldShow !== cursorVisible) {
+    cursorVisible = shouldShow;
+    if (cursorEl) cursorEl.style.display = shouldShow ? 'block' : 'none';
+    document.body.classList.toggle('map-cursor', shouldShow);
+  }
 });
-canvas.addEventListener('mouseenter', () => { cursorOnCanvas = true; });
-canvas.addEventListener('mouseleave', () => { cursorOnCanvas = false; });
 canvas.addEventListener('mousedown', () => { if(cursorEl) cursorEl.classList.add('clicking'); });
 addEventListener('mouseup', () => { if(cursorEl) cursorEl.classList.remove('clicking'); });
-
-/* hide reticle when over any UI overlay */
-function updateCursorVisibility(e) {
-  if (!cursorEl) return;
-  const over = e.target.closest('#sidePanel, #hud, #statusBar, #orrery-modal');
-  cursorEl.style.display = over ? 'none' : 'block';
-}
-addEventListener('mousemove', updateCursorVisibility);
 
 let hoveredId = null;
 let selectedId = null;
