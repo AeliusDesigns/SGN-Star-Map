@@ -226,62 +226,81 @@ void main(){
   float ang = atan(uv.y, uv.x);
   float PI = 3.14159265;
   float alpha = 0.0;
-  vec3 col = mix(uColGlow, uColCore, 0.4);
+  vec3 col = mix(uColGlow, uColCore, 0.3);
 
-  // ── outer segmented arc ring ──
-  float outerR = 0.82;
-  float outerW = 0.025;
-  float outerRing = smoothstep(outerR - outerW, outerR, r) * (1.0 - smoothstep(outerR, outerR + outerW, r));
-  // segment into 8 arcs with gaps
-  float seg8 = mod(ang + PI, PI * 0.25) / (PI * 0.25);
-  float arcMask = smoothstep(0.08, 0.12, seg8) * (1.0 - smoothstep(0.88, 0.92, seg8));
-  outerRing *= arcMask;
-  // slow rotation
-  float rotOuter = mod(ang + uTime * 0.4, PI * 2.0);
-  alpha += outerRing * 0.7;
+  // ── strong radial glow filling the interior ──
+  float glow = exp(-r * r * 3.5) * 0.3;
+  alpha += glow;
 
-  // ── inner ring (thinner, continuous, brighter) ──
-  float innerR = 0.55;
-  float innerW = 0.015;
-  float innerRing = smoothstep(innerR - innerW, innerR, r) * (1.0 - smoothstep(innerR, innerR + innerW, r));
-  alpha += innerRing * 0.85;
+  // ── outer thick segmented ring ──
+  float outerR = 0.78;
+  float outerW = 0.05;
+  float outerBand = smoothstep(outerR - outerW, outerR - outerW * 0.5, r)
+                  * (1.0 - smoothstep(outerR + outerW * 0.5, outerR + outerW, r));
+  // rotating segmented mask — 6 segments
+  float rotAng = ang + uTime * 0.35;
+  float seg = mod(rotAng + PI, PI / 3.0) / (PI / 3.0);
+  float arcMask = smoothstep(0.06, 0.14, seg) * (1.0 - smoothstep(0.86, 0.94, seg));
+  alpha += outerBand * arcMask * 1.0;
+  // glow around outer ring
+  float outerGlow = exp(-pow(abs(r - outerR), 2.0) * 120.0) * 0.5;
+  alpha += outerGlow * arcMask;
+  col += uColCore * outerGlow * arcMask * 0.3;
 
-  // ── scanning sweep (single beam rotating) ──
-  float sweep = mod(ang + uTime * 1.5, PI * 2.0);
-  float sweepArc = smoothstep(0.0, 0.3, sweep) * (1.0 - smoothstep(0.3, 0.6, sweep));
-  float sweepMask = smoothstep(innerR - 0.05, innerR, r) * (1.0 - smoothstep(outerR, outerR + 0.05, r));
-  alpha += sweepArc * sweepMask * 0.3;
-  col += uColCore * sweepArc * sweepMask * 0.15;
+  // ── inner solid ring ──
+  float innerR = 0.48;
+  float innerW = 0.035;
+  float innerBand = smoothstep(innerR - innerW, innerR - innerW * 0.3, r)
+                  * (1.0 - smoothstep(innerR + innerW * 0.3, innerR + innerW, r));
+  alpha += innerBand * 1.0;
+  // glow around inner ring
+  float innerGlow = exp(-pow(abs(r - innerR), 2.0) * 80.0) * 0.4;
+  alpha += innerGlow;
 
-  // ── 4 cardinal tick marks on outer ring ──
+  // ── scanning sweep (wide, bright) ──
+  float sweep = mod(ang + uTime * 1.2, PI * 2.0);
+  float sweepArc = exp(-pow(sweep - 0.5, 2.0) * 8.0);
+  float sweepR = smoothstep(innerR - 0.08, innerR, r) * (1.0 - smoothstep(outerR, outerR + 0.08, r));
+  alpha += sweepArc * sweepR * 0.5;
+  col += uColCore * sweepArc * sweepR * 0.4;
+
+  // ── 4 bright cardinal ticks extending outward ──
   for(int i = 0; i < 4; i++){
     float tickAng = float(i) * PI * 0.5;
     float da = abs(mod(ang - tickAng + PI, PI * 2.0) - PI);
-    float tick = smoothstep(0.04, 0.0, da);
-    float tickR = smoothstep(outerR + outerW, outerR + outerW + 0.01, r) * (1.0 - smoothstep(outerR + outerW + 0.06, outerR + outerW + 0.08, r));
-    alpha += tick * tickR * 0.9;
+    float tick = exp(-da * da * 800.0);
+    float tickR = smoothstep(outerR + outerW * 0.5, outerR + outerW, r)
+                * (1.0 - smoothstep(outerR + outerW + 0.08, outerR + outerW + 0.12, r));
+    alpha += tick * tickR * 1.2;
+    col += uColCore * tick * tickR * 0.3;
   }
 
-  // ── 4 diamond indicators at diagonals (selected only) ──
+  // ── selection mode extras ──
   if(uMode > 0.5){
+    // 4 diagonal bracket marks
     for(int i = 0; i < 4; i++){
       float dAng = float(i) * PI * 0.5 + PI * 0.25;
       float da = abs(mod(ang - dAng + PI, PI * 2.0) - PI);
-      float diamond = smoothstep(0.08, 0.0, da) * smoothstep(0.02, 0.0, abs(r - outerR));
-      alpha += diamond * 0.8;
-      col += uColCore * diamond * 0.2;
+      float bracket = exp(-da * da * 400.0);
+      float bracketR = smoothstep(outerR + outerW, outerR + outerW + 0.01, r)
+                     * (1.0 - smoothstep(outerR + outerW + 0.06, outerR + outerW + 0.09, r));
+      alpha += bracket * bracketR * 1.0;
+      col += uColCore * bracket * bracketR * 0.2;
     }
+    // pulsing fill between rings
+    float fill = smoothstep(innerR + innerW, innerR + innerW + 0.02, r)
+               * (1.0 - smoothstep(outerR - outerW - 0.02, outerR - outerW, r));
+    float pulse = 0.12 + 0.08 * sin(uTime * 2.5);
+    alpha += fill * pulse;
+
+    // overall brightness pulse
+    alpha *= 0.9 + 0.1 * sin(uTime * 2.0);
   }
 
-  // ── center glow ──
-  float center = exp(-r * r * 12.0) * 0.12;
-  alpha += center;
-
-  // ── pulse on selected ──
-  if(uMode > 0.5){
-    float pulse = 0.85 + 0.15 * sin(uTime * 2.0);
-    alpha *= pulse;
-  }
+  // ── bright center pip ──
+  float pip = exp(-r * r * 60.0) * 0.5;
+  alpha += pip;
+  col += vec3(1.0) * pip * 0.3;
 
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }`;
@@ -1796,9 +1815,18 @@ function loop() {
   }
 
   const t = wallTime;
-  if (hoveredNow) drawHalo(hoveredNow, 40.0, t,        [0.35,0.95,1.0], [1.0,0.95,0.50], 0.0);
-  if (selectedId) drawHalo(selectedId, 52.0, t*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.70], 1.0);
-  if (window._lanePickA) drawHalo(window._lanePickA, 44.0, t*1.5, [0.15,0.65,0.78], [0.4,0.85,1.0], 2.0);
+  if (hoveredNow) {
+    drawHalo(hoveredNow, 70.0, t, [0.20,0.60,0.70], [0.35,0.95,1.0], 0.0); // bloom
+    drawHalo(hoveredNow, 48.0, t, [0.35,0.95,1.0], [1.0,0.95,0.50], 0.0); // crisp
+  }
+  if (selectedId) {
+    drawHalo(selectedId, 80.0, t, [0.50,0.40,0.15], [1.0,0.85,0.35], 1.0); // bloom
+    drawHalo(selectedId, 56.0, t, [1.0,0.85,0.35],  [1.0,0.98,0.70], 1.0); // crisp
+  }
+  if (window._lanePickA) {
+    drawHalo(window._lanePickA, 65.0, t*1.5, [0.10,0.40,0.55], [0.15,0.65,0.78], 2.0);
+    drawHalo(window._lanePickA, 46.0, t*1.5, [0.15,0.65,0.78], [0.4,0.85,1.0],  2.0);
+  }
 
   updateFleetMapIcons(mvp);
 
