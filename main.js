@@ -269,12 +269,24 @@ function updateHUD() {
   const hudLanes = document.getElementById('hud-lanes');
   const hudAdd   = document.getElementById('hud-add');
   if (hudLanes) {
-    hudLanes.innerHTML = `LANES &nbsp;<b>${editMode ? 'ON' : 'OFF'}</b>`;
+    let label = 'LANES &nbsp;<b>OFF</b>';
+    if (editMode) {
+      if (window._lanePickA) {
+        const pickSys = systems.find(s => s.id === window._lanePickA);
+        const pickName = pickSys?.name || window._lanePickA;
+        label = `LANES &nbsp;<b>FROM: ${pickName.toUpperCase()}</b>`;
+      } else {
+        label = 'LANES &nbsp;<b>ON — PICK 1ST</b>';
+      }
+    }
+    hudLanes.innerHTML = label;
     hudLanes.style.color = editMode ? 'var(--cyan)' : '';
+    if (editMode) hudLanes.classList.add('mode-active'); else hudLanes.classList.remove('mode-active');
   }
   if (hudAdd) {
-    hudAdd.innerHTML   = `ADD &nbsp;<b>${addMode ? 'ON' : 'OFF'}</b>`;
+    hudAdd.innerHTML   = `ADD &nbsp;<b>${addMode ? 'ON — CLICK MAP' : 'OFF'}</b>`;
     hudAdd.style.color = addMode ? 'var(--cyan)' : '';
+    if (addMode) hudAdd.classList.add('mode-active'); else hudAdd.classList.remove('mode-active');
   }
 }
 
@@ -343,6 +355,7 @@ canvas.addEventListener('mouseup', async e => {
 
   if (!_clickDownId) {
     if (addMode) {
+      if (!requireEditor()) return;
       const mvp = buildMVP();
       const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
       if (!world) return;
@@ -367,13 +380,19 @@ canvas.addEventListener('mouseup', async e => {
   _clickDownId = null;
 
   if (editMode) {
+    if (!requireEditor()) return;
     if (!window._lanePickA) {
       window._lanePickA = id;
+      updateHUD();
     } else {
-      const key = [window._lanePickA, id].sort().join('::');
-      if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
+      if (window._lanePickA !== id) {
+        const key = [window._lanePickA, id].sort().join('::');
+        if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
+        rebuildLinesVBOFromSet();
+        updateLaneCounts();
+      }
       window._lanePickA = null;
-      rebuildLinesVBOFromSet();
+      updateHUD();
     }
     return;
   }
@@ -416,9 +435,11 @@ function deleteNearestLane(mx, my, mvp) {
 }
 
 canvas.addEventListener('auxclick', e => {
-  if (!editMode || e.button !== 1 || !editorOK) return;
+  if (!editMode || e.button !== 1) return;
+  if (!requireEditor()) return;
   const [mx, my] = mouseToCanvas(e);
   deleteNearestLane(mx, my, buildMVP());
+  updateLaneCounts();
 });
 
 const panel      = document.getElementById('sidePanel');
@@ -432,6 +453,7 @@ document.getElementById('sp-tabs').addEventListener('click', e => {
   const tab = e.target.closest('.tab');
   if (!tab) return;
   const name = tab.dataset.tab;
+  if (name === 'edit' && !requireEditor()) return;
   document.querySelectorAll('#sp-tabs .tab').forEach(t => t.classList.toggle('active', t === tab));
   document.querySelectorAll('#sp-body .tab-pane').forEach(p => p.classList.toggle('active', p.id === `pane-${name}`));
 });
@@ -454,7 +476,10 @@ canvas.addEventListener('dblclick', async e => {
   if (!requireEditor()) return;
   const sys = systems.find(s => s.id === id);
   const nn = prompt('Rename system:', sys?.name || id);
-  if (nn && nn.trim()) sys.name = nn.trim();
+  if (nn && nn.trim()) {
+    sys.name = nn.trim();
+    rebuildStarsVBO();
+  }
 });
 
 window.addEventListener('keydown', async e => {
@@ -463,6 +488,7 @@ window.addEventListener('keydown', async e => {
     if (!requireEditor()) return;
     editMode = !editMode;
     if (editMode) addMode = false;
+    if (!editMode) window._lanePickA = null;
     updateHUD();
     return;
   }
@@ -477,15 +503,20 @@ window.addEventListener('keydown', async e => {
     renderPanel(selectedId, await ensureSystemDetails(selectedId));
     return;
   }
-  if (!editMode || !editorOK) return;
+  if (!editMode) return;
+  if (!requireEditor()) return;
   if (k === 'c') {
+    if (!confirm('Clear ALL lanes?')) return;
     lanesSet.clear();
     rebuildLinesVBOFromSet();
+    updateLaneCounts();
   }
   if (k === 'r') {
+    if (!confirm('Reset lanes to defaults?')) return;
     lanesSet.clear();
     (DEFAULT_DATA.lanes || []).forEach(([a,b]) => lanesSet.add([a,b].sort().join('::')));
     rebuildLinesVBOFromSet();
+    updateLaneCounts();
   }
   if (k === 'x') {
     const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
@@ -1048,102 +1079,248 @@ function renderEditPane(id, details, sys) {
   const star    = details?.star || {};
   const planets = details?.planets || [];
   const starKinds = ['Main Sequence','K-Dwarf','G-Dwarf','F-Dwarf','M-Dwarf','Subgiant','Giant','Neutron','Black Hole'];
-  const options = starKinds.map(k => `<option value="${k}" ${star.kind===k?'selected':''}>${k}</option>`).join('');
+  const starOpts = starKinds.map(k => `<option value="${k}" ${star.kind===k?'selected':''}>${k}</option>`).join('');
+  const planetTypes = ['Rocky','Ice','Gas','Ocean','Desert','Shield World','Ecumenopolis','Installation','Habitat'];
+
+  /* ── find connected lanes ── */
+  const connectedLanes = [];
+  for (const key of lanesSet) {
+    const [a,b] = key.split('::');
+    if (a === id || b === id) {
+      const otherId = a === id ? b : a;
+      const otherSys = systems.find(s => s.id === otherId);
+      connectedLanes.push({ key, otherId, otherName: otherSys?.name || otherId });
+    }
+  }
+  connectedLanes.sort((a,b) => a.otherName.localeCompare(b.otherName));
+
+  /* ── build lane-add target list (exclude self + already connected) ── */
+  const connectedIds = new Set(connectedLanes.map(l => l.otherId));
+  const laneTargets = systems
+    .filter(s => s.id !== id && !connectedIds.has(s.id))
+    .sort((a,b) => (a.name||a.id).localeCompare(b.name||b.id));
+  const laneTargetOpts = laneTargets.map(s => `<option value="${s.id}">${s.name || s.id}</option>`).join('');
 
   const pedit = document.getElementById('pane-edit');
   pedit.innerHTML = `
-    <form id="sys-edit">
-      <div class="edit-section">
-        <div class="edit-section-title">System Identity</div>
-        <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
-        <div class="form-row">
-          <label class="fl" for="sysName">Name</label>
-          <input id="sysName" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
-        </div>
-        <div class="form-row">
-          <label class="fl" for="starKind">Star Class</label>
-          <select id="starKind" class="sci-select">${options}</select>
-        </div>
+    <div class="edit-section">
+      <div class="edit-section-title">System Identity</div>
+      <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
+      <div class="form-row">
+        <label class="fl">Name</label>
+        <input id="ed-name" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
       </div>
-      <div class="edit-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Orbital Bodies</div>
-          <button id="addPlanet" type="button" class="pbtn primary" style="margin-bottom:10px;">+ ADD BODY</button>
-        </div>
-        <div id="planetList" style="margin-top:8px;">
-          ${planets.map((p,i) => planetEditorRow(p,i)).join('')}
-        </div>
+      <div class="form-row">
+        <label class="fl">Owner</label>
+        <input id="ed-owner" class="sci-input" type="text" value="${(sys?.owner||'').replaceAll('"','&quot;')}" placeholder="Faction / owner..."/>
       </div>
-      <div class="edit-actions">
-        <button id="saveEdit"   type="submit" class="pbtn success" style="flex:1;padding:8px;">&#10003; SAVE CHANGES</button>
-        <button id="cancelEdit" type="button" class="pbtn danger"  style="padding:8px 12px;">✕</button>
+      <div class="form-row">
+        <label class="fl">Tags</label>
+        <input id="ed-tags" class="sci-input" type="text" value="${(sys?.tags||[]).join(', ')}" placeholder="comma separated..."/>
       </div>
-    </form>
+      <div class="form-row">
+        <label class="fl">Star</label>
+        <select id="ed-star" class="sci-select">${starOpts}</select>
+      </div>
+    </div>
+
+    <div class="edit-section">
+      <div class="edit-section-title">Lanes (${connectedLanes.length})</div>
+      <div id="ed-lane-list">
+        ${connectedLanes.length ? connectedLanes.map(l => `
+          <div class="lane-row" data-lane-key="${l.key}">
+            <span class="lane-row-name">${l.otherName}</span>
+            <span class="lane-row-id">${l.otherId}</span>
+            <button type="button" class="lane-row-del" title="Remove lane">✕</button>
+          </div>
+        `).join('') : '<div class="edit-empty-hint">No lanes connected</div>'}
+      </div>
+      ${laneTargets.length ? `
+      <div class="lane-add-bar">
+        <select id="ed-lane-target" class="sci-select" style="flex:1;font-size:12px;">
+          <option value="" disabled selected>Connect to…</option>
+          ${laneTargetOpts}
+        </select>
+        <button type="button" id="ed-lane-add" class="pbtn primary" style="padding:5px 10px;white-space:nowrap;">+ LANE</button>
+      </div>` : ''}
+    </div>
+
+    <div class="edit-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Bodies (${planets.length})</div>
+        <button id="ed-add-body" type="button" class="pbtn primary" style="margin-bottom:8px;padding:3px 10px;">+ BODY</button>
+      </div>
+      <div id="ed-planet-list">
+        ${planets.map((p,i) => planetEditorRow(p, i, planetTypes)).join('')}
+      </div>
+    </div>
+
+    <div class="edit-actions" style="margin-top:12px;">
+      <button id="ed-save" class="pbtn success" style="flex:1;padding:8px;">✓ SAVE ALL</button>
+      <button id="ed-delete-sys" class="pbtn danger" style="padding:8px 12px;" title="Delete system">⌫ DEL</button>
+    </div>
+    <div id="ed-toast" class="edit-toast"></div>
   `;
 
-  const form   = pedit.querySelector('#sys-edit');
-  const btnAdd = pedit.querySelector('#addPlanet');
-  const listEl = pedit.querySelector('#planetList');
-
-  btnAdd.onclick = () => {
-    const idx = listEl.querySelectorAll('.planetRow').length;
-    const tmp = document.createElement('div');
-    tmp.innerHTML = planetEditorRow({name:`P${idx+1}`,type:'Rocky',semi_major_AU:1.0,notes:''}, idx);
-    listEl.appendChild(tmp.firstElementChild);
-  };
-
-  listEl.addEventListener('click', e => {
-    if (e.target?.matches('.delPlanet')) {
-      e.target.closest('.planetRow').remove();
-      listEl.querySelectorAll('.planetRow .p-idx').forEach((el,i) => { el.textContent = `BODY ${i+1}`; });
+  /* ── wire up lane management ── */
+  const laneList = pedit.querySelector('#ed-lane-list');
+  laneList.addEventListener('click', e => {
+    const del = e.target.closest('.lane-row-del');
+    if (!del) return;
+    const row = del.closest('.lane-row');
+    const key = row.dataset.laneKey;
+    if (key && lanesSet.has(key)) {
+      lanesSet.delete(key);
+      rebuildLinesVBOFromSet();
+      updateLaneCounts();
+      row.style.opacity = '0';
+      row.style.height = row.offsetHeight + 'px';
+      requestAnimationFrame(() => { row.style.height = '0'; row.style.padding = '0'; row.style.margin = '0'; row.style.overflow = 'hidden'; });
+      setTimeout(() => {
+        row.remove();
+        if (!laneList.querySelector('.lane-row')) laneList.innerHTML = '<div class="edit-empty-hint">No lanes connected</div>';
+        showEditToast('Lane removed');
+      }, 180);
     }
   });
 
-  form.onsubmit = ev => {
-    ev.preventDefault();
-    if (!requireEditor()) return;
-    const newName    = pedit.querySelector('#sysName').value.trim();
-    const newKind    = pedit.querySelector('#starKind').value;
-    const newPlanets = Array.from(listEl.querySelectorAll('.planetRow')).map(row => ({
-      name:          row.querySelector('.pName').value.trim() || 'Body',
-      type:          row.querySelector('.pType').value,
-      semi_major_AU: +parseFloat(row.querySelector('.pSMA').value).toFixed(2) || null,
-      notes:         row.querySelector('.pNotes').value.trim()
-    }));
-    const updated = { ...(getCachedSystem(id)||{version:SYSGEN_VERSION,system_id:id,seeded:true}), star:{kind:newKind}, planets:newPlanets };
-    setCachedSystem(id, updated);
-    if (newName) { const s=systems.find(s=>s.id===id); if(s) s.name=newName; }
-    renderPanel(id, updated);
-    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
+  pedit.querySelector('#ed-lane-add')?.addEventListener('click', () => {
+    const sel = pedit.querySelector('#ed-lane-target');
+    const targetId = sel.value;
+    if (!targetId) return;
+    const key = [id, targetId].sort().join('::');
+    if (!lanesSet.has(key)) {
+      lanesSet.add(key);
+      rebuildLinesVBOFromSet();
+      updateLaneCounts();
+      /* re-render the edit pane to refresh lane list */
+      const det = getCachedSystem(id) || details;
+      renderEditPane(id, det, sys);
+      showEditToast('Lane connected');
+    }
+  });
+
+  /* ── wire up planet list ── */
+  const planetList = pedit.querySelector('#ed-planet-list');
+
+  pedit.querySelector('#ed-add-body').onclick = () => {
+    const idx = planetList.querySelectorAll('.ed-body-row').length;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = planetEditorRow({name:`P${idx+1}`,type:'Rocky',semi_major_AU:1.0,notes:''}, idx, planetTypes);
+    const row = tmp.firstElementChild;
+    planetList.appendChild(row);
+    row.style.opacity = '0';
+    requestAnimationFrame(() => row.style.opacity = '1');
+    reindexPlanets(planetList);
   };
 
-  pedit.querySelector('#cancelEdit').onclick = () => {
-    document.querySelector('#sp-tabs .tab[data-tab="overview"]').click();
+  planetList.addEventListener('click', e => {
+    const del = e.target.closest('.ed-body-del');
+    if (!del) return;
+    const row = del.closest('.ed-body-row');
+    row.style.opacity = '0';
+    setTimeout(() => { row.remove(); reindexPlanets(planetList); }, 150);
+  });
+
+  /* ── collapsible body rows ── */
+  planetList.addEventListener('click', e => {
+    const head = e.target.closest('.ed-body-head');
+    if (!head || e.target.closest('.ed-body-del')) return;
+    const row = head.closest('.ed-body-row');
+    row.classList.toggle('collapsed');
+  });
+
+  /* ── save ── */
+  pedit.querySelector('#ed-save').onclick = () => {
+    const newName  = pedit.querySelector('#ed-name').value.trim();
+    const newOwner = pedit.querySelector('#ed-owner').value.trim();
+    const newTags  = pedit.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const newKind  = pedit.querySelector('#ed-star').value;
+    const newPlanets = Array.from(planetList.querySelectorAll('.ed-body-row')).map(row => ({
+      name:          row.querySelector('.ed-b-name').value.trim() || 'Body',
+      type:          row.querySelector('.ed-b-type').value,
+      semi_major_AU: +parseFloat(row.querySelector('.ed-b-au').value).toFixed(3) || 1,
+      notes:         row.querySelector('.ed-b-notes').value.trim()
+    }));
+
+    const base = getCachedSystem(id) || { version:SYSGEN_VERSION, system_id:id, seeded:true };
+    const updated = { ...base, star:{ ...base.star, kind:newKind }, planets:newPlanets };
+    setCachedSystem(id, updated);
+
+    if (sys) {
+      if (newName) sys.name = newName;
+      sys.owner = newOwner || undefined;
+      sys.tags = newTags.length ? newTags : undefined;
+    }
+
+    showEditToast('Changes saved');
+    setTimeout(() => {
+      renderPanel(id, updated);
+      document.querySelector('#sp-tabs .tab[data-tab="overview"]')?.click();
+    }, 400);
+  };
+
+  /* ── delete system ── */
+  pedit.querySelector('#ed-delete-sys').onclick = () => {
+    const sysName = sys?.name || id;
+    if (!confirm(`Delete system "${sysName}"?\nThis also removes all lanes connected to it.`)) return;
+    /* remove lanes */
+    for (const key of [...lanesSet]) {
+      const [a,b] = key.split('::');
+      if (a === id || b === id) lanesSet.delete(key);
+    }
+    rebuildLinesVBOFromSet();
+    /* remove system */
+    const idx = systems.findIndex(s => s.id === id);
+    if (idx >= 0) systems.splice(idx, 1);
+    idToWorld.delete(id);
+    try { localStorage.removeItem(sysKey(id)); } catch {}
+    rebuildStarsVBO();
+    updateLaneCounts();
+    selectedId = null;
+    hidePanel();
   };
 }
 
-function planetEditorRow(p, i) {
-  const opt = (v, sel) => `<option value="${v}" ${sel===v?'selected':''}>${v}</option>`;
+function reindexPlanets(container) {
+  container.querySelectorAll('.ed-body-row').forEach((row, i) => {
+    const idx = row.querySelector('.ed-body-idx');
+    if (idx) idx.textContent = `${i + 1}`;
+  });
+}
+
+function planetEditorRow(p, i, planetTypes) {
   const pm  = getPlanetMeta(p.type);
+  const typeOpts = planetTypes.map(t => `<option value="${t}" ${p.type===t?'selected':''}>${t}</option>`).join('');
   return `
-  <div class="planetRow planet-row">
-    <div class="planet-row-head">
-      <span class="p-idx pIndex" style="display:flex;align-items:center;gap:6px;">
-        <span style="color:${pm.color};font-size:14px;">${pm.icon}</span>BODY ${i+1}
-      </span>
-      <button type="button" class="delPlanet pbtn danger" style="padding:3px 8px;">REMOVE</button>
+  <div class="ed-body-row" style="transition:opacity .15s;">
+    <div class="ed-body-head">
+      <span class="ed-body-icon" style="color:${pm.color};">${pm.icon}</span>
+      <span class="ed-body-idx">${i+1}</span>
+      <span class="ed-body-preview">${p.name || 'Body'} <span class="ed-body-au-hint">${p.semi_major_AU ?? '?'} AU</span></span>
+      <span class="ed-body-chevron">▾</span>
+      <button type="button" class="ed-body-del" title="Remove body">✕</button>
     </div>
-    <div class="planet-row-body">
-      <div class="form-row"><span class="fl">Name</span><input class="pName sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/></div>
-      <div class="form-row"><span class="fl">Type</span><select class="pType sci-select">
-        ${opt('Rocky',p.type)}${opt('Ice',p.type)}${opt('Gas',p.type)}${opt('Ocean',p.type)}
-        ${opt('Desert',p.type)}${opt('Shield World',p.type)}${opt('Ecumenopolis',p.type)}
-        ${opt('Installation',p.type)}${opt('Habitat',p.type)}
-      </select></div>
-      <div class="form-row"><span class="fl">Orbit (AU)</span><input class="pSMA sci-input" type="number" step="0.01" min="0.01" value="${p.semi_major_AU ?? 1}"/></div>
-      <div class="form-row"><span class="fl">Notes</span><input class="pNotes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}"/></div>
+    <div class="ed-body-fields">
+      <div class="form-row"><span class="fl">Name</span><input class="ed-b-name sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/></div>
+      <div class="form-row"><span class="fl">Type</span><select class="ed-b-type sci-select">${typeOpts}</select></div>
+      <div class="form-row"><span class="fl">Orbit AU</span><input class="ed-b-au sci-input" type="number" step="0.001" min="0.001" value="${p.semi_major_AU ?? 1}"/></div>
+      <div class="form-row"><span class="fl">Notes</span><input class="ed-b-notes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" placeholder="optional..."/></div>
     </div>
   </div>`;
+}
+
+function showEditToast(msg) {
+  const el = document.getElementById('ed-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 1800);
+}
+
+function updateLaneCounts() {
+  const sbLanes = document.getElementById('sb-lanes-ct');
+  if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
 }
 
 function projectToScreen(x, y, z, mvp) {
@@ -1335,6 +1512,7 @@ function loop() {
   const t = (performance.now() - t0) * 0.001;
   if (hoveredNow) drawHalo(hoveredNow, 34.0, t,        [0.35,0.95,1.0], [1.0,0.95,0.50]);
   if (selectedId) drawHalo(selectedId, 42.0, t*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.70]);
+  if (window._lanePickA) drawHalo(window._lanePickA, 38.0, t*1.5, [0.15,0.65,0.78], [0.4,0.85,1.0]);
 
   updateFleetMapIcons(mvp);
 
