@@ -233,10 +233,26 @@ let haloVBO = null;
 const t0 = performance.now();
 
 let editorOK = sessionStorage.getItem('starmap_editor_ok') === '1';
+let _editorPW = null;
+
+(async function loadEditorPW() {
+  try {
+    const r = await fetch('./editor.json', { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      if (typeof d.pw === 'string' && d.pw.length) _editorPW = d.pw;
+    }
+  } catch {}
+})();
+
 function requireEditor() {
   if (editorOK) return true;
+  if (_editorPW === null) {
+    alert('Editor not available.');
+    return false;
+  }
   const pw = prompt('Enter editor password:');
-  if (pw === '1776') {
+  if (pw === _editorPW) {
     editorOK = true;
     sessionStorage.setItem('starmap_editor_ok', '1');
     updateHUD();
@@ -491,7 +507,7 @@ let orreryData  = null;
 let orrerySpeed = 1;
 let orreryT     = 0;
 let lastTS      = null;
-const YEAR_SECS = 120;
+const YEAR_SECS = 40;
 
 orreryClose.onclick = closeOrrery;
 document.addEventListener('keydown', e => {
