@@ -572,7 +572,8 @@ function buildToolbar() {
     <button class="tb-btn" data-action="table" title="">⊞</button>
     <button class="tb-btn" data-action="hr" title="">―</button>
     <button class="tb-btn" data-action="link" title="">🔗</button>
-    <button class="tb-btn" data-action="image" title="">🖼</button>
+    <button class="tb-btn" data-action="image-upload" title="">🖼</button>
+    <input type="file" id="tb-img-upload" accept="image/*" style="display:none;" multiple/>
     <div class="tb-sep"></div>
     <button class="tb-btn" data-cmd="removeFormat" title="">✕</button>
   </div>`;
@@ -607,9 +608,8 @@ function wireToolbar() {
     } else if (action === 'link') {
       const url = prompt('URL:','https://');
       if (url) document.execCommand('createLink', false, url);
-    } else if (action === 'image') {
-      const url = prompt('Image URL:','https://');
-      if (url) document.execCommand('insertHTML', false, '<img src="'+url.replace(/"/g,'&quot;')+'" alt="image"/>');
+    } else if (action === 'image-upload') {
+      document.getElementById('tb-img-upload').click();
     } else if (action === 'blockquote') {
       document.execCommand('formatBlock', false, '<blockquote>');
     } else if (action === 'code') {
@@ -624,6 +624,84 @@ function wireToolbar() {
         }
       }
     }
+  });
+
+  /* ── File upload handler for images ── */
+  const fileInput = document.getElementById('tb-img-upload');
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files);
+      files.forEach(f => insertImageFile(f));
+      fileInput.value = '';
+    });
+  }
+}
+
+/* ── Image utilities ── */
+const MAX_IMG_WIDTH = 800;
+const MAX_IMG_BYTES = 400000; // aim for <400KB per image to preserve localStorage space
+
+function insertImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      let dataUrl;
+      if (img.width > MAX_IMG_WIDTH || file.size > MAX_IMG_BYTES) {
+        dataUrl = resizeImage(img, MAX_IMG_WIDTH);
+      } else {
+        dataUrl = reader.result;
+      }
+      const ed = document.getElementById('editor-area');
+      ed.focus();
+      document.execCommand('insertHTML', false, '<img src="'+dataUrl.replace(/"/g,'&quot;')+'" alt="'+esc(file.name)+'"/><p><br></p>');
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resizeImage(img, maxW) {
+  const ratio = Math.min(maxW / img.width, 1);
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  // try webp first for smaller size, fall back to jpeg
+  let dataUrl = cvs.toDataURL('image/webp', 0.82);
+  if (dataUrl.length < 50) dataUrl = cvs.toDataURL('image/jpeg', 0.82);
+  return dataUrl;
+}
+
+function setupEditorImageHandlers(editorEl) {
+  /* ── Drag & drop images into editor ── */
+  editorEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  editorEl.addEventListener('drop', e => {
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    e.preventDefault();
+    files.forEach(f => insertImageFile(f));
+  });
+
+  /* ── Paste images from clipboard ── */
+  editorEl.addEventListener('paste', ev => {
+    const items = Array.from(ev.clipboardData.items || []);
+    const imageItems = items.filter(i => i.type.startsWith('image/'));
+    if (imageItems.length) {
+      ev.preventDefault();
+      imageItems.forEach(item => {
+        const file = item.getAsFile();
+        if (file) insertImageFile(file);
+      });
+      return;
+    }
+    // fallback: paste HTML or text
+    ev.preventDefault();
+    const html = ev.clipboardData.getData('text/html') || ev.clipboardData.getData('text/plain');
+    document.execCommand('insertHTML', false, html);
   });
 }
 
@@ -814,11 +892,7 @@ function editEntry(id, tpl) {
     else { main.innerHTML = ''; activeId = null; }
   };
 
-  document.getElementById('editor-area').addEventListener('paste', ev => {
-    ev.preventDefault();
-    const text = ev.clipboardData.getData('text/html') || ev.clipboardData.getData('text/plain');
-    document.execCommand('insertHTML', false, text);
-  });
+  setupEditorImageHandlers(document.getElementById('editor-area'));
 }
 
 function statRow(key, val, idx) {
