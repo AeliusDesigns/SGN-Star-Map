@@ -116,7 +116,7 @@
     .sci-select option{background:#080d18;}
     .sci-textarea{min-height:120px;resize:vertical;font-size:13px;line-height:1.6;}
 
-    .form-row{display:grid;grid-template-columns:90px 1fr;gap:6px 10px;align-items:center;margin-bottom:8px;}
+    .form-row{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;margin-bottom:8px;}
     .fl{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
     .edit-section{margin-bottom:18px;}
     .edit-section-title{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
@@ -389,7 +389,7 @@ function viewEntry(id) {
 
   let statsHTML = '';
   if (e.stats && e.stats.length) {
-    const statsLabel = cat === 'technology' ? 'Technical Summary' : 'Specifications';
+    const statsLabel = {technology:'Technical Summary',ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance'}[cat] || 'Specifications';
     statsHTML = `<div class="dossier-section-label">${statsLabel}</div>
       <div class="dossier-stats">${e.stats.map(s => `
         <div class="dossier-stat">
@@ -399,25 +399,25 @@ function viewEntry(id) {
       </div>`;
   }
 
-  /* ── Technology-specific header fields ── */
-  let techHeaderHTML = '';
-  if (cat === 'technology') {
+  /* ── Structured metadata header (tech + ship/vehicle/soldier) ── */
+  let metaHeaderHTML = '';
+  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
     const fields = [
       e.opStatus   ? ['Operational Status', e.opStatus] : null,
       e.accessLevel? ['Access Level', e.accessLevel] : null,
       e.origin     ? ['Origin', e.origin] : null,
     ].filter(Boolean);
     if (fields.length) {
-      techHeaderHTML = `<div class="dossier-tech-meta">
+      metaHeaderHTML = `<div class="dossier-tech-meta">
         ${fields.map(([k,v]) => `<div class="dossier-tech-row"><span class="dossier-tech-key">${esc(k)}</span><span class="dossier-tech-val">${esc(v)}</span></div>`).join('')}
       </div>`;
     }
   }
 
-  /* ── Technology document footer ── */
-  let techFooterHTML = '';
-  if (cat === 'technology' && (e.docClass || e.revision)) {
-    techFooterHTML = `<div class="dossier-doc-footer">
+  /* ── Document classification footer (tech + ship/vehicle/soldier) ── */
+  let docFooterHTML = '';
+  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier') && (e.docClass || e.revision)) {
+    docFooterHTML = `<div class="dossier-doc-footer">
       ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
       ${e.revision ? `<div class="dossier-doc-rev">Revision: ${esc(e.revision)}</div>` : ''}
     </div>`;
@@ -451,12 +451,12 @@ function viewEntry(id) {
       <div class="dossier-title">${esc(e.title || 'Untitled')}</div>
       <div class="dossier-subtitle">${esc(e.designation || '')}</div>
       <div class="dossier-divider${divAccent}"></div>
-      ${techHeaderHTML}
+      ${metaHeaderHTML}
       ${loreHeaderHTML}
       ${e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
       ${statsHTML}
       ${e.body ? `<div class="dossier-divider${divAccent}"></div><div class="dossier-body">${e.body}</div>` : ''}
-      ${techFooterHTML}
+      ${docFooterHTML}
       <div class="dossier-actions">
         <button class="pbtn primary" id="d-edit">✎ EDIT</button>
         <button class="pbtn" id="d-dup">⧉ DUPLICATE</button>
@@ -662,26 +662,45 @@ function editEntry(id, tpl) {
       </div>
     `;
   } else if (cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
-    const detailLabel = {ship:'Ship',vehicle:'Vehicle',soldier:'Unit'}[cat] || 'Entry';
+    const detailLabel = {ship:'Ship Identification',vehicle:'Vehicle Identification',soldier:'Unit Identification'}[cat];
+    const desigPlaceholder = {ship:'e.g. Thalasrën-Class Light Frigate — Troop Transport & Close-Support Frigate',vehicle:'e.g. Velendril "Wardancer" — Tracked IFV / Mechanized Assault Carrier',soldier:'e.g. Caelyndor Marinyr Clone Trooper Corps (CM-CTC)'}[cat];
+    const classPlaceholder = {ship:'e.g. Light Frigate / Troop Transport / Close Bombardment Support',vehicle:'e.g. Infantry Fighting Vehicle / Mechanized Assault Carrier',soldier:'e.g. Elite Naval Infantry / Biogenic Troopers'}[cat];
+    const rolePlaceholder = {ship:'e.g. Fast, well-protected troop transport and close-support combatant...',vehicle:'e.g. Protected mechanized transport and close-support IFV...',soldier:'e.g. Shipborne assault infantry designed for void operations, hull breaching...'}[cat];
+    const statsLabel = {ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance Metrics'}[cat];
     const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
     templateFields = `
       <div class="edit-section">
-        <div class="edit-section-title">${detailLabel} Details</div>
-        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. Single-Seat Interceptor"/></div>
-        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Tactical Interceptor / Light Escort"/></div>
-        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;">${esc(e.role||'')}</textarea></div>
+        <div class="edit-section-title">${detailLabel}</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="${desigPlaceholder}"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="${classPlaceholder}"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${esc(e.opStatus||'')}" placeholder="e.g. Active Service — AEN Fleet Standard"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Restricted — AEN Command & Engineering Division Only"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Calandorë Orbital Shipworks"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="${rolePlaceholder}">${esc(e.role||'')}</textarea></div>
       </div>
       <div class="edit-section">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Specifications</div>
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">${statsLabel}</div>
           <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ STAT</button>
         </div>
         <div id="stat-list">${statsHTML}</div>
       </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — MEDICAL & BIOLOGICS COMMAND"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. VANY-CMCTC-001-B"/></div>
+      </div>
     `;
   }
 
-  const bodyLabel = {technology:'System Overview / Capabilities / Security',lore:'Full Account',freeform:'Content'}[cat] || 'Extended Content';
+  const bodyLabel = {
+    technology:'System Overview / Capabilities / Security',
+    lore:'Full Account',
+    freeform:'Content',
+    ship:'Purpose / Armament / Armor / Systems / Complement',
+    vehicle:'Purpose / Armament / Armor / Defensive Systems / Crew Support',
+    soldier:'Overview / Enhancements / Equipment / Safeguards'
+  }[cat] || 'Extended Content';
 
   main.innerHTML = `
     <div class="editor-page">
