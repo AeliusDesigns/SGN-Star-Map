@@ -95,7 +95,7 @@ function makeProgram(vsSrc, fsSrc) {
    SHADERS
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Fullscreen background quad (nebula + dust) ── */
+/* ── Background nebula + star dust ── */
 const VS_BG = `
 attribute vec2 position;
 varying vec2 vUV;
@@ -110,110 +110,61 @@ uniform float uTime;
 uniform vec2 uRes;
 uniform vec3 uPan;
 uniform float uZoom;
-
-// simplex-ish hash noise
-vec3 hash3(vec3 p){
-  p = vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6)));
-  return fract(sin(p)*43758.5453123);
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){
+  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+             mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
 }
-float noise(vec3 p){
-  vec3 i=floor(p), f=fract(p);
-  f=f*f*(3.0-2.0*f);
-  float a=dot(hash3(i),f-vec3(0,0,0)),
-        b=dot(hash3(i+vec3(1,0,0)),f-vec3(1,0,0)),
-        c=dot(hash3(i+vec3(0,1,0)),f-vec3(0,1,0)),
-        d=dot(hash3(i+vec3(1,1,0)),f-vec3(1,1,0)),
-        e=dot(hash3(i+vec3(0,0,1)),f-vec3(0,0,1)),
-        ff=dot(hash3(i+vec3(1,0,1)),f-vec3(1,0,1)),
-        g=dot(hash3(i+vec3(0,1,1)),f-vec3(0,1,1)),
-        h=dot(hash3(i+vec3(1,1,1)),f-vec3(1,1,1));
-  return mix(mix(mix(a,b,f.x),mix(c,d,f.x),f.y),
-             mix(mix(e,ff,f.x),mix(g,h,f.x),f.y),f.z);
-}
-float fbm(vec3 p){
+float fbm(vec2 p){
   float v=0.0, a=0.5;
-  for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.1; a*=0.48; }
+  mat2 rot = mat2(0.8,-0.6,0.6,0.8);
+  for(int i=0;i<6;i++){ v+=a*noise(p); p=rot*p*2.0; a*=0.5; }
   return v;
 }
-
 void main(){
   vec2 uv = vUV;
   vec2 aspect = vec2(uRes.x/uRes.y, 1.0);
-  // parallax offset based on camera pan/zoom
-  vec2 off = uPan.xy * 0.0003 / max(uZoom, 0.1);
-  vec3 p = vec3((uv - 0.5) * aspect * 2.0 + off, uTime * 0.008);
+  vec2 off = uPan.xy * 0.0002;
+  vec2 p = (uv - 0.5) * aspect * 2.5 + off;
 
-  // nebula layers
-  float n1 = fbm(p * 0.8 + vec3(0.0, 0.0, uTime*0.003));
-  float n2 = fbm(p * 1.6 + vec3(5.0, 3.0, uTime*0.005));
-  float n3 = fbm(p * 3.2 + vec3(10.0, 7.0, 0.0));
+  // subtle nebula — dark blues and teals, very subdued
+  float n1 = fbm(p * 0.7 + uTime * 0.004);
+  float n2 = fbm(p * 1.4 + vec2(5.0,3.0) + uTime * 0.006);
+  float n3 = fbm(p * 2.8 + vec2(10.0,7.0));
 
-  // color channels — deep blue / teal / violet
-  vec3 c1 = vec3(0.02, 0.06, 0.16) * (0.6 + 0.4 * n1);  // deep blue base
-  vec3 c2 = vec3(0.04, 0.12, 0.18) * n2 * 0.7;           // teal wisps
-  vec3 c3 = vec3(0.08, 0.03, 0.14) * n3 * 0.5;           // violet streaks
-  vec3 col = c1 + c2 + c3;
+  vec3 col = vec3(0.018, 0.028, 0.06);                    // base void
+  col += vec3(0.01, 0.04, 0.08) * smoothstep(0.3,0.7,n1); // blue clouds
+  col += vec3(0.02, 0.05, 0.06) * smoothstep(0.4,0.8,n2) * 0.5; // teal wisps
+  col += vec3(0.04, 0.01, 0.06) * smoothstep(0.5,0.9,n3) * 0.3; // faint violet
 
-  // subtle vignette
-  float vig = 1.0 - 0.5 * length((uv - 0.5) * 1.6);
-  col *= vig;
+  // vignette
+  col *= 1.0 - 0.4 * length((uv - 0.5) * 1.4);
 
-  // star dust particles (static tiny dots)
-  vec2 grid = fract(uv * 180.0 + off * 50.0);
-  vec2 id = floor(uv * 180.0 + off * 50.0);
-  float rnd = fract(sin(dot(id, vec2(12.9898, 78.233))) * 43758.5453);
-  float rnd2 = fract(sin(dot(id, vec2(63.7264, 10.873))) * 43758.5453);
-  float star = smoothstep(0.97 + rnd2 * 0.025, 1.0, 1.0 - length(grid - 0.5) * 2.0);
-  star *= step(0.92, rnd);
-  float twinkle = 0.6 + 0.4 * sin(uTime * (1.5 + rnd * 3.0) + rnd * 6.28);
-  col += star * twinkle * vec3(0.5 + rnd2 * 0.5, 0.6 + rnd * 0.4, 0.8) * 0.3;
+  // star dust — tiny static dots
+  vec2 grid = floor(uv * 220.0 + off * 60.0);
+  float rnd = hash(grid);
+  float rnd2 = hash(grid + 99.0);
+  vec2 cell = fract(uv * 220.0 + off * 60.0);
+  float d = length(cell - 0.5);
+  float star = smoothstep(0.02, 0.0, d - 0.005) * step(0.94, rnd);
+  float twinkle = 0.5 + 0.5 * sin(uTime * (1.0 + rnd2 * 4.0) + rnd * 6.28);
+  col += star * twinkle * vec3(0.4 + rnd2*0.3, 0.5 + rnd*0.3, 0.7) * 0.25;
 
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-/* ── Lane glow shader ── */
-const VS_LANES = `
+/* ── Simple lines (for lanes) ── */
+const VS_LINES = `
 attribute vec3 position;
-attribute vec3 aOther;
-attribute float aSide;
 uniform mat4 uMVP;
-uniform vec2 uRes;
-uniform float uWidth;
-varying float vEdge;
-varying float vAlong;
-void main(){
-  vec4 a = uMVP * vec4(position, 1.0);
-  vec4 b = uMVP * vec4(aOther, 1.0);
-  vec2 sa = (a.xy / a.w) * uRes * 0.5;
-  vec2 sb = (b.xy / b.w) * uRes * 0.5;
-  vec2 dir = normalize(sb - sa);
-  vec2 norm = vec2(-dir.y, dir.x);
-  vec2 offset = norm * aSide * uWidth;
-  a.xy += offset * (2.0 * a.w / uRes);
-  gl_Position = a;
-  vEdge = aSide;
-  vAlong = length(sa - sb) > 0.01 ? dot(sa - sb, dir) / length(sb - sa) : 0.0;
-}`;
-const FS_LANES = `
+void main(){ gl_Position = uMVP * vec4(position, 1.0); }`;
+const FS_LINES = `
 precision mediump float;
-varying float vEdge;
-varying float vAlong;
-uniform float uTime;
-uniform vec3 uColor;
-void main(){
-  float d = abs(vEdge);
-  // core bright line
-  float core = exp(-d * d * 40.0) * 0.9;
-  // softer glow
-  float glow = exp(-d * d * 8.0) * 0.35;
-  // energy flow pulse
-  float pulse = 0.8 + 0.2 * sin(vAlong * 12.0 - uTime * 2.5);
-  float alpha = (core + glow) * pulse;
-  vec3 col = uColor * (1.0 + core * 1.5);
-  gl_FragColor = vec4(col, alpha);
-}`;
+uniform vec4 uColor;
+void main(){ gl_FragColor = uColor; }`;
 
-/* ── Star point shader (enhanced) ── */
+/* ── Star points ── */
 const VS_POINTS = `
 attribute vec3 position;
 attribute vec3 aColor;
@@ -231,44 +182,29 @@ varying vec3 vColor;
 void main(){
   vec2 uv = gl_PointCoord * 2.0 - 1.0;
   float r = length(uv);
-  float angle = atan(uv.y, uv.x);
+  float ang = atan(uv.y, uv.x);
 
-  // bright white core
-  float core = exp(-r * r * 18.0);
-  // inner color halo
-  float inner = exp(-r * r * 4.0) * 0.55;
-  // outer soft glow
-  float outer = exp(-r * r * 1.2) * 0.2;
+  // bright white core with gaussian falloff
+  float core = exp(-r * r * 22.0);
+  // colored inner glow
+  float inner = exp(-r * r * 5.0) * 0.5;
+  // soft outer glow
+  float outer = exp(-r * r * 1.5) * 0.18;
 
-  // 6-point diffraction spikes
+  // 4-point diffraction spikes (subtle, thin)
   float spike = 0.0;
-  for(int i = 0; i < 3; i++){
-    float a = angle + float(i) * 1.0472; // 60 degree spacing
-    float s = abs(sin(a));
-    spike += exp(-s * s * 600.0) * exp(-r * 1.5) * 0.3;
-  }
+  spike += exp(-pow(abs(uv.x), 0.8) * 80.0) * exp(-r * 2.0) * 0.25;
+  spike += exp(-pow(abs(uv.y), 0.8) * 80.0) * exp(-r * 2.0) * 0.25;
 
-  // chromatic ring
-  float ring = smoothstep(0.28, 0.32, r) * smoothstep(0.42, 0.36, r) * 0.15;
-
-  float alpha = clamp(core + inner + outer + spike + ring, 0.0, 1.0);
-  vec3 white = vec3(1.0, 0.98, 0.95);
-  vec3 col = mix(vColor, white, core * 0.85 + spike * 0.5) * (1.0 + core * 2.0);
-  // chromatic ring tint
-  col += vColor * ring * 3.0;
+  float alpha = clamp(core + inner + outer + spike, 0.0, 1.0);
+  vec3 white = vec3(1.0, 0.98, 0.94);
+  vec3 col = mix(vColor, white, core * 0.8) * (1.0 + core * 2.0);
+  col += vColor * outer * 2.0;
 
   gl_FragColor = vec4(col, alpha);
 }`;
 
-const VS_LINES_SIMPLE = `
-attribute vec3 position;
-uniform mat4 uMVP;
-void main(){ gl_Position = uMVP * vec4(position, 1.0); }`;
-const FS_LINES_SIMPLE = `
-precision mediump float;
-uniform vec3 uColor;
-void main(){ gl_FragColor = vec4(uColor, 1.0); }`;
-
+/* ── Halo rings ── */
 const VS_HALO = `
 attribute vec3 position;
 uniform mat4 uMVP;
@@ -296,52 +232,40 @@ void main(){
   gl_FragColor = vec4(col, alpha);
 }`;
 
-/* ── Compile all programs ── */
+/* ── Compile programs ── */
 const progBG     = makeProgram(VS_BG, FS_BG);
 const progPoints = makeProgram(VS_POINTS, FS_POINTS);
-const progLanes  = makeProgram(VS_LANES, FS_LANES);
-const progLinesSi= makeProgram(VS_LINES_SIMPLE, FS_LINES_SIMPLE);
+const progLines  = makeProgram(VS_LINES, FS_LINES);
 const progHalo   = makeProgram(VS_HALO, FS_HALO);
 
-/* BG uniforms */
-const uTimeBG  = gl.getUniformLocation(progBG, 'uTime');
-const uResBG   = gl.getUniformLocation(progBG, 'uRes');
-const uPanBG   = gl.getUniformLocation(progBG, 'uPan');
-const uZoomBG  = gl.getUniformLocation(progBG, 'uZoom');
-const aPosB    = gl.getAttribLocation(progBG, 'position');
-// fullscreen quad
-const bgVBO = gl.createBuffer();
+/* BG */
+const uTimeBG = gl.getUniformLocation(progBG, 'uTime');
+const uResBG  = gl.getUniformLocation(progBG, 'uRes');
+const uPanBG  = gl.getUniformLocation(progBG, 'uPan');
+const uZoomBG = gl.getUniformLocation(progBG, 'uZoom');
+const aPosB   = gl.getAttribLocation(progBG, 'position');
+const bgVBO   = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, bgVBO);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 
-/* Points uniforms */
+/* Points */
 const aPos_points   = gl.getAttribLocation(progPoints, 'position');
 const aColor_points = gl.getAttribLocation(progPoints, 'aColor');
 const aSize_points  = gl.getAttribLocation(progPoints, 'aSize');
 const uMVP_points   = gl.getUniformLocation(progPoints, 'uMVP');
 
-/* Lane glow uniforms */
-const aPos_lanes   = gl.getAttribLocation(progLanes, 'position');
-const aOther_lanes = gl.getAttribLocation(progLanes, 'aOther');
-const aSide_lanes  = gl.getAttribLocation(progLanes, 'aSide');
-const uMVP_lanes   = gl.getUniformLocation(progLanes, 'uMVP');
-const uRes_lanes   = gl.getUniformLocation(progLanes, 'uRes');
-const uWidth_lanes = gl.getUniformLocation(progLanes, 'uWidth');
-const uTime_lanes  = gl.getUniformLocation(progLanes, 'uTime');
-const uColor_lanes = gl.getUniformLocation(progLanes, 'uColor');
-
-/* Simple lines (fallback) */
-const aPos_lines    = gl.getAttribLocation(progLinesSi, 'position');
-const uMVP_lines    = gl.getUniformLocation(progLinesSi, 'uMVP');
-const uColorLines   = gl.getUniformLocation(progLinesSi, 'uColor');
+/* Lines */
+const aPos_lines  = gl.getAttribLocation(progLines, 'position');
+const uMVP_lines  = gl.getUniformLocation(progLines, 'uMVP');
+const uColorLines = gl.getUniformLocation(progLines, 'uColor');
 
 /* Halo */
-const aPos_halo   = gl.getAttribLocation(progHalo, 'position');
-const uMVP_halo   = gl.getUniformLocation(progHalo, 'uMVP');
-const uPix_halo   = gl.getUniformLocation(progHalo, 'uPixelSize');
-const uTime_halo  = gl.getUniformLocation(progHalo, 'uTime');
-const uColGlow    = gl.getUniformLocation(progHalo, 'uColGlow');
-const uColCore    = gl.getUniformLocation(progHalo, 'uColCore');
+const aPos_halo  = gl.getAttribLocation(progHalo, 'position');
+const uMVP_halo  = gl.getUniformLocation(progHalo, 'uMVP');
+const uPix_halo  = gl.getUniformLocation(progHalo, 'uPixelSize');
+const uTime_halo = gl.getUniformLocation(progHalo, 'uTime');
+const uColGlow   = gl.getUniformLocation(progHalo, 'uColGlow');
+const uColCore   = gl.getUniformLocation(progHalo, 'uColCore');
 
 let yaw = 0, pitch = 0, dist = 1800;
 let dragging = false, dragMoved = false, lx = 0, ly = 0;
@@ -1623,7 +1547,7 @@ function rebuildStarsVBO() {
   for (const sys of systems) {
     const p = idToWorld.get(sys.id); if (!p) continue;
     const { color, size } = getStarVisuals(sys.id);
-    verts.push(p[0], p[1], p[2], color[0], color[1], color[2], size * dpr * 3.2);
+    verts.push(p[0], p[1], p[2], color[0], color[1], color[2], size * dpr * 2.8);
   }
   starCount = verts.length / 7;
   if (!starsVBO) starsVBO = gl.createBuffer();
@@ -1633,35 +1557,17 @@ function rebuildStarsVBO() {
 
 function rebuildLinesVBOFromSet() {
   const verts = [];
-  const glowVerts = [];
   for (const key of lanesSet) {
     const [a,b] = key.split('::');
     const pa = idToWorld.get(a), pb = idToWorld.get(b);
     if (!pa || !pb) continue;
     verts.push(pa[0],pa[1],pa[2], pb[0],pb[1],pb[2]);
-    // glow quad: 2 triangles (6 verts), each with position + otherEnd + side (-1 or +1)
-    // pos(3) + other(3) + side(1) = 7 floats per vert
-    const ax=pa[0],ay=pa[1],az=pa[2], bx=pb[0],by=pb[1],bz=pb[2];
-    // tri 1: A-left, A-right, B-left
-    glowVerts.push(ax,ay,az,bx,by,bz,-1.0);
-    glowVerts.push(ax,ay,az,bx,by,bz, 1.0);
-    glowVerts.push(bx,by,bz,ax,ay,az,-1.0);
-    // tri 2: A-right, B-right, B-left
-    glowVerts.push(ax,ay,az,bx,by,bz, 1.0);
-    glowVerts.push(bx,by,bz,ax,ay,az, 1.0);
-    glowVerts.push(bx,by,bz,ax,ay,az,-1.0);
   }
   lineVertCount = verts.length / 3;
   if (!linesVBO) linesVBO = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-
-  laneGlowCount = glowVerts.length / 7;
-  if (!laneGlowVBO) laneGlowVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, laneGlowVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(glowVerts), gl.STATIC_DRAW);
 }
-let laneGlowVBO = null, laneGlowCount = 0;
 
 function loop() {
   const W = canvas.width, H = canvas.height;
@@ -1687,37 +1593,28 @@ function loop() {
 
   gl.enable(gl.BLEND);
 
-  /* ── 2. Lane glow (quad-expanded) ── */
-  if (laneGlowVBO && laneGlowCount > 0) {
-    gl.useProgram(progLanes);
-    gl.uniformMatrix4fv(uMVP_lanes, false, mvp);
-    gl.uniform2f(uRes_lanes, W, H);
-    gl.uniform1f(uWidth_lanes, 4.0 * (window.devicePixelRatio || 1));
-    gl.uniform1f(uTime_lanes, wallTime);
-    gl.uniform3f(uColor_lanes, 0.15, 0.65, 0.78);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.bindBuffer(gl.ARRAY_BUFFER, laneGlowVBO);
-    const lStride = 7 * 4;
-    gl.enableVertexAttribArray(aPos_lanes);
-    gl.vertexAttribPointer(aPos_lanes, 3, gl.FLOAT, false, lStride, 0);
-    gl.enableVertexAttribArray(aOther_lanes);
-    gl.vertexAttribPointer(aOther_lanes, 3, gl.FLOAT, false, lStride, 3*4);
-    gl.enableVertexAttribArray(aSide_lanes);
-    gl.vertexAttribPointer(aSide_lanes, 1, gl.FLOAT, false, lStride, 6*4);
-    gl.drawArrays(gl.TRIANGLES, 0, laneGlowCount);
-    gl.disableVertexAttribArray(aOther_lanes);
-    gl.disableVertexAttribArray(aSide_lanes);
-  }
-
-  /* ── 2b. Lane core lines ── */
+  /* ── 2. Lanes — multi-pass glow using simple GL_LINES ── */
   if (linesVBO && lineVertCount > 0) {
-    gl.useProgram(progLinesSi);
+    gl.useProgram(progLines);
     gl.uniformMatrix4fv(uMVP_lines, false, mvp);
-    gl.uniform3f(uColorLines, 0.22, 0.75, 0.88);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
     gl.enableVertexAttribArray(aPos_lines);
     gl.vertexAttribPointer(aPos_lines, 3, gl.FLOAT, false, 0, 0);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    // outer glow pass (dim, wide if supported)
+    gl.uniform4f(uColorLines, 0.10, 0.50, 0.65, 0.12);
+    gl.lineWidth(3.0);
+    gl.drawArrays(gl.LINES, 0, lineVertCount);
+
+    // mid glow
+    gl.uniform4f(uColorLines, 0.15, 0.60, 0.75, 0.30);
+    gl.lineWidth(2.0);
+    gl.drawArrays(gl.LINES, 0, lineVertCount);
+
+    // core line (bright)
+    gl.uniform4f(uColorLines, 0.25, 0.80, 0.95, 0.65);
+    gl.lineWidth(1.0);
     gl.drawArrays(gl.LINES, 0, lineVertCount);
   }
 
