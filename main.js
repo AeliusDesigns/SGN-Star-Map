@@ -209,6 +209,7 @@ addEventListener('mousemove', e => {
   }
 });
 addEventListener('wheel', e => {
+  if (e.target.closest('#sidePanel') || e.target.closest('#orrery-modal')) return;
   dist *= (1 + Math.sign(e.deltaY) * 0.12);
   dist = Math.max(300, Math.min(6000, dist));
 });
