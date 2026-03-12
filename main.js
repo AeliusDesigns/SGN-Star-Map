@@ -414,6 +414,7 @@ function saveMapState() {
     const saved = localStorage.getItem(MAP_STORE_KEY);
     if (saved) {
       await initFromData(JSON.parse(saved));
+      await loadSolarSystems();
       return;
     }
   } catch {}
@@ -425,7 +426,27 @@ function saveMapState() {
   } catch {
     await initFromData(DEFAULT_DATA);
   }
+  await loadSolarSystems();
 })();
+
+async function loadSolarSystems() {
+  /* For each system, if we don't have detail in localStorage, try solar_systems.json */
+  let fileSolarData = null;
+  for (const sys of systems) {
+    if (getCachedSystem(sys.id)) continue; // already have it
+    /* lazy-load the file only once */
+    if (fileSolarData === null) {
+      try {
+        const r = await fetch('./solar_systems.json', { cache: 'no-store' });
+        if (r.ok) fileSolarData = await r.json();
+        else fileSolarData = {};
+      } catch { fileSolarData = {}; }
+    }
+    if (fileSolarData[sys.id]) {
+      setCachedSystem(sys.id, fileSolarData[sys.id]);
+    }
+  }
+}
 
 async function initFromData(data) {
   imgW = data?.image_size?.width  ?? 1090;
@@ -586,7 +607,8 @@ document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrer
 
 document.getElementById('sb-save-repo').onclick = () => {
   if (!requireEditor()) return;
-  /* systems.json — the canonical map file */
+
+  /* systems.json — map nodes + lanes */
   const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
   const sysBlob = new Blob([JSON.stringify({ image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut }, null, 2)], { type:'application/json' });
   const a1 = document.createElement('a');
@@ -594,12 +616,25 @@ document.getElementById('sb-save-repo').onclick = () => {
   a1.download = 'systems.json';
   a1.click();
   URL.revokeObjectURL(a1.href);
+
+  /* solar_systems.json — all star/planet/body compositions */
+  const solarData = {};
+  for (const sys of systems) {
+    const det = getCachedSystem(sys.id);
+    if (det) solarData[sys.id] = det;
+  }
+  const solBlob = new Blob([JSON.stringify(solarData, null, 2)], { type:'application/json' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(solBlob);
+  a2.download = 'solar_systems.json';
+  setTimeout(() => { a2.click(); URL.revokeObjectURL(a2.href); }, 300);
+
   /* fleets.json */
   const fBlob = new Blob([JSON.stringify(fleets, null, 2)], { type:'application/json' });
-  const a2 = document.createElement('a');
-  a2.href = URL.createObjectURL(fBlob);
-  a2.download = 'fleets.json';
-  setTimeout(() => { a2.click(); URL.revokeObjectURL(a2.href); }, 300);
+  const a3 = document.createElement('a');
+  a3.href = URL.createObjectURL(fBlob);
+  a3.download = 'fleets.json';
+  setTimeout(() => { a3.click(); URL.revokeObjectURL(a3.href); }, 600);
 };
 
 canvas.addEventListener('dblclick', async e => {
