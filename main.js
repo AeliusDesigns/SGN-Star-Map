@@ -320,8 +320,28 @@ const tip      = document.getElementById('tooltip');
 const tipName  = document.getElementById('tip-name');
 const tipId    = document.getElementById('tip-id');
 const tipOwner = document.getElementById('tip-owner');
+const cursorEl = document.getElementById('cursor-reticle');
 let mouseX = 0, mouseY = 0;
-addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+let cursorOnCanvas = false;
+addEventListener('mousemove', e => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  if (cursorEl) {
+    cursorEl.style.left = e.clientX + 'px';
+    cursorEl.style.top  = e.clientY + 'px';
+  }
+});
+canvas.addEventListener('mouseenter', () => { cursorOnCanvas = true; });
+canvas.addEventListener('mouseleave', () => { cursorOnCanvas = false; });
+canvas.addEventListener('mousedown', () => { if(cursorEl) cursorEl.classList.add('clicking'); });
+addEventListener('mouseup', () => { if(cursorEl) cursorEl.classList.remove('clicking'); });
+
+/* hide reticle when over any UI overlay */
+function updateCursorVisibility(e) {
+  if (!cursorEl) return;
+  const over = e.target.closest('#sidePanel, #hud, #statusBar, #orrery-modal');
+  cursorEl.style.display = over ? 'none' : 'block';
+}
+addEventListener('mousemove', updateCursorVisibility);
 
 let hoveredId = null;
 let selectedId = null;
@@ -1686,6 +1706,7 @@ function loop() {
       if (d2 < r2 && (best === null || d2 < best)) { best = d2; hoveredNow = sys.id; }
     }
     hoveredId = hoveredNow || null;
+    if (cursorEl) cursorEl.classList.toggle('hovering', !!hoveredNow);
     if (hoveredNow) {
       const sys = systems.find(s => s.id === hoveredNow);
       if (tipName)  tipName.textContent  = sys.name || sys.id;
