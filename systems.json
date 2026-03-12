@@ -291,7 +291,7 @@
     },
     {
       "id": "SGN-SYS-020",
-      "name": "System 020",
+      "name": "Vaelthir",
       "owner": "Arandorë Eldainë",
       "coords": {
         "x_norm": 0.40246,
@@ -546,7 +546,7 @@
     },
     {
       "id": "SGN-SYS-037",
-      "name": "System 037",
+      "name": "Anorvalas",
       "owner": "Arandorë Eldainë",
       "coords": {
         "x_norm": 0.782074,
@@ -1326,7 +1326,7 @@
     },
     {
       "id": "SYS_89",
-      "name": "Test",
+      "name": "Sylcalen Araneth",
       "coords": {
         "x_norm": 0.7922824360876781,
         "y_norm": 0.5690684099222962,
@@ -1334,7 +1334,8 @@
       },
       "tags": [
         "manmade"
-      ]
+      ],
+      "owner": "Arandorë Eldainë"
     }
   ],
   "lanes": [
