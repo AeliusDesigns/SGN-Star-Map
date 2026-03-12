@@ -1,1990 +1,914 @@
-const canvas = document.getElementById('gl');
-let gl = canvas.getContext('webgl2', { antialias: true });
-if (!gl) gl = canvas.getContext('webgl', { antialias: true });
-if (!gl) { alert('WebGL not supported'); throw new Error('WebGL not supported'); }
-
-function resize() {
-  canvas.width  = Math.floor(innerWidth);
-  canvas.height = Math.floor(innerHeight);
-  canvas.style.width  = innerWidth  + 'px';
-  canvas.style.height = innerHeight + 'px';
-  gl.viewport(0, 0, canvas.width, canvas.height);
-}
-addEventListener('resize', resize);
-resize();
-
-function mat4Mul(a, b) {
-  const o = new Float32Array(16);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
-    o[r*4+c] = a[r*4+0]*b[0*4+c] + a[r*4+1]*b[1*4+c] + a[r*4+2]*b[2*4+c] + a[r*4+3]*b[3*4+c];
-  return o;
-}
-function mat4Perspective(fovy, aspect, near, far) {
-  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
-  return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,(2*far*near)*nf,0]);
-}
-function mat4Translate(x, y, z) {
-  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
-}
-function mat4RotateY(a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
-}
-function mat4RotateX(a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
-}
-function mat4Invert(m) {
-  const a = m, out = new Float32Array(16);
-  const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
-        a10=a[4],a11=a[5],a12=a[6],a13=a[7],
-        a20=a[8],a21=a[9],a22=a[10],a23=a[11],
-        a30=a[12],a31=a[13],a32=a[14],a33=a[15];
-  const b00=a00*a11-a01*a10, b01=a00*a12-a02*a10, b02=a00*a13-a03*a10,
-        b03=a01*a12-a02*a11, b04=a01*a13-a03*a11, b05=a02*a13-a03*a12,
-        b06=a20*a31-a21*a30, b07=a20*a32-a22*a30, b08=a20*a33-a23*a30,
-        b09=a21*a32-a22*a31, b10=a21*a33-a23*a31, b11=a22*a33-a23*a32;
-  let det = b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;
-  if (!det) return null;
-  det = 1.0 / det;
-  out[0]  = ( a11*b11-a12*b10+a13*b09)*det;
-  out[1]  = (-a01*b11+a02*b10-a03*b09)*det;
-  out[2]  = ( a31*b05-a32*b04+a33*b03)*det;
-  out[3]  = (-a21*b05+a22*b04-a23*b03)*det;
-  out[4]  = (-a10*b11+a12*b08-a13*b07)*det;
-  out[5]  = ( a00*b11-a02*b08+a03*b07)*det;
-  out[6]  = (-a30*b05+a32*b02-a33*b01)*det;
-  out[7]  = ( a20*b05-a22*b02+a23*b01)*det;
-  out[8]  = ( a10*b10-a11*b08+a13*b06)*det;
-  out[9]  = (-a00*b10+a01*b08-a03*b06)*det;
-  out[10] = ( a30*b04-a31*b02+a33*b00)*det;
-  out[11] = (-a20*b04+a21*b02-a23*b00)*det;
-  out[12] = (-a10*b09+a11*b07-a12*b06)*det;
-  out[13] = ( a00*b09-a01*b07+a02*b06)*det;
-  out[14] = (-a30*b03+a31*b01-a32*b00)*det;
-  out[15] = ( a20*b03-a21*b01+a22*b00)*det;
-  return out;
-}
-function vec4MulMat(m, v) {
-  const x=v[0],y=v[1],z=v[2],w=v[3];
-  return new Float32Array([
-    m[0]*x+m[4]*y+m[8]*z +m[12]*w,
-    m[1]*x+m[5]*y+m[9]*z +m[13]*w,
-    m[2]*x+m[6]*y+m[10]*z+m[14]*w,
-    m[3]*x+m[7]*y+m[11]*z+m[15]*w
-  ]);
-}
-
-function compile(type, src) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src);
-  gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s);
-  return s;
-}
-function makeProgram(vsSrc, fsSrc) {
-  const p = gl.createProgram();
-  gl.attachShader(p, compile(gl.VERTEX_SHADER,   vsSrc));
-  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw gl.getProgramInfoLog(p);
-  return p;
-}
-
-const VS_POINTS = `
-attribute vec3 position;
-attribute vec3 aColor;
-attribute float aSize;
-uniform mat4 uMVP;
-varying vec3 vColor;
-void main(){
-  gl_Position = uMVP * vec4(position, 1.0);
-  gl_PointSize = aSize;
-  vColor = aColor;
-}`;
-const FS_POINTS = `
-precision mediump float;
-varying vec3 vColor;
-void main(){
-  vec2 uv = gl_PointCoord * 2.0 - 1.0;
-  float r = length(uv);
-  float core  = smoothstep(0.18, 0.0,  r);
-  float inner = smoothstep(0.55, 0.10, r) * 0.6;
-  float glow  = smoothstep(1.0,  0.0,  r) * 0.25;
-  float spike1 = smoothstep(0.04, 0.0, abs(uv.x)) * smoothstep(1.0, 0.1, r) * 0.35;
-  float spike2 = smoothstep(0.04, 0.0, abs(uv.y)) * smoothstep(1.0, 0.1, r) * 0.35;
-  float alpha = clamp(core + inner + glow + spike1 + spike2, 0.0, 1.0);
-  vec3 col = mix(vec3(1.0), vColor, 0.55) * (core * 2.5 + 1.0);
-  gl_FragColor = vec4(col, alpha);
-}`;
-const VS_LINES = `
-attribute vec3 position;
-uniform mat4 uMVP;
-void main(){ gl_Position = uMVP * vec4(position, 1.0); }`;
-const FS_LINES = `
-precision mediump float;
-uniform vec3 uColor;
-void main(){ gl_FragColor = vec4(uColor, 1.0); }`;
-
-const progPoints = makeProgram(VS_POINTS, FS_POINTS);
-const progLines  = makeProgram(VS_LINES,  FS_LINES);
-
-const aPos_points   = gl.getAttribLocation(progPoints, 'position');
-const aColor_points = gl.getAttribLocation(progPoints, 'aColor');
-const aSize_points  = gl.getAttribLocation(progPoints, 'aSize');
-const uMVP_points   = gl.getUniformLocation(progPoints, 'uMVP');
-const aPos_lines    = gl.getAttribLocation(progLines,  'position');
-const uMVP_lines    = gl.getUniformLocation(progLines, 'uMVP');
-const uColorLines   = gl.getUniformLocation(progLines, 'uColor');
-
-const VS_HALO = `
-attribute vec3 position;
-uniform mat4 uMVP;
-uniform float uPixelSize;
-void main(){
-  gl_Position = uMVP * vec4(position, 1.0);
-  gl_PointSize = uPixelSize;
-}`;
-const FS_HALO = `
-precision mediump float;
-uniform float uTime;
-uniform vec3 uColGlow;
-uniform vec3 uColCore;
-void main(){
-  vec2 uv = gl_PointCoord * 2.0 - 1.0;
-  float r = length(uv);
-  float inner = 0.55, outer = 0.85;
-  float ring = smoothstep(inner, inner+0.02, r) * (1.0 - smoothstep(outer-0.02, outer, r));
-  float ang = atan(uv.y, uv.x);
-  float phase = fract((ang / 6.2831853) * 3.0 + uTime * 1.8);
-  float scanner = smoothstep(0.05, 0.0, abs(phase - 0.5) - 0.25);
-  float glow = exp(-6.0 * (r*r));
-  vec3 col = mix(uColGlow, uColCore, 0.35);
-  float alpha = clamp(ring * (0.55 + 0.45*scanner) + glow*0.15, 0.0, 1.0);
-  gl_FragColor = vec4(col, alpha);
-}`;
-
-const progHalo    = makeProgram(VS_HALO, FS_HALO);
-const aPos_halo   = gl.getAttribLocation(progHalo, 'position');
-const uMVP_halo   = gl.getUniformLocation(progHalo, 'uMVP');
-const uPix_halo   = gl.getUniformLocation(progHalo, 'uPixelSize');
-const uTime_halo  = gl.getUniformLocation(progHalo, 'uTime');
-const uColGlow    = gl.getUniformLocation(progHalo, 'uColGlow');
-const uColCore    = gl.getUniformLocation(progHalo, 'uColCore');
-
-let yaw = 0, pitch = 0, dist = 1800;
-let dragging = false, dragMoved = false, lx = 0, ly = 0;
-let panning = false, panX = 0, panY = 0;
-let _clickDownId = null, _clickMoved = false;
-
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-canvas.addEventListener('mousedown', e => {
-  lx = e.clientX; ly = e.clientY;
-  dragMoved = false;
-  _clickMoved = false;
-  if (e.button === 2) panning = true;
-  else {
-    dragging = true;
-    if (e.button === 0) {
-      _clickDownId = hoveredId;
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SGN — Codex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@200;300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void:       #050810;
+      --deep:       #080d18;
+      --surface:    #0c1220;
+      --surface2:   #111b2e;
+      --border:     #1a2d46;
+      --border2:    #243d5e;
+      --cyan:       #38e8ff;
+      --cyan-dim:   #1a7090;
+      --gold:       #f5c542;
+      --gold-dim:   #7a6020;
+      --red-alert:  #ff3b3b;
+      --text:       #c8deff;
+      --text-dim:   #5a7a99;
+      --text-muted: #2e4a66;
+      --glow-cyan:  rgba(56,232,255,.18);
+      --glow-gold:  rgba(245,197,66,.18);
+      --green:      #5cdb7a;
+      --green-dim:  #1e4a28;
+      --purple:     #b388ff;
+      --purple-dim: #4a2e80;
+      --amber:      #ff9e44;
+      --amber-dim:  #6e3f10;
+      --slate:      #8faabe;
+      --slate-dim:  #3a5060;
     }
-  }
-});
-addEventListener('mouseup', () => { dragging = false; panning = false; });
-addEventListener('mousemove', e => {
-  const dx = e.clientX - lx, dy = e.clientY - ly;
-  lx = e.clientX; ly = e.clientY;
-  if (dragging) {
-    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) { dragMoved = true; _clickMoved = true; }
-    if (!addMode && dragMoved) {
-      yaw   += dx * 0.005;
-      pitch += dy * 0.005;
-      pitch = Math.max(-1.55, Math.min(1.55, pitch));
-    }
-  } else if (panning) {
-    const s = dist / 1000;
-    panX -= dx * s;
-    panY += dy * s;
-  }
-});
-addEventListener('wheel', e => {
-  if (e.target.closest('#sidePanel') || e.target.closest('#orrery-modal')) return;
-  dist *= (1 + Math.sign(e.deltaY) * 0.12);
-  dist = Math.max(300, Math.min(6000, dist));
-});
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:var(--void);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;}
 
-let starsVBO = null, starCount = 0;
-let linesVBO = null, lineVertCount = 0;
-let idToWorld = new Map();
-let systems = [];
-let lanesSet = new Set();
-let imgW = 1090, imgH = 1494, worldW = 2200, worldH = 2200*(1090/1494);
+    body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:100;}
 
-const tip      = document.getElementById('tooltip');
-const tipName  = document.getElementById('tip-name');
-const tipId    = document.getElementById('tip-id');
-const tipOwner = document.getElementById('tip-owner');
-let mouseX = 0, mouseY = 0;
-addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+    /* ── HUD ── */
+    #hud{position:fixed;top:0;left:0;right:0;height:52px;z-index:50;display:flex;align-items:center;gap:0;background:linear-gradient(180deg,rgba(5,8,16,.97) 0%,rgba(5,8,16,.7) 100%);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);padding:0 20px;}
+    #hud::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,var(--cyan-dim) 15%,var(--cyan) 50%,var(--cyan-dim) 85%,transparent 100%);opacity:.4;}
+    .hud-logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;letter-spacing:6px;color:var(--cyan);text-transform:uppercase;white-space:nowrap;text-shadow:0 0 16px rgba(56,232,255,.7),0 0 32px rgba(56,232,255,.3);margin-right:20px;}
+    .hud-sep{width:1px;height:18px;background:var(--border2);margin:0 14px;flex-shrink:0;opacity:.6;}
+    .hud-item{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text-dim);white-space:nowrap;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;}
+    .hud-nav{transition:color .12s;cursor:pointer;}
+    .hud-nav:hover{color:var(--cyan) !important;}
+    .hud-nav.active{color:var(--cyan) !important;text-shadow:0 0 8px rgba(56,232,255,.5);}
+    .hud-spacer{flex:1;}
 
-let hoveredId = null;
-let selectedId = null;
-let haloVBO = null;
-const t0 = performance.now();
+    /* ── LAYOUT ── */
+    #app{display:flex;height:100vh;padding-top:52px;}
 
-let editorOK = sessionStorage.getItem('starmap_editor_ok') === '1';
+    /* ── SIDEBAR ── */
+    #sidebar{width:300px;min-width:300px;background:rgba(5,8,16,.95);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10;position:relative;}
+    #sidebar::after{content:'';position:absolute;top:0;right:0;width:1px;height:100%;background:linear-gradient(180deg,var(--cyan) 0%,rgba(56,232,255,.15) 40%,transparent 100%);opacity:.4;pointer-events:none;}
+
+    .sb-header{padding:14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .sb-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;letter-spacing:3px;color:var(--text);text-transform:uppercase;margin-bottom:10px;}
+    .sb-search{width:100%;background:rgba(5,8,16,.9);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:7px 10px 7px 28px;font-family:'Exo 2',sans-serif;font-size:13px;outline:none;transition:border-color .12s;}
+    .sb-search:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.08);}
+    .sb-search-wrap{position:relative;}
+    .sb-search-wrap::before{content:'⌕';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-muted);pointer-events:none;}
+
+    .sb-filters{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;}
+    .sb-filter{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border);border-radius:2px;background:transparent;color:var(--text-muted);cursor:pointer;transition:all .12s;}
+    .sb-filter:hover{border-color:var(--border2);color:var(--text-dim);}
+    .sb-filter.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.06);}
+
+    #post-list{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+    #post-list::-webkit-scrollbar{width:3px;}
+    #post-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    .post-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;position:relative;}
+    .post-item::before{content:'';position:absolute;left:0;top:0;width:3px;height:100%;background:transparent;transition:background .12s;}
+    .post-item:hover{background:rgba(56,232,255,.03);}
+    .post-item:hover::before{background:var(--cyan-dim);}
+    .post-item.active{background:rgba(56,232,255,.06);}
+    .post-item.active::before{background:var(--cyan);}
+    .post-item-title{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:15px;color:var(--text);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .post-item-meta{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;display:flex;gap:8px;align-items:center;}
+    .post-item-cat{padding:1px 5px;border:1px solid var(--border);border-radius:2px;font-size:9px;}
+    .post-item-cat.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
+    .post-item-cat.vehicle{border-color:rgba(245,197,66,.3);color:var(--gold-dim);}
+    .post-item-cat.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .post-item-cat.technology{border-color:rgba(179,136,255,.3);color:var(--purple-dim);}
+    .post-item-cat.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
+    .post-item-cat.doctrine{border-color:rgba(143,170,190,.3);color:var(--slate-dim);}
+    .post-item-cat.freeform{border-color:rgba(90,122,153,.4);color:var(--text-dim);}
+
+    .sb-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;}
+    .sb-footer .pbtn{flex:1;}
+
+    /* ── MAIN ── */
+    #main{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;position:relative;}
+    #main::-webkit-scrollbar{width:4px;}
+    #main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    /* ── EMPTY STATE ── */
+    .empty-state{text-align:center;padding:80px 20px;}
+    .empty-state-icon{font-size:42px;opacity:.2;margin-bottom:14px;}
+    .empty-state-text{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text-muted);letter-spacing:1.5px;line-height:2;}
+
+    /* ── BUTTONS ── */
+    .pbtn{background:transparent;border:1px solid var(--border2);color:var(--text-dim);border-radius:2px;padding:6px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:all .12s;}
+    .pbtn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(56,232,255,.05);}
+    .pbtn.primary{border-color:var(--cyan-dim);color:var(--cyan);}
+    .pbtn.success{border-color:var(--green-dim);color:var(--green);}
+    .pbtn.success:hover{border-color:var(--green);background:rgba(92,219,122,.05);}
+    .pbtn.danger{border-color:#3a2020;color:#cc6666;}
+    .pbtn.danger:hover{border-color:var(--red-alert);color:var(--red-alert);background:rgba(255,59,59,.05);}
+    .pbtn.gold{border-color:var(--gold-dim);color:var(--gold);}
+    .pbtn.gold:hover{border-color:var(--gold);background:rgba(245,197,66,.06);}
+
+    /* ── FORM ── */
+    .sci-input,.sci-select,.sci-textarea{background:rgba(5,8,16,.9);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:7px 10px;font-family:'Exo 2',sans-serif;font-size:14px;width:100%;outline:none;transition:border-color .12s,box-shadow .12s;}
+    .sci-input:focus,.sci-select:focus,.sci-textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.08);}
+    .sci-select option{background:#080d18;}
+    .sci-textarea{min-height:120px;resize:vertical;font-size:13px;line-height:1.6;}
+
+    .form-row{display:grid;grid-template-columns:100px 1fr;gap:6px 10px;align-items:center;margin-bottom:8px;}
+    .fl{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
+    .edit-section{margin-bottom:18px;}
+    .edit-section-title{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+
+    /* ── TOOLBAR ── */
+    .toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;background:rgba(8,13,24,.8);border:1px solid var(--border);border-bottom:none;border-radius:3px 3px 0 0;}
+    .tb-btn{background:transparent;border:1px solid transparent;color:var(--text-dim);width:30px;height:28px;border-radius:2px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .1s;font-family:'Share Tech Mono',monospace;}
+    .tb-btn:hover{border-color:var(--border2);color:var(--cyan);background:rgba(56,232,255,.04);}
+    .tb-btn.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.08);}
+    .tb-sep{width:1px;height:20px;background:var(--border);margin:4px 4px;flex-shrink:0;}
+    .tb-btn[title]::after{content:attr(title);}
+
+    #editor-area{border:1px solid var(--border);border-radius:0 0 3px 3px;min-height:350px;padding:16px 20px;background:rgba(5,8,16,.8);color:var(--text);font-family:'Exo 2',sans-serif;font-size:14px;line-height:1.7;outline:none;overflow-y:auto;max-height:60vh;}
+    #editor-area:focus{border-color:var(--cyan-dim);}
+    #editor-area h1,#editor-area h2,#editor-area h3,#editor-area h4{font-family:'Rajdhani',sans-serif;color:var(--text);margin:16px 0 8px;line-height:1.3;}
+    #editor-area h1{font-size:26px;font-weight:700;letter-spacing:2px;color:var(--cyan);border-bottom:1px solid var(--border);padding-bottom:6px;}
+    #editor-area h2{font-size:20px;font-weight:600;letter-spacing:1px;color:var(--gold);}
+    #editor-area h3{font-size:16px;font-weight:600;color:var(--text);}
+    #editor-area h4{font-size:14px;font-weight:500;color:var(--text-dim);}
+    #editor-area table{border-collapse:collapse;width:100%;margin:12px 0;}
+    #editor-area th,#editor-area td{border:1px solid var(--border);padding:6px 10px;text-align:left;font-size:13px;}
+    #editor-area th{background:rgba(56,232,255,.06);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan-dim);letter-spacing:1px;text-transform:uppercase;}
+    #editor-area blockquote{border-left:3px solid var(--cyan-dim);margin:12px 0;padding:8px 14px;background:rgba(56,232,255,.03);color:var(--text-dim);font-style:italic;}
+    #editor-area code{font-family:'Share Tech Mono',monospace;background:rgba(56,232,255,.06);padding:1px 5px;border-radius:2px;font-size:12px;color:var(--cyan);}
+    #editor-area pre{background:rgba(5,8,16,.9);border:1px solid var(--border);border-radius:3px;padding:12px;margin:12px 0;overflow-x:auto;}
+    #editor-area pre code{background:none;padding:0;}
+    #editor-area ul,#editor-area ol{margin:8px 0;padding-left:24px;}
+    #editor-area li{margin-bottom:4px;}
+    #editor-area hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+    #editor-area img{max-width:100%;border-radius:3px;margin:8px 0;}
+    #editor-area a{color:var(--cyan);text-decoration:underline;}
+
+    /* ── DOSSIER VIEW ── */
+    .dossier{padding:32px 40px 40px;max-width:900px;margin:0 auto;}
+    .dossier-class-bar{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+    .dossier-class-tag{padding:2px 8px;border:1px solid var(--border2);border-radius:2px;}
+    .dossier-class-tag.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
+    .dossier-class-tag.vehicle{border-color:rgba(245,197,66,.3);color:var(--gold-dim);}
+    .dossier-class-tag.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .dossier-class-tag.soldier{border-color:rgba(92,219,122,.3);color:var(--green-dim);}
+    .dossier-class-tag.technology{border-color:rgba(179,136,255,.3);color:var(--purple-dim);}
+    .dossier-class-tag.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
+    .dossier-class-tag.doctrine{border-color:rgba(143,170,190,.3);color:var(--slate-dim);}
+    .dossier-class-tag.freeform{border-color:var(--border2);color:var(--text-muted);}
+
+    .dossier-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:32px;letter-spacing:2px;color:var(--text);line-height:1.15;margin-bottom:4px;}
+    .dossier-subtitle{font-family:'Exo 2',sans-serif;font-size:14px;color:var(--text-dim);margin-bottom:20px;font-weight:300;}
+
+    .dossier-divider{height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent 80%);margin:20px 0;opacity:.5;}
+    .dossier-divider.gold{background:linear-gradient(90deg,var(--gold-dim),transparent 80%);}
+    .dossier-divider.purple{background:linear-gradient(90deg,var(--purple-dim),transparent 80%);}
+    .dossier-divider.slate{background:linear-gradient(90deg,var(--slate-dim),transparent 80%);}
+
+    .dossier-section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+
+    /* ── Technology dossier ── */
+    .dossier-tech-meta{margin-bottom:18px;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+    .dossier-tech-row{display:flex;border-bottom:1px solid var(--border);padding:0;}
+    .dossier-tech-row:last-child{border-bottom:none;}
+    .dossier-tech-key{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;padding:8px 12px;width:160px;flex-shrink:0;background:rgba(8,13,24,.5);border-right:1px solid var(--border);}
+    .dossier-tech-val{font-family:'Exo 2',sans-serif;font-size:13px;color:var(--text);padding:8px 12px;flex:1;}
+
+    .dossier-doc-footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--border);}
+    .dossier-doc-class{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--purple-dim);margin-bottom:3px;}
+    .dossier-doc-rev{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;color:var(--text-muted);}
+
+    /* ── Lore dossier ── */
+    .dossier-lore-context{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+    .dossier-lore-field{display:flex;flex-direction:column;gap:2px;flex:1;min-width:160px;background:rgba(255,158,68,.04);border:1px solid rgba(255,158,68,.15);border-radius:3px;padding:10px 14px;}
+    .dossier-lore-key{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber-dim);}
+    .dossier-lore-val{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:600;color:var(--text);line-height:1.3;}
+
+    .dossier-lore-summary{margin-bottom:20px;background:rgba(255,158,68,.03);border-left:3px solid var(--amber-dim);padding:14px 18px;border-radius:0 3px 3px 0;}
+    .dossier-lore-summary-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--amber-dim);margin-bottom:6px;}
+    .dossier-lore-summary p{font-size:14px;color:var(--text-dim);line-height:1.7;margin:0;}
+
+    .dossier-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:20px;}
+    .dossier-stat{background:rgba(8,13,24,.6);border:1px solid var(--border);border-radius:3px;padding:10px 12px;position:relative;overflow:hidden;}
+    .dossier-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent);opacity:.4;}
+    .dossier-stat-key{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
+    .dossier-stat-val{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;color:var(--text);line-height:1.2;}
+
+    .dossier-body{font-size:14px;line-height:1.7;color:var(--text);}
+    .dossier-body h1,.dossier-body h2,.dossier-body h3,.dossier-body h4{font-family:'Rajdhani',sans-serif;margin:18px 0 8px;line-height:1.3;}
+    .dossier-body h1{font-size:24px;font-weight:700;letter-spacing:2px;color:var(--cyan);border-bottom:1px solid var(--border);padding-bottom:6px;}
+    .dossier-body h2{font-size:19px;font-weight:600;letter-spacing:1px;color:var(--gold);}
+    .dossier-body h3{font-size:15px;font-weight:600;color:var(--text);}
+    .dossier-body table{border-collapse:collapse;width:100%;margin:12px 0;}
+    .dossier-body th,.dossier-body td{border:1px solid var(--border);padding:6px 10px;text-align:left;font-size:13px;}
+    .dossier-body th{background:rgba(56,232,255,.06);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan-dim);letter-spacing:1px;text-transform:uppercase;}
+    .dossier-body blockquote{border-left:3px solid var(--cyan-dim);margin:12px 0;padding:8px 14px;background:rgba(56,232,255,.03);color:var(--text-dim);font-style:italic;}
+    .dossier-body code{font-family:'Share Tech Mono',monospace;background:rgba(56,232,255,.06);padding:1px 5px;border-radius:2px;font-size:12px;color:var(--cyan);}
+    .dossier-body pre{background:rgba(5,8,16,.9);border:1px solid var(--border);border-radius:3px;padding:12px;margin:12px 0;overflow-x:auto;}
+    .dossier-body pre code{background:none;padding:0;}
+    .dossier-body ul,.dossier-body ol{margin:8px 0;padding-left:24px;}
+    .dossier-body li{margin-bottom:4px;}
+    .dossier-body hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+    .dossier-body img{max-width:100%;border-radius:3px;margin:8px 0;}
+    .dossier-body a{color:var(--cyan);}
+
+    .dossier-actions{display:flex;gap:8px;margin-top:24px;padding-top:16px;border-top:1px solid var(--border);}
+
+    /* ── EDITOR PAGE ── */
+    .editor-page{padding:24px 32px 40px;max-width:860px;margin:0 auto;}
+    .editor-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;letter-spacing:2px;color:var(--text);margin-bottom:16px;}
+
+    /* template stat rows */
+    .stat-editor-row{display:grid;grid-template-columns:1fr 1fr 32px;gap:6px;margin-bottom:4px;align-items:center;}
+    .stat-editor-row .sci-input{font-size:12px;padding:5px 8px;}
+    .stat-del{background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:2px;cursor:pointer;font-size:11px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+    .stat-del:hover{border-color:var(--red-alert);color:var(--red-alert);}
+
+    /* toast */
+    .wiki-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);padding:10px 20px;background:rgba(92,219,122,.15);border:1px solid rgba(92,219,122,.3);border-radius:3px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:200;}
+    .wiki-toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
+  </style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hud-logo">SGN</div>
+  <div class="hud-sep"></div>
+  <a href="./index.html" class="hud-item hud-nav">STAR CHART</a>
+  <div class="hud-sep"></div>
+  <a href="./wiki.html" class="hud-item hud-nav active">CODEX</a>
+  <div class="hud-spacer"></div>
+  <span class="hud-item" id="hud-count" style="color:var(--text-muted);"></span>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="sb-header">
+      <div class="sb-title">Codex Index</div>
+      <div class="sb-search-wrap">
+        <input type="text" class="sb-search" id="search" placeholder="Search entries..."/>
+      </div>
+      <div class="sb-filters" id="filters">
+        <button class="sb-filter active" data-cat="all">ALL</button>
+        <button class="sb-filter" data-cat="ship">SHIPS</button>
+        <button class="sb-filter" data-cat="vehicle">VEHICLES</button>
+        <button class="sb-filter" data-cat="soldier">SOLDIERS</button>
+        <button class="sb-filter" data-cat="technology">TECH</button>
+        <button class="sb-filter" data-cat="lore">LORE</button>
+        <button class="sb-filter" data-cat="doctrine">DOCTRINE</button>
+        <button class="sb-filter" data-cat="freeform">OTHER</button>
+      </div>
+    </div>
+    <div id="post-list"></div>
+    <div class="sb-footer">
+      <button class="pbtn gold" id="btn-new">+ NEW ENTRY</button>
+      <button class="pbtn" id="btn-export-all">↓ JSON</button>
+    </div>
+  </div>
+  <div id="main">
+    <div class="empty-state" id="empty-view">
+      <div class="empty-state-icon">◈</div>
+      <div class="empty-state-text">// SELECT AN ENTRY FROM THE INDEX<br>// OR CREATE A NEW ONE</div>
+    </div>
+  </div>
+</div>
+
+<div class="wiki-toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   DATA & STORAGE
+   ══════════════════════════════════════════ */
+const STORE_KEY  = 'sgn_codex_v1';
+const PW_SESSION = 'starmap_editor_ok';
+let entries = [];
+let activeId = null;
+let filterCat = 'all';
 let _editorPW = null;
+let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 
-(async function loadEditorPW() {
-  try {
-    const r = await fetch('./editor.json', { cache: 'no-store' });
-    if (r.ok) {
-      const d = await r.json();
-      if (typeof d.pw === 'string' && d.pw.length) _editorPW = d.pw;
-    }
-  } catch {}
+function load()  { try { entries = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { entries = []; } }
+function save()  { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); updateCount(); }
+function genId() { return 'CX_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,5).toUpperCase(); }
+
+(async function loadPW() {
+  try { const r = await fetch('./editor.json',{cache:'no-store'}); if(r.ok){ const d=await r.json(); if(typeof d.pw==='string'&&d.pw.length) _editorPW=d.pw; } } catch{}
 })();
 
 function requireEditor() {
   if (editorOK) return true;
-  if (_editorPW === null) {
-    alert('Editor not available.');
-    return false;
-  }
+  if (_editorPW === null) { alert('Editor not available.'); return false; }
   const pw = prompt('Enter editor password:');
-  if (pw === _editorPW) {
-    editorOK = true;
-    sessionStorage.setItem('starmap_editor_ok', '1');
-    updateHUD();
-    return true;
-  }
+  if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION,'1'); return true; }
   alert('Incorrect password.');
   return false;
 }
 
-let editMode = false;
-let addMode  = false;
-
-function updateHUD() {
-  const hudLanes = document.getElementById('hud-lanes');
-  const hudAdd   = document.getElementById('hud-add');
-  if (hudLanes) {
-    let label = 'LANES &nbsp;<b>OFF</b>';
-    if (editMode) {
-      if (window._lanePickA) {
-        const pickSys = systems.find(s => s.id === window._lanePickA);
-        const pickName = pickSys?.name || window._lanePickA;
-        label = `LANES &nbsp;<b>FROM: ${pickName.toUpperCase()}</b>`;
-      } else {
-        label = 'LANES &nbsp;<b>ON — PICK 1ST</b>';
-      }
-    }
-    hudLanes.innerHTML = label;
-    hudLanes.style.color = editMode ? 'var(--cyan)' : '';
-    if (editMode) hudLanes.classList.add('mode-active'); else hudLanes.classList.remove('mode-active');
-  }
-  if (hudAdd) {
-    hudAdd.innerHTML   = `ADD &nbsp;<b>${addMode ? 'ON — CLICK MAP' : 'OFF'}</b>`;
-    hudAdd.style.color = addMode ? 'var(--cyan)' : '';
-    if (addMode) hudAdd.classList.add('mode-active'); else hudAdd.classList.remove('mode-active');
-  }
-}
-
-const DEFAULT_DATA = {
-  image_size: { width: 1090, height: 1494 },
-  systems: [
-    { id:'SYS_1', name:'Vanyamar', coords:{ x_norm:0.52, y_norm:0.41, z:0 } },
-    { id:'SYS_2', name:'Calithen', coords:{ x_norm:0.31, y_norm:0.64, z:0 } },
-    { id:'SYS_3', name:'Elendir',  coords:{ x_norm:0.75, y_norm:0.22, z:0 } }
-  ],
-  lanes: [['SYS_1','SYS_2'], ['SYS_1','SYS_3']]
-};
-
-requestAnimationFrame(loop);
-
-(async function boot() {
-  try {
-    const r = await fetch('./systems.json', { cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    initFromData(await r.json());
-  } catch {
-    initFromData(DEFAULT_DATA);
-  }
-})();
-
-function initFromData(data) {
-  imgW = data?.image_size?.width  ?? 1090;
-  imgH = data?.image_size?.height ?? 1494;
-  const SCALE = 2200;
-  worldW = SCALE;
-  worldH = SCALE / (imgW / imgH);
-
-  const toWorldXY = (xn, yn) => [(xn - 0.5) * worldW, -(yn - 0.5) * worldH];
-
-  idToWorld = new Map();
-  systems = data.systems || [];
-  for (const sys of systems) {
-    let xn = sys.coords?.x_norm, yn = sys.coords?.y_norm;
-    if (xn == null || yn == null) {
-      const px = sys.pixel?.x, py = sys.pixel?.y;
-      if (px == null || py == null) continue;
-      xn = px / imgW; yn = py / imgH;
-    }
-    const [x, y] = toWorldXY(xn, yn);
-    const z = (sys.coords && typeof sys.coords.z === 'number') ? sys.coords.z : 0;
-    idToWorld.set(sys.id, [x, y, z]);
-  }
-  rebuildStarsVBO();
-
-  lanesSet = new Set((data.lanes || []).map(([a,b]) => [a,b].sort().join('::')));
-  rebuildLinesVBOFromSet();
-
-  updateHUD();
-
-  const sbSys   = document.getElementById('sb-sys');
-  const sbLanes = document.getElementById('sb-lanes-ct');
-  if (sbSys)   sbSys.textContent   = `${systems.length} NODES ACTIVE`;
-  if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
-  loadFleets();
-  updateFleetStatusBar();
-}
-
-canvas.addEventListener('mouseup', async e => {
-  if (e.button !== 0) return;
-  if (_clickMoved) return;
-
-  if (!_clickDownId) {
-    if (addMode) {
-      if (!requireEditor()) return;
-      const mvp = buildMVP();
-      const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
-      if (!world) return;
-      const [wx, wy] = world;
-      const xn = Math.max(0, Math.min(1, (wx / worldW) + 0.5));
-      const yn = Math.max(0, Math.min(1, 0.5 - (wy / worldH)));
-      let n = systems.length + 1;
-      while (systems.some(s => s.id === 'SYS_' + n)) n++;
-      const newId = 'SYS_' + n;
-      const defaultName = prompt('Name for new system:', `New System ${n}`) || `New System ${n}`;
-      const sys = { id:newId, name:defaultName, coords:{x_norm:xn, y_norm:yn, z:0}, tags:['installation'] };
-      systems.push(sys);
-      idToWorld.set(newId, [wx, wy, 0]);
-      rebuildStarsVBO();
-      selectedId = newId;
-      renderPanel(newId, await ensureSystemDetails(newId));
-    }
-    return;
-  }
-
-  const id = _clickDownId;
-  _clickDownId = null;
-
-  if (editMode) {
-    if (!requireEditor()) return;
-    if (!window._lanePickA) {
-      window._lanePickA = id;
-      updateHUD();
-    } else {
-      if (window._lanePickA !== id) {
-        const key = [window._lanePickA, id].sort().join('::');
-        if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
-        rebuildLinesVBOFromSet();
-        updateLaneCounts();
-      }
-      window._lanePickA = null;
-      updateHUD();
-    }
-    return;
-  }
-
-  selectedId = id;
-  updateHUD();
-  renderPanel(id, await ensureSystemDetails(id));
-});
-
-function mouseToCanvas(e) {
-  return [
-    e.clientX * (canvas.width  / canvas.clientWidth),
-    e.clientY * (canvas.height / canvas.clientHeight)
-  ];
-}
-
-function distPointToSeg(px, py, ax, ay, bx, by) {
-  const abx = bx-ax, aby = by-ay;
-  const len2 = abx*abx + aby*aby || 1;
-  const t = Math.max(0, Math.min(1, ((px-ax)*abx + (py-ay)*aby) / len2));
-  return Math.hypot(px - (ax + t*abx), py - (ay + t*aby));
-}
-
-function deleteNearestLane(mx, my, mvp) {
-  let bestKey = null, bestD = 1e9;
-  for (const key of lanesSet) {
-    const [a,b] = key.split('::');
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    const sa = projectToScreen(pa[0], pa[1], pa[2], mvp);
-    const sb = projectToScreen(pb[0], pb[1], pb[2], mvp);
-    if (!sa || !sb) continue;
-    const d = distPointToSeg(mx, my, sa[0], sa[1], sb[0], sb[1]);
-    if (d < bestD) { bestD = d; bestKey = key; }
-  }
-  if (bestKey && bestD < 20) {
-    lanesSet.delete(bestKey);
-    rebuildLinesVBOFromSet();
-  }
-}
-
-canvas.addEventListener('auxclick', e => {
-  if (!editMode || e.button !== 1) return;
-  if (!requireEditor()) return;
-  const [mx, my] = mouseToCanvas(e);
-  deleteNearestLane(mx, my, buildMVP());
-  updateLaneCounts();
-});
-
-const panel      = document.getElementById('sidePanel');
-const spTitle    = document.getElementById('sp-title');
-const spSysId    = document.getElementById('sp-sys-id');
-const spOwner    = document.getElementById('sp-owner');
-const spStarOrb  = document.getElementById('sp-star-orb');
-const spStarAbbr = document.getElementById('sp-star-abbr');
-
-document.getElementById('sp-tabs').addEventListener('click', e => {
-  const tab = e.target.closest('.tab');
-  if (!tab) return;
-  const name = tab.dataset.tab;
-  if (name === 'edit' && !requireEditor()) return;
-  document.querySelectorAll('#sp-tabs .tab').forEach(t => t.classList.toggle('active', t === tab));
-  document.querySelectorAll('#sp-body .tab-pane').forEach(p => p.classList.toggle('active', p.id === `pane-${name}`));
-});
-
-document.getElementById('sp-close').onclick  = () => hidePanel();
-document.getElementById('sp-gen').onclick    = async () => {
-  if (!selectedId) return;
-  renderPanel(selectedId, await ensureSystemDetails(selectedId, true));
-};
-document.getElementById('sp-exp').onclick    = () => { if (selectedId && requireEditor()) exportSystemDetails(selectedId); };
-document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
-
-canvas.addEventListener('dblclick', async e => {
-  const id = findNearestSystemId(e.clientX, e.clientY, buildMVP(), 18);
-  if (!id) return;
-  if (selectedId === id) {
-    renderPanel(id, await ensureSystemDetails(id));
-    return;
-  }
-  if (!requireEditor()) return;
-  const sys = systems.find(s => s.id === id);
-  const nn = prompt('Rename system:', sys?.name || id);
-  if (nn && nn.trim()) {
-    sys.name = nn.trim();
-    rebuildStarsVBO();
-  }
-});
-
-window.addEventListener('keydown', async e => {
-  const k = e.key.toLowerCase();
-  if (k === 'e') {
-    if (!requireEditor()) return;
-    editMode = !editMode;
-    if (editMode) addMode = false;
-    if (!editMode) window._lanePickA = null;
-    updateHUD();
-    return;
-  }
-  if (k === 'a') {
-    if (!requireEditor()) return;
-    addMode = !addMode;
-    if (addMode) editMode = false;
-    updateHUD();
-    return;
-  }
-  if (k === 'enter' && selectedId) {
-    renderPanel(selectedId, await ensureSystemDetails(selectedId));
-    return;
-  }
-  if (!editMode) return;
-  if (!requireEditor()) return;
-  if (k === 'c') {
-    if (!confirm('Clear ALL lanes?')) return;
-    lanesSet.clear();
-    rebuildLinesVBOFromSet();
-    updateLaneCounts();
-  }
-  if (k === 'r') {
-    if (!confirm('Reset lanes to defaults?')) return;
-    lanesSet.clear();
-    (DEFAULT_DATA.lanes || []).forEach(([a,b]) => lanesSet.add([a,b].sort().join('::')));
-    rebuildLinesVBOFromSet();
-    updateLaneCounts();
-  }
-  if (k === 'x') {
-    const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
-    const blob = new Blob([JSON.stringify({ image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut }, null, 2)], { type:'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'systems.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-});
-
-const orreryModal  = document.getElementById('orrery-modal');
-const orreryCanvas = document.getElementById('orrery-canvas');
-const orreryCtx    = orreryCanvas.getContext('2d');
-const orreryClose  = document.getElementById('orrery-close');
-const orreryHover  = document.getElementById('orrery-hover');
-
-let orreryRAF   = null;
-let orreryData  = null;
-let orrerySpeed = 1;
-let orreryT     = 0;
-let lastTS      = null;
-const YEAR_SECS = 40;
-
-orreryClose.onclick = closeOrrery;
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && orreryModal.classList.contains('open')) closeOrrery();
-});
-
-document.querySelectorAll('.speed-btn').forEach(btn => {
-  btn.onclick = () => {
-    orrerySpeed = parseFloat(btn.dataset.speed);
-    document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b === btn));
-  };
-});
-
-function openOrrery(id) {
-  const det = getCachedSystem(id);
-  if (!det) return;
-  const sys     = systems.find(s => s.id === id) || { name: id };
-  const star    = det.star || {};
-  const sm      = getStarMeta(star.kind);
-  const planets = (det.planets || []).slice().sort((a,b) => (a.semi_major_AU||0) - (b.semi_major_AU||0));
-
-  orreryData = { sys, details: det, planets, star, sm };
-  orreryT  = 0;
-  lastTS   = null;
-
-  document.getElementById('orrery-name').textContent = sys.name || id;
-  document.getElementById('orrery-sub').textContent  =
-    `${star.kind || '—'} · ${planets.length} ORBITAL OBJECT${planets.length !== 1 ? 'S' : ''}`;
-
-  buildOrreryLegend(planets, star.hz);
-  orreryModal.classList.add('open');
-  requestAnimationFrame(() => {
-    resizeOrreryCanvas();
-    if (orreryRAF) cancelAnimationFrame(orreryRAF);
-    orreryRAF = requestAnimationFrame(orreryTick);
-  });
-}
-
-function closeOrrery() {
-  orreryModal.classList.remove('open');
-  if (orreryRAF) { cancelAnimationFrame(orreryRAF); orreryRAF = null; }
-}
-
-function resizeOrreryCanvas() {
-  const rect = orreryCanvas.parentElement.getBoundingClientRect();
-  orreryCanvas.width  = rect.width  * devicePixelRatio;
-  orreryCanvas.height = rect.height * devicePixelRatio;
-}
-
-window.addEventListener('resize', () => {
-  if (orreryModal.classList.contains('open')) resizeOrreryCanvas();
-});
-
-function buildOrreryLegend(planets, hz) {
-  const leg   = document.getElementById('orrery-legend');
-  const types = [...new Set(planets.map(p => p.type))];
-  let html = '';
-  if (hz && hz[0] > 0) html += `<div class="orrery-legend-item"><div class="orrery-legend-ring"></div>HABITABLE ZONE</div>`;
-  types.forEach(t => {
-    const pm = getPlanetMeta(t);
-    html += `<div class="orrery-legend-item"><div class="orrery-legend-dot" style="background:${pm.color}"></div>${t.toUpperCase()}</div>`;
-  });
-  leg.innerHTML = html;
-}
-
-function orreryTick(ts) {
-  if (!orreryData) return;
-  if (lastTS !== null) orreryT += Math.min((ts - lastTS) / 1000, 0.1) * orrerySpeed / YEAR_SECS;
-  lastTS = ts;
-  drawOrrery();
-  orreryRAF = requestAnimationFrame(orreryTick);
-}
-
-function drawOrrery() {
-  const cvs = orreryCanvas, ctx = orreryCtx;
-  const W = cvs.width, H = cvs.height, cx = W/2, cy = H/2, dpr = devicePixelRatio;
-
-  ctx.clearRect(0, 0, W, H);
-  if (!orreryData) return;
-  const { planets, star, sm } = orreryData;
-  if (!planets.length) return;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  ctx.clip();
-
-  const allAU   = planets.map(p => p.semi_major_AU || 0.1);
-  const minAU   = Math.max(0.01, (star.inner_edge || 0.05) * 0.5);
-  const maxAU   = Math.max(...allAU);
-  const labelPad = 52 * dpr;
-  const maxR    = Math.min(cx, cy) - labelPad;
-  const usableR = maxR * 0.82;
-  const logMin  = Math.log(minAU), logMax = Math.log(maxAU * 1.15);
-
-  function auToR(au) {
-    const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
-    return 14 * dpr + t * (usableR - 14 * dpr);
-  }
-
-  ctx.save();
-  for (let r = usableR * 0.25; r <= usableR; r += usableR * 0.25) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(56,232,255,0.04)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  const hz = star.hz || [0,0];
-  if (hz[0] > 0 && hz[1] > hz[0]) {
-    const r1 = auToR(hz[0]), r2 = auToR(hz[1]);
-    ctx.save();
-    const grad = ctx.createRadialGradient(cx,cy,r1,cx,cy,r2);
-    grad.addColorStop(0,   'rgba(60,220,100,0.00)');
-    grad.addColorStop(0.3, 'rgba(60,220,100,0.06)');
-    grad.addColorStop(0.7, 'rgba(60,220,100,0.06)');
-    grad.addColorStop(1,   'rgba(60,220,100,0.00)');
-    ctx.beginPath();
-    ctx.arc(cx,cy,r2,0,Math.PI*2);
-    ctx.arc(cx,cy,r1,0,Math.PI*2,true);
-    ctx.fillStyle = grad; ctx.fill();
-    ctx.setLineDash([4*dpr, 6*dpr]);
-    ctx.lineWidth = 0.8;
-    ctx.strokeStyle = 'rgba(60,220,100,0.22)';
-    ctx.beginPath(); ctx.arc(cx,cy,r1,0,Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy,r2,0,Math.PI*2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-
-  ctx.save();
-  planets.forEach(p => {
-    const a = auToR(p.semi_major_AU || 0.1);
-    ctx.beginPath(); ctx.arc(cx, cy, a, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(56,232,255,0.18)'; ctx.lineWidth = 0.8; ctx.stroke();
-  });
-  ctx.restore();
-
-  const starR     = Math.max(6, (star.radius_hint || 5) * dpr * 1.2);
-  const starColor = sm.glow || '#38e8ff';
-  const sg1 = ctx.createRadialGradient(cx,cy,0,cx,cy,starR*5);
-  sg1.addColorStop(0, hexToRgba(starColor,0.35)); sg1.addColorStop(0.3,hexToRgba(starColor,0.12)); sg1.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.beginPath(); ctx.arc(cx,cy,starR*5,0,Math.PI*2); ctx.fillStyle=sg1; ctx.fill();
-  const sg2 = ctx.createRadialGradient(cx-starR*0.3,cy-starR*0.3,0,cx,cy,starR);
-  sg2.addColorStop(0,'#ffffff'); sg2.addColorStop(0.4,starColor); sg2.addColorStop(1,hexToRgba(starColor,0.6));
-  ctx.beginPath(); ctx.arc(cx,cy,starR,0,Math.PI*2); ctx.fillStyle=sg2; ctx.fill();
-
-  const planetPositions = [];
-  planets.forEach(p => {
-    const a      = auToR(p.semi_major_AU || 0.1);
-    const period = Math.sqrt(Math.pow(p.semi_major_AU || 1, 3));
-    const phase  = ((p.angle_deg || 0) * Math.PI) / 180;
-    const angle  = phase + (orreryT / period) * Math.PI * 2;
-    const px = cx + Math.cos(angle) * a;
-    const py = cy + Math.sin(angle) * a;
-    const pm = getPlanetMeta(p.type);
-    const pr = Math.max(3*dpr, Math.min(9*dpr, (p.radius_hint||1) * 3.2 * dpr));
-
-    if (p.zone === 'habitable') {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(px,py,pr+4*dpr,0,Math.PI*2);
-      ctx.strokeStyle='rgba(80,255,120,0.4)'; ctx.lineWidth=1; ctx.stroke();
-      ctx.restore();
-    }
-
-    const pg = ctx.createRadialGradient(px,py,0,px,py,pr*2.5);
-    pg.addColorStop(0, hexToRgba(pm.color,0.5)); pg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.beginPath(); ctx.arc(px,py,pr*2.5,0,Math.PI*2); ctx.fillStyle=pg; ctx.fill();
-
-    const pb = ctx.createRadialGradient(px-pr*0.3,py-pr*0.3,0,px,py,pr);
-    pb.addColorStop(0, lightenHex(pm.color,60)); pb.addColorStop(0.5,pm.color); pb.addColorStop(1,darkenHex(pm.color,50));
-    ctx.beginPath(); ctx.arc(px,py,pr,0,Math.PI*2); ctx.fillStyle=pb; ctx.fill();
-
-    ctx.save();
-    ctx.font = `${11*dpr}px 'Share Tech Mono', monospace`;
-    ctx.fillStyle = 'rgba(180,210,255,0.65)';
-    ctx.textAlign = px > cx ? 'left' : 'right';
-    ctx.fillText(p.name, px + (px > cx ? pr+4*dpr : -(pr+4*dpr)), py + 4*dpr);
-    ctx.restore();
-
-    planetPositions.push({ p, px, py, pr });
-  });
-
-  orreryCanvas._planets = planetPositions;
-  ctx.restore();
-}
-
-orreryCanvas.addEventListener('mousemove', e => {
-  if (!orreryCanvas._planets) return;
-  const rect = orreryCanvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) * devicePixelRatio;
-  const my = (e.clientY - rect.top)  * devicePixelRatio;
-  let hit = null;
-  for (const { p, px, py, pr } of orreryCanvas._planets) {
-    if (Math.hypot(mx-px, my-py) < pr + 8 * devicePixelRatio) { hit = p; break; }
-  }
-  if (hit) {
-    document.getElementById('ohl-name').textContent = hit.name;
-    document.getElementById('ohl-sub').textContent  = `${hit.type} · ${hit.semi_major_AU} AU`;
-    const mRect = orreryModal.getBoundingClientRect();
-    orreryHover.style.display = 'block';
-    orreryHover.style.left = (e.clientX - mRect.left + 14) + 'px';
-    orreryHover.style.top  = (e.clientY - mRect.top  - 14) + 'px';
-    orreryCanvas.style.cursor = 'crosshair';
-  } else {
-    orreryHover.style.display = 'none';
-    orreryCanvas.style.cursor = 'default';
-  }
-});
-orreryCanvas.addEventListener('mouseleave', () => { orreryHover.style.display = 'none'; });
-
-function hexToRgba(hex, a) {
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-function lightenHex(hex, amt) {
-  return `rgb(${Math.min(255,parseInt(hex.slice(1,3),16)+amt)},${Math.min(255,parseInt(hex.slice(3,5),16)+amt)},${Math.min(255,parseInt(hex.slice(5,7),16)+amt)})`;
-}
-function darkenHex(hex, amt) {
-  return `rgb(${Math.max(0,parseInt(hex.slice(1,3),16)-amt)},${Math.max(0,parseInt(hex.slice(3,5),16)-amt)},${Math.max(0,parseInt(hex.slice(5,7),16)-amt)})`;
-}
-
-function showPanel() { panel.style.transform = 'translateX(0)'; }
-function hidePanel()  { panel.style.transform = 'translateX(100%)'; }
-
-const SYSGEN_VERSION = 'v2';
-function sysKey(id)             { return `sysgen:${SYSGEN_VERSION}:${id}`; }
-function getCachedSystem(id)    { try { const r=localStorage.getItem(sysKey(id)); return r ? JSON.parse(r) : null; } catch { return null; } }
-function setCachedSystem(id, d) { try { localStorage.setItem(sysKey(id), JSON.stringify(d)); } catch {} }
-
-function prngSeed(str) {
-  let h = 2166136261 >>> 0;
-  for (let i=0; i<str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  let s = h || 0xdeadbeef;
-  return () => { s ^= s<<13; s ^= s>>>17; s ^= s<<5; return (s>>>0) / 4294967296; };
-}
-
-async function ensureSystemDetails(id, forceRegen=false) {
-  let det = forceRegen ? null : getCachedSystem(id);
-  if (!det) { det = generateDeterministic(id); setCachedSystem(id, det); }
-  return det;
-}
-
-function exportSystemDetails(id) {
-  const det = getCachedSystem(id);
-  if (!det) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(det,null,2)],{type:'application/json'}));
-  a.download = `system_${id}_${SYSGEN_VERSION}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-const STAR_META = {
-  'Main Sequence': { abbr:'MS', bg:'#2a4a1a', glow:'#7ed44a', text:'#7ed44a' },
-  'K-Dwarf':       { abbr:'K',  bg:'#4a2e10', glow:'#e8832a', text:'#e8832a' },
-  'G-Dwarf':       { abbr:'G',  bg:'#4a3a10', glow:'#f5c542', text:'#f5c542' },
-  'F-Dwarf':       { abbr:'F',  bg:'#3a3a1a', glow:'#fff0a0', text:'#ffe060' },
-  'M-Dwarf':       { abbr:'M',  bg:'#4a1a1a', glow:'#ff6666', text:'#ff6666' },
-  'Subgiant':      { abbr:'SG', bg:'#3a2a10', glow:'#ffaa44', text:'#ffaa44' },
-  'Giant':         { abbr:'GI', bg:'#2a1a40', glow:'#cc88ff', text:'#cc88ff' },
-  'Neutron':       { abbr:'NS', bg:'#102030', glow:'#38e8ff', text:'#38e8ff' },
-  'Black Hole':    { abbr:'BH', bg:'#080808', glow:'#9955ff', text:'#9955ff' },
-};
-
-const PLANET_META = {
-  'Rocky':        { icon:'◉', color:'#aa8866' },
-  'Ice':          { icon:'❄', color:'#88ccee' },
-  'Gas':          { icon:'⬤', color:'#8866bb' },
-  'Ocean':        { icon:'◉', color:'#3388cc' },
-  'Desert':       { icon:'◉', color:'#cc9944' },
-  'Shield World': { icon:'⬡', color:'#33ccaa' },
-  'Ecumenopolis': { icon:'⬡', color:'#ffcc44' },
-  'Installation': { icon:'◈', color:'#38e8ff' },
-  'Habitat':      { icon:'◈', color:'#88ff88' },
-};
-
-function getPlanetMeta(type) { return PLANET_META[type] || { icon:'◉', color:'#888' }; }
-function getStarMeta(kind)   { return STAR_META[kind]   || { abbr:'?', bg:'#1a2a3a', glow:'#38e8ff', text:'#38e8ff' }; }
-
-function generateDeterministic(id) {
-  const rnd = prngSeed(id);
-
-  const starTable = [
-    { kind:'M-Dwarf',       w:34, hz:[0.1,0.4],   innerEdge:0.05, outerEdge:8,  starR:3 },
-    { kind:'K-Dwarf',       w:22, hz:[0.4,0.9],   innerEdge:0.08, outerEdge:15, starR:4 },
-    { kind:'G-Dwarf',       w:18, hz:[0.8,1.6],   innerEdge:0.15, outerEdge:20, starR:5 },
-    { kind:'Main Sequence', w:10, hz:[0.9,1.8],   innerEdge:0.15, outerEdge:20, starR:5 },
-    { kind:'F-Dwarf',       w:8,  hz:[1.2,2.5],   innerEdge:0.2,  outerEdge:25, starR:6 },
-    { kind:'Subgiant',      w:4,  hz:[2.0,5.0],   innerEdge:0.3,  outerEdge:40, starR:7 },
-    { kind:'Giant',         w:2,  hz:[5.0,12.0],  innerEdge:0.5,  outerEdge:60, starR:9 },
-    { kind:'Neutron',       w:1,  hz:[0.02,0.08], innerEdge:0.01, outerEdge:5,  starR:2 },
-    { kind:'Black Hole',    w:1,  hz:[0.0,0.0],   innerEdge:0.3,  outerEdge:50, starR:2 },
-  ];
-  const totalW = starTable.reduce((s,e) => s+e.w, 0);
-  let pick = rnd() * totalW;
-  const starEntry = starTable.find(e => { pick -= e.w; return pick <= 0; }) || starTable[2];
-  const kind = starEntry.kind;
-  const [hzIn, hzOut] = starEntry.hz;
-
-  function classifyZone(a) {
-    if (a < starEntry.innerEdge * 1.5)                    return 'inner';
-    if (a >= hzIn * 0.7 && a <= hzOut * 1.3)             return 'habitable';
-    if (a > hzOut * 1.3 && a < starEntry.outerEdge * 0.4) return 'outer';
-    return 'fringe';
-  }
-
-  function pickType(zone) {
-    const r = rnd();
-    if (kind === 'Neutron')    return ['Rocky','Installation','Habitat','Ice'][Math.floor(rnd()*4)];
-    if (kind === 'Black Hole') return ['Rocky','Desert','Installation'][Math.floor(rnd()*3)];
-    switch(zone) {
-      case 'inner':     return r<0.50?'Rocky':r<0.75?'Desert':r<0.88?'Ocean':'Installation';
-      case 'habitable': return r<0.30?'Ocean':r<0.55?'Rocky':r<0.70?'Desert':r<0.82?'Ecumenopolis':r<0.90?'Shield World':'Installation';
-      case 'outer':     return r<0.45?'Gas':r<0.70?'Ice':r<0.85?'Rocky':'Habitat';
-      case 'fringe':    return r<0.55?'Ice':r<0.80?'Gas':'Rocky';
-    }
-  }
-
-  const TYPE_RADIUS = {
-    'Rocky':0.9,'Desert':0.85,'Ocean':1.0,'Ice':0.8,'Gas':2.2,
-    'Ecumenopolis':1.1,'Shield World':1.0,'Installation':0.6,'Habitat':0.5
-  };
-
-  const usedNames = new Set();
-  const prefixes  = ['Aryn','Vel','Cor','Sith','Eld','Myr','Tar','Keth','Vor','Sev','Nox','Cal'];
-  const suffixes  = ['is','os','ax','en','ar','ia','um','on','eth','el'];
-  function genName() {
-    let n;
-    do { n = prefixes[Math.floor(rnd()*prefixes.length)] + suffixes[Math.floor(rnd()*suffixes.length)]; }
-    while (usedNames.has(n));
-    usedNames.add(n);
-    return n;
-  }
-
-  const planetCount = 2 + Math.floor(rnd() * 9);
-  const planets = [];
-  let au = starEntry.innerEdge * (1 + rnd() * 2);
-
-  for (let i=0; i<planetCount; i++) {
-    const zone = classifyZone(au);
-    const type = pickType(zone);
-    planets.push({
-      name:          genName(),
-      semi_major_AU: +au.toFixed(3),
-      type, zone,
-      radius_hint:   +((TYPE_RADIUS[type]||1) * (0.85 + rnd()*0.3)).toFixed(3),
-      ecc:           +(rnd()*0.18).toFixed(3),
-      angle_deg:     +(rnd()*360).toFixed(1),
-      notes:         (i > 0 && rnd() < 0.12) ? 'Orbital resonance detected' : ''
-    });
-    au = au * (1.45 + rnd()*0.75) * (0.9 + rnd()*0.2);
-    if (au > starEntry.outerEdge) break;
-  }
-
-  return {
-    version: SYSGEN_VERSION,
-    system_id: id,
-    seeded: true,
-    generated_at: new Date().toISOString(),
-    star: { kind, hz: starEntry.hz, inner_edge: starEntry.innerEdge, outer_edge: starEntry.outerEdge, radius_hint: starEntry.starR },
-    planets
-  };
-}
-
-function buildOrbitSVG(planets, starColor, sm, starData) {
-  const cx = 110, cy = 110, maxR = 100;
-  const allAU  = planets.map(p => p.semi_major_AU||0.1);
-  const minAU  = Math.max(0.01, (starData?.inner_edge||0.05) * 0.5);
-  const maxAU  = Math.max(...allAU, 1) * 1.15;
-  const logMin = Math.log(minAU), logMax = Math.log(maxAU);
-
-  function auToR(au) {
-    const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
-    return 8 + t * (maxR - 8);
-  }
-
-  const [hzIn, hzOut] = starData?.hz || [0.8, 1.6];
-  const hzR1 = auToR(hzIn), hzR2 = auToR(hzOut);
-  const hzVisible = hzR1 < maxR && hzR2 > 8 && hzIn > 0;
-  const starVisR = Math.min(7, 3 + (starData?.radius_hint||5) * 0.6);
-
-  const defs = `<defs>
-    <filter id="glow-s" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="3" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="glow-p" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur stdDeviation="1.5" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <radialGradient id="star-grad" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#fff" stop-opacity="0.9"/>
-      <stop offset="50%" stop-color="${starColor}" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="${starColor}" stop-opacity="0.5"/>
-    </radialGradient>
-  </defs>`;
-
-  const bg   = `<circle cx="${cx}" cy="${cy}" r="108" fill="rgba(4,7,14,.85)" stroke="rgba(56,232,255,.06)" stroke-width="1"/>`;
-  let grid   = '';
-  for (let r = 20; r <= maxR; r += 20) grid += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(56,232,255,.05)" stroke-width="0.5"/>`;
-
-  const hz = hzVisible
-    ? `<circle cx="${cx}" cy="${cy}" r="${hzR2.toFixed(1)}" fill="rgba(80,255,120,.06)" stroke="rgba(80,255,120,.18)" stroke-width="0.8" stroke-dasharray="3 4"/>
-       <circle cx="${cx}" cy="${cy}" r="${hzR1.toFixed(1)}" fill="none" stroke="rgba(80,255,120,.12)" stroke-width="0.6" stroke-dasharray="2 5"/>` : '';
-
-  let orbits = '', dots = '', labels = '';
-  planets.forEach(p => {
-    const a   = auToR(p.semi_major_AU||0.1), ecc = p.ecc||0;
-    const b   = a * Math.sqrt(1 - ecc*ecc), off = a * ecc;
-    const rot = p.angle_deg || 0;
-    orbits += `<ellipse cx="${(cx+off*0.3).toFixed(1)}" cy="${cy}" rx="${a.toFixed(1)}" ry="${b.toFixed(1)}" fill="none" stroke="rgba(56,232,255,.16)" stroke-width="0.7" transform="rotate(${rot} ${cx} ${cy})"/>`;
-
-    const ang = ((p.angle_deg||0) * Math.PI) / 180;
-    const px  = cx + off*0.3 + Math.cos(ang) * a;
-    const py  = cy + Math.sin(ang) * b;
-    const pr  = Math.max(2.2, Math.min(5.5, (p.radius_hint||1) * 2.2));
-    const pm  = getPlanetMeta(p.type);
-
-    if (p.zone === 'habitable') dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(pr+3).toFixed(1)}" fill="none" stroke="rgba(80,255,120,.3)" stroke-width="0.8"/>`;
-    dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${pr.toFixed(1)}" fill="${pm.color}" opacity=".92" filter="url(#glow-p)"><title>${p.name} · ${p.type} · ${p.semi_major_AU} AU</title></circle>`;
-
-    const ld = Math.hypot(px-cx, py-cy);
-    if (ld > 14 && ld < 104) {
-      const lx = cx + (px-cx)/ld * (ld+pr+5), ly = cy + (py-cy)/ld * (ld+pr+5);
-      labels += `<text x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}" font-family="'Share Tech Mono',monospace" font-size="7" fill="rgba(180,210,255,.55)" text-anchor="${lx>cx?'start':'end'}" letter-spacing="0.5">${p.name}</text>`;
-    }
-  });
-
-  const starGlow = `<circle cx="${cx}" cy="${cy}" r="${(starVisR*3.5).toFixed(1)}" fill="${starColor}" opacity=".08"/>
-    <circle cx="${cx}" cy="${cy}" r="${(starVisR*1.8).toFixed(1)}" fill="${starColor}" opacity=".15"/>
-    <circle cx="${cx}" cy="${cy}" r="${starVisR.toFixed(1)}" fill="url(#star-grad)" filter="url(#glow-s)"/>`;
-
-  let ticks = '';
-  [0.5, 1, 5, 10, 20].filter(v => v >= minAU && v <= maxAU).forEach(v => {
-    const tr = auToR(v);
-    if (tr > 10 && tr < maxR - 2) ticks += `<text x="${(cx+tr+2).toFixed(1)}" y="${(cy+3).toFixed(1)}" font-family="'Share Tech Mono',monospace" font-size="6" fill="rgba(56,232,255,.3)">${v}AU</text>`;
-  });
-
-  const hzLabel = hzVisible
-    ? `<text x="${((hzR1+hzR2)/2+cx+2).toFixed(1)}" y="${(cy-3).toFixed(1)}" font-family="'Share Tech Mono',monospace" font-size="6" fill="rgba(80,255,120,.45)" letter-spacing="0.5">HZ</text>` : '';
-
-  return `<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">${defs}${bg}${grid}${hz}${orbits}${labels}${ticks}${hzLabel}${starGlow}${dots}</svg>`;
-}
-
-function renderPanel(id, details) {
-  const sys    = systems.find(s => s.id === id);
-  const star   = details?.star || {};
-  const planets= details?.planets || [];
-  const sm     = getStarMeta(star.kind);
-
-  spTitle.textContent        = sys?.name || id;
-  spSysId.textContent        = id;
-  spOwner.textContent        = sys?.owner ? `◈ ${sys.owner}` : '';
-  spStarAbbr.textContent     = sm.abbr;
-  spStarOrb.style.background = `radial-gradient(circle at 35% 35%, ${sm.glow}44, ${sm.bg})`;
-  spStarOrb.style.boxShadow  = `0 0 12px ${sm.glow}44, inset 0 0 8px ${sm.glow}22`;
-  spStarOrb.style.color      = sm.text;
-
-  const pov  = document.getElementById('pane-overview');
-  const tags = Array.isArray(sys?.tags) && sys.tags.length
-    ? sys.tags.map(t => `<span class="tag-chip">${t}</span>`).join('') : '';
-
-  const orbitSVG = planets.length
-    ? `<div class="orbit-diagram">${buildOrbitSVG(planets, sm.glow, sm, details?.star)}</div>` : '';
-
-  const inner  = planets.length ? planets.reduce((a,b) => (a.semi_major_AU||99)<(b.semi_major_AU||99)?a:b).semi_major_AU ?? '?' : '—';
-  const outer  = planets.length ? planets.reduce((a,b) => (a.semi_major_AU||0)>(b.semi_major_AU||0)?a:b).semi_major_AU ?? '?' : '—';
-
-  pov.innerHTML = `
-    ${orbitSVG}
-    <div class="stats-grid">
-      <div class="stat-cell">
-        <div class="stat-key">Star Class</div>
-        <div class="stat-val" style="color:${sm.text};font-size:16px;">${star.kind || '—'}</div>
-        <div class="stat-sub">${sm.abbr} TYPE</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Bodies</div>
-        <div class="stat-val cyan">${planets.length}</div>
-        <div class="stat-sub">ORBITAL OBJECTS</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Nearest</div>
-        <div class="stat-val gold" style="font-size:15px;">${inner}</div>
-        <div class="stat-sub">AU INNER ORBIT</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Farthest</div>
-        <div class="stat-val" style="font-size:15px;">${outer}</div>
-        <div class="stat-sub">AU OUTER ORBIT</div>
-      </div>
-    </div>
-    <div class="meta-row"><span class="mk">System ID</span><span class="mv hi">${id}</span></div>
-    <div class="meta-row"><span class="mk">Name</span><span class="mv">${sys?.name || '—'}</span></div>
-    ${sys?.owner  ? `<div class="meta-row"><span class="mk">Owner</span><span class="mv go">${sys.owner}</span></div>` : ''}
-    ${sys?.source ? `<div class="meta-row"><span class="mk">Source</span><span class="mv" style="font-size:13px;color:var(--text-muted);">${sys.source}</span></div>` : ''}
-    ${tags        ? `<div class="meta-row"><span class="mk">Tags</span><span class="mv">${tags}</span></div>` : ''}
-    <div class="meta-row"><span class="mk">Record</span><span class="mv" style="font-size:13px;color:var(--text-muted);">${details?.version || '—'} · ${details?.generated_at ? new Date(details.generated_at).toLocaleDateString() : 'unscanned'}</span></div>
-  `;
-
-  const pbod = document.getElementById('pane-bodies');
-  if (!planets.length) {
-    pbod.innerHTML = `<div class="empty-state"><div class="empty-state-icon">◎</div><div class="empty-state-text">// NO ORBITAL DATA<br>// PRESS ⟳ SCAN SYSTEM</div></div>`;
-  } else {
-    const sorted = [...planets].sort((a,b) => (a.semi_major_AU||0) - (b.semi_major_AU||0));
-    pbod.innerHTML = `
-      <div class="bodies-header">
-        <span class="bodies-count">${planets.length} ORBITAL OBJECT${planets.length!==1?'S':''} DETECTED</span>
-      </div>
-      ${sorted.map(p => {
-        const pm = getPlanetMeta(p.type);
-        return `<div class="planet-card">
-          <div class="p-icon" style="background:${pm.color}22;color:${pm.color};">${pm.icon}</div>
-          <div class="p-info">
-            <div class="p-name">${p.name}</div>
-            <div class="p-type-badge">${p.type ?? 'UNKNOWN'}</div>
-            ${p.notes ? `<div class="p-notes-line">${p.notes}</div>` : ''}
-          </div>
-          <div class="p-orbit-val">${p.semi_major_AU ?? '?'}<br><span style="font-size:7px;color:var(--text-muted);">AU</span></div>
-        </div>`;
-      }).join('')}
-    `;
-  }
-
-  renderEditPane(id, details, sys);
-  renderFleetsPane(id);
-  rebuildStarsVBO();
-  showPanel();
-}
-
-function renderEditPane(id, details, sys) {
-  if (!sys) sys = systems.find(s => s.id === id);
-  const star    = details?.star || {};
-  const planets = details?.planets || [];
-  const starKinds = ['Main Sequence','K-Dwarf','G-Dwarf','F-Dwarf','M-Dwarf','Subgiant','Giant','Neutron','Black Hole'];
-  const starOpts = starKinds.map(k => `<option value="${k}" ${star.kind===k?'selected':''}>${k}</option>`).join('');
-  const planetTypes = ['Rocky','Ice','Gas','Ocean','Desert','Shield World','Ecumenopolis','Installation','Habitat'];
-
-  /* ── find connected lanes ── */
-  const connectedLanes = [];
-  for (const key of lanesSet) {
-    const [a,b] = key.split('::');
-    if (a === id || b === id) {
-      const otherId = a === id ? b : a;
-      const otherSys = systems.find(s => s.id === otherId);
-      connectedLanes.push({ key, otherId, otherName: otherSys?.name || otherId });
-    }
-  }
-  connectedLanes.sort((a,b) => a.otherName.localeCompare(b.otherName));
-
-  /* ── build lane-add target list (exclude self + already connected) ── */
-  const connectedIds = new Set(connectedLanes.map(l => l.otherId));
-  const laneTargets = systems
-    .filter(s => s.id !== id && !connectedIds.has(s.id))
-    .sort((a,b) => (a.name||a.id).localeCompare(b.name||b.id));
-  const laneTargetOpts = laneTargets.map(s => `<option value="${s.id}">${s.name || s.id}</option>`).join('');
-
-  const pedit = document.getElementById('pane-edit');
-  pedit.innerHTML = `
-    <div class="edit-section">
-      <div class="edit-section-title">System Identity</div>
-      <div class="form-row"><span class="fl">ID</span><span style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:1px;">${id}</span></div>
-      <div class="form-row">
-        <label class="fl">Name</label>
-        <input id="ed-name" class="sci-input" type="text" value="${(sys?.name||'').replaceAll('"','&quot;')}"/>
-      </div>
-      <div class="form-row">
-        <label class="fl">Owner</label>
-        <input id="ed-owner" class="sci-input" type="text" value="${(sys?.owner||'').replaceAll('"','&quot;')}" placeholder="Faction / owner..."/>
-      </div>
-      <div class="form-row">
-        <label class="fl">Tags</label>
-        <input id="ed-tags" class="sci-input" type="text" value="${(sys?.tags||[]).join(', ')}" placeholder="comma separated..."/>
-      </div>
-      <div class="form-row">
-        <label class="fl">Star</label>
-        <select id="ed-star" class="sci-select">${starOpts}</select>
-      </div>
-    </div>
-
-    <div class="edit-section">
-      <div class="edit-section-title">Lanes (${connectedLanes.length})</div>
-      <div id="ed-lane-list">
-        ${connectedLanes.length ? connectedLanes.map(l => `
-          <div class="lane-row" data-lane-key="${l.key}">
-            <span class="lane-row-name">${l.otherName}</span>
-            <span class="lane-row-id">${l.otherId}</span>
-            <button type="button" class="lane-row-del" title="Remove lane">✕</button>
-          </div>
-        `).join('') : '<div class="edit-empty-hint">No lanes connected</div>'}
-      </div>
-      ${laneTargets.length ? `
-      <div class="lane-add-bar">
-        <select id="ed-lane-target" class="sci-select" style="flex:1;font-size:12px;">
-          <option value="" disabled selected>Connect to…</option>
-          ${laneTargetOpts}
-        </select>
-        <button type="button" id="ed-lane-add" class="pbtn primary" style="padding:5px 10px;white-space:nowrap;">+ LANE</button>
-      </div>` : ''}
-    </div>
-
-    <div class="edit-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Bodies (${planets.length})</div>
-        <button id="ed-add-body" type="button" class="pbtn primary" style="margin-bottom:8px;padding:3px 10px;">+ BODY</button>
-      </div>
-      <div id="ed-planet-list">
-        ${planets.map((p,i) => planetEditorRow(p, i, planetTypes)).join('')}
-      </div>
-    </div>
-
-    <div class="edit-actions" style="margin-top:12px;">
-      <button id="ed-save" class="pbtn success" style="flex:1;padding:8px;">✓ SAVE ALL</button>
-      <button id="ed-delete-sys" class="pbtn danger" style="padding:8px 12px;" title="Delete system">⌫ DEL</button>
-    </div>
-    <div id="ed-toast" class="edit-toast"></div>
-  `;
-
-  /* ── wire up lane management ── */
-  const laneList = pedit.querySelector('#ed-lane-list');
-  laneList.addEventListener('click', e => {
-    const del = e.target.closest('.lane-row-del');
-    if (!del) return;
-    const row = del.closest('.lane-row');
-    const key = row.dataset.laneKey;
-    if (key && lanesSet.has(key)) {
-      lanesSet.delete(key);
-      rebuildLinesVBOFromSet();
-      updateLaneCounts();
-      row.style.opacity = '0';
-      row.style.height = row.offsetHeight + 'px';
-      requestAnimationFrame(() => { row.style.height = '0'; row.style.padding = '0'; row.style.margin = '0'; row.style.overflow = 'hidden'; });
-      setTimeout(() => {
-        row.remove();
-        if (!laneList.querySelector('.lane-row')) laneList.innerHTML = '<div class="edit-empty-hint">No lanes connected</div>';
-        showEditToast('Lane removed');
-      }, 180);
-    }
-  });
-
-  pedit.querySelector('#ed-lane-add')?.addEventListener('click', () => {
-    const sel = pedit.querySelector('#ed-lane-target');
-    const targetId = sel.value;
-    if (!targetId) return;
-    const key = [id, targetId].sort().join('::');
-    if (!lanesSet.has(key)) {
-      lanesSet.add(key);
-      rebuildLinesVBOFromSet();
-      updateLaneCounts();
-      /* re-render the edit pane to refresh lane list */
-      const det = getCachedSystem(id) || details;
-      renderEditPane(id, det, sys);
-      showEditToast('Lane connected');
-    }
-  });
-
-  /* ── wire up planet list ── */
-  const planetList = pedit.querySelector('#ed-planet-list');
-
-  pedit.querySelector('#ed-add-body').onclick = () => {
-    const idx = planetList.querySelectorAll('.ed-body-row').length;
-    const tmp = document.createElement('div');
-    tmp.innerHTML = planetEditorRow({name:`P${idx+1}`,type:'Rocky',semi_major_AU:1.0,notes:''}, idx, planetTypes);
-    const row = tmp.firstElementChild;
-    planetList.appendChild(row);
-    row.style.opacity = '0';
-    requestAnimationFrame(() => row.style.opacity = '1');
-    reindexPlanets(planetList);
-  };
-
-  planetList.addEventListener('click', e => {
-    const del = e.target.closest('.ed-body-del');
-    if (!del) return;
-    const row = del.closest('.ed-body-row');
-    row.style.opacity = '0';
-    setTimeout(() => { row.remove(); reindexPlanets(planetList); }, 150);
-  });
-
-  /* ── collapsible body rows ── */
-  planetList.addEventListener('click', e => {
-    const head = e.target.closest('.ed-body-head');
-    if (!head || e.target.closest('.ed-body-del')) return;
-    const row = head.closest('.ed-body-row');
-    row.classList.toggle('collapsed');
-  });
-
-  /* ── save ── */
-  pedit.querySelector('#ed-save').onclick = () => {
-    const newName  = pedit.querySelector('#ed-name').value.trim();
-    const newOwner = pedit.querySelector('#ed-owner').value.trim();
-    const newTags  = pedit.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-    const newKind  = pedit.querySelector('#ed-star').value;
-    const newPlanets = Array.from(planetList.querySelectorAll('.ed-body-row')).map(row => ({
-      name:          row.querySelector('.ed-b-name').value.trim() || 'Body',
-      type:          row.querySelector('.ed-b-type').value,
-      semi_major_AU: +parseFloat(row.querySelector('.ed-b-au').value).toFixed(3) || 1,
-      notes:         row.querySelector('.ed-b-notes').value.trim()
-    }));
-
-    const base = getCachedSystem(id) || { version:SYSGEN_VERSION, system_id:id, seeded:true };
-    const updated = { ...base, star:{ ...base.star, kind:newKind }, planets:newPlanets };
-    setCachedSystem(id, updated);
-
-    if (sys) {
-      if (newName) sys.name = newName;
-      sys.owner = newOwner || undefined;
-      sys.tags = newTags.length ? newTags : undefined;
-    }
-
-    showEditToast('Changes saved');
-    setTimeout(() => {
-      renderPanel(id, updated);
-      document.querySelector('#sp-tabs .tab[data-tab="overview"]')?.click();
-    }, 400);
-  };
-
-  /* ── delete system ── */
-  pedit.querySelector('#ed-delete-sys').onclick = () => {
-    const sysName = sys?.name || id;
-    if (!confirm(`Delete system "${sysName}"?\nThis also removes all lanes connected to it.`)) return;
-    /* remove lanes */
-    for (const key of [...lanesSet]) {
-      const [a,b] = key.split('::');
-      if (a === id || b === id) lanesSet.delete(key);
-    }
-    rebuildLinesVBOFromSet();
-    /* remove system */
-    const idx = systems.findIndex(s => s.id === id);
-    if (idx >= 0) systems.splice(idx, 1);
-    idToWorld.delete(id);
-    try { localStorage.removeItem(sysKey(id)); } catch {}
-    rebuildStarsVBO();
-    updateLaneCounts();
-    selectedId = null;
-    hidePanel();
-  };
-}
-
-function reindexPlanets(container) {
-  container.querySelectorAll('.ed-body-row').forEach((row, i) => {
-    const idx = row.querySelector('.ed-body-idx');
-    if (idx) idx.textContent = `${i + 1}`;
-  });
-}
-
-function planetEditorRow(p, i, planetTypes) {
-  const pm  = getPlanetMeta(p.type);
-  const typeOpts = planetTypes.map(t => `<option value="${t}" ${p.type===t?'selected':''}>${t}</option>`).join('');
-  return `
-  <div class="ed-body-row" style="transition:opacity .15s;">
-    <div class="ed-body-head">
-      <span class="ed-body-icon" style="color:${pm.color};">${pm.icon}</span>
-      <span class="ed-body-idx">${i+1}</span>
-      <span class="ed-body-preview">${p.name || 'Body'} <span class="ed-body-au-hint">${p.semi_major_AU ?? '?'} AU</span></span>
-      <span class="ed-body-chevron">▾</span>
-      <button type="button" class="ed-body-del" title="Remove body">✕</button>
-    </div>
-    <div class="ed-body-fields">
-      <div class="form-row"><span class="fl">Name</span><input class="ed-b-name sci-input" type="text" value="${(p.name||'').replaceAll('"','&quot;')}"/></div>
-      <div class="form-row"><span class="fl">Type</span><select class="ed-b-type sci-select">${typeOpts}</select></div>
-      <div class="form-row"><span class="fl">Orbit AU</span><input class="ed-b-au sci-input" type="number" step="0.001" min="0.001" value="${p.semi_major_AU ?? 1}"/></div>
-      <div class="form-row"><span class="fl">Notes</span><input class="ed-b-notes sci-input" type="text" value="${(p.notes||'').replaceAll('"','&quot;')}" placeholder="optional..."/></div>
-    </div>
-  </div>`;
-}
-
-function showEditToast(msg) {
-  const el = document.getElementById('ed-toast');
-  if (!el) return;
-  el.textContent = msg;
-  el.classList.add('visible');
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('visible');
   setTimeout(() => el.classList.remove('visible'), 1800);
 }
 
-function updateLaneCounts() {
-  const sbLanes = document.getElementById('sb-lanes-ct');
-  if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
+function updateCount() {
+  document.getElementById('hud-count').textContent = entries.length + ' ENTRIES';
 }
 
-function projectToScreen(x, y, z, mvp) {
-  const cx = x*mvp[0]+y*mvp[4]+z*mvp[8] +mvp[12];
-  const cy = x*mvp[1]+y*mvp[5]+z*mvp[9] +mvp[13];
-  const cz = x*mvp[2]+y*mvp[6]+z*mvp[10]+mvp[14];
-  const cw = x*mvp[3]+y*mvp[7]+z*mvp[11]+mvp[15];
-  if (!cw) return null;
-  return [
-    Math.round((cx/cw*0.5+0.5)*canvas.width),
-    Math.round((-cy/cw*0.5+0.5)*canvas.height),
-    cz/cw
-  ];
-}
+/* ══════════════════════════════════════════
+   SIDEBAR
+   ══════════════════════════════════════════ */
+const postList = document.getElementById('post-list');
+const searchEl = document.getElementById('search');
 
-function screenToWorldOnZ0(clientX, clientY, mvp) {
-  const inv = mat4Invert(mvp);
-  if (!inv) return null;
-  const x = (clientX / canvas.clientWidth)  * 2 - 1;
-  const y = -((clientY / canvas.clientHeight) * 2 - 1);
-  const p0 = vec4MulMat(inv, new Float32Array([x, y, -1, 1]));
-  const p1 = vec4MulMat(inv, new Float32Array([x, y,  1, 1]));
-  for (const p of [p0,p1]) { p[0]/=p[3]; p[1]/=p[3]; p[2]/=p[3]; p[3]=1; }
-  const dir = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
-  if (Math.abs(dir[2]) < 1e-6) return null;
-  const t = -p0[2]/dir[2];
-  return [p0[0]+dir[0]*t, p0[1]+dir[1]*t, 0];
-}
+function renderList() {
+  const q = searchEl.value.trim().toLowerCase();
+  let items = entries.slice().sort((a,b) => (b.updated||0) - (a.updated||0));
+  if (filterCat !== 'all') items = items.filter(e => e.category === filterCat);
+  if (q) items = items.filter(e => (e.title||'').toLowerCase().includes(q) || (e.designation||'').toLowerCase().includes(q));
 
-function findNearestSystemId(clientX, clientY, mvp, r=32) {
-  const mx  = clientX * (canvas.width  / canvas.clientWidth);
-  const my  = clientY * (canvas.height / canvas.clientHeight);
-  const r2  = r * r;
-  let best = null, bestId = null;
-  for (const sys of systems) {
-    const p = idToWorld.get(sys.id); if (!p) continue;
-    const s = projectToScreen(p[0], p[1], p[2], mvp); if (!s) continue;
-    const d2 = (s[0]-mx)**2 + (s[1]-my)**2;
-    if (d2 < r2 && (best === null || d2 < best)) { best = d2; bestId = sys.id; }
-  }
-  return bestId;
-}
-
-function buildMVP() {
-  const proj = mat4Perspective(55 * Math.PI / 180, canvas.width / canvas.height, 0.1, 50000);
-  const rot  = mat4Mul(mat4RotateY(yaw), mat4RotateX(pitch));
-  const view = mat4Translate(-panX, -panY, -dist);
-  return mat4Mul(rot, mat4Mul(view, proj));
-}
-
-const STAR_COLORS = {
-  'M-Dwarf':       [1.0,  0.38, 0.28],
-  'K-Dwarf':       [1.0,  0.65, 0.25],
-  'G-Dwarf':       [1.0,  0.92, 0.55],
-  'Main Sequence': [0.95, 1.0,  0.85],
-  'F-Dwarf':       [0.95, 0.97, 1.0 ],
-  'Subgiant':      [1.0,  0.72, 0.35],
-  'Giant':         [0.85, 0.58, 1.0 ],
-  'Neutron':       [0.40, 0.95, 1.0 ],
-  'Black Hole':    [0.65, 0.35, 1.0 ],
-};
-const STAR_SIZES = {
-  'M-Dwarf':3.5,'K-Dwarf':4.5,'G-Dwarf':5.5,'Main Sequence':5.5,
-  'F-Dwarf':6.5,'Subgiant':7.5,'Giant':9.0,'Neutron':3.0,'Black Hole':4.0
-};
-
-function getStarVisuals(id) {
-  const det = getCachedSystem(id);
-  const kind = det?.star?.kind;
-  if (kind && STAR_COLORS[kind]) {
-    return { color: STAR_COLORS[kind], size: STAR_SIZES[kind] || 5.0 };
-  }
-  const rnd = prngSeed(id);
-  const keys = Object.keys(STAR_COLORS);
-  const k = keys[Math.floor(rnd() * keys.length)];
-  return { color: STAR_COLORS[k], size: STAR_SIZES[k] || 5.0 };
-}
-
-function rebuildStarsVBO() {
-  const dpr  = window.devicePixelRatio || 1;
-  const verts = [];
-  for (const sys of systems) {
-    const p = idToWorld.get(sys.id); if (!p) continue;
-    const { color, size } = getStarVisuals(sys.id);
-    verts.push(p[0], p[1], p[2], color[0], color[1], color[2], size * dpr * 2.8);
-  }
-  starCount = verts.length / 7;
-  if (!starsVBO) starsVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-}
-
-function rebuildLinesVBOFromSet() {
-  const verts = [];
-  for (const key of lanesSet) {
-    const [a,b] = key.split('::');
-    const pa = idToWorld.get(a), pb = idToWorld.get(b);
-    if (!pa || !pb) continue;
-    verts.push(pa[0],pa[1],pa[2], pb[0],pb[1],pb[2]);
-  }
-  lineVertCount = verts.length / 3;
-  if (!linesVBO) linesVBO = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-}
-
-function loop() {
-  gl.clearColor(0.020, 0.031, 0.063, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  const mvp = buildMVP();
-
-  if (linesVBO && lineVertCount > 0) {
-    gl.useProgram(progLines);
-    gl.uniformMatrix4fv(uMVP_lines, false, mvp);
-    gl.uniform3f(uColorLines, 0.15, 0.65, 0.78);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.bindBuffer(gl.ARRAY_BUFFER, linesVBO);
-    gl.enableVertexAttribArray(aPos_lines);
-    gl.vertexAttribPointer(aPos_lines, 3, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.LINES, 0, lineVertCount);
-  }
-
-  if (starsVBO && starCount > 0) {
-    gl.useProgram(progPoints);
-    gl.uniformMatrix4fv(uMVP_points, false, mvp);
-    gl.bindBuffer(gl.ARRAY_BUFFER, starsVBO);
-    const stride = 7 * 4;
-    gl.enableVertexAttribArray(aPos_points);
-    gl.vertexAttribPointer(aPos_points,   3, gl.FLOAT, false, stride, 0);
-    gl.enableVertexAttribArray(aColor_points);
-    gl.vertexAttribPointer(aColor_points, 3, gl.FLOAT, false, stride, 3 * 4);
-    gl.enableVertexAttribArray(aSize_points);
-    gl.vertexAttribPointer(aSize_points,  1, gl.FLOAT, false, stride, 6 * 4);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.drawArrays(gl.POINTS, 0, starCount);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.disableVertexAttribArray(aColor_points);
-    gl.disableVertexAttribArray(aSize_points);
-  }
-
-  let hoveredNow = null;
-  if (systems.length) {
-    const mx  = mouseX * (canvas.width  / canvas.clientWidth);
-    const my  = mouseY * (canvas.height / canvas.clientHeight);
-    const r2  = (32 * (window.devicePixelRatio || 1)) ** 2;
-    let best = null;
-    for (const sys of systems) {
-      const p = idToWorld.get(sys.id); if (!p) continue;
-      const s = projectToScreen(p[0], p[1], p[2], mvp); if (!s) continue;
-      const d2 = (s[0]-mx)**2 + (s[1]-my)**2;
-      if (d2 < r2 && (best === null || d2 < best)) { best = d2; hoveredNow = sys.id; }
-    }
-    hoveredId = hoveredNow || null;
-    if (hoveredNow) {
-      const sys = systems.find(s => s.id === hoveredNow);
-      if (tipName)  tipName.textContent  = sys.name || sys.id;
-      if (tipId)    tipId.textContent    = sys.id;
-      if (tipOwner) tipOwner.textContent = sys.owner ? `◈ ${sys.owner}` : '';
-      tip.style.left    = mouseX + 'px';
-      tip.style.top     = mouseY + 'px';
-      tip.style.display = 'block';
-    } else {
-      tip.style.display = 'none';
-    }
-  }
-
-  if (!haloVBO) haloVBO = gl.createBuffer();
-  function drawHalo(id, pix, t, glow, core) {
-    const p = idToWorld.get(id); if (!p) return;
-    gl.useProgram(progHalo);
-    gl.uniformMatrix4fv(uMVP_halo, false, mvp);
-    gl.uniform1f(uPix_halo, pix);
-    gl.uniform1f(uTime_halo, t);
-    gl.uniform3f(uColGlow, glow[0], glow[1], glow[2]);
-    gl.uniform3f(uColCore, core[0], core[1], core[2]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(aPos_halo);
-    gl.vertexAttribPointer(aPos_halo, 3, gl.FLOAT, false, 0, 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.drawArrays(gl.POINTS, 0, 1);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-  }
-
-  const t = (performance.now() - t0) * 0.001;
-  if (hoveredNow) drawHalo(hoveredNow, 34.0, t,        [0.35,0.95,1.0], [1.0,0.95,0.50]);
-  if (selectedId) drawHalo(selectedId, 42.0, t*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.70]);
-  if (window._lanePickA) drawHalo(window._lanePickA, 38.0, t*1.5, [0.15,0.65,0.78], [0.4,0.85,1.0]);
-
-  updateFleetMapIcons(mvp);
-
-  requestAnimationFrame(loop);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   FLEET MANAGEMENT SYSTEM
-   ═══════════════════════════════════════════════════════════════════ */
-
-const ELVISH_SHIP_CLASSES = [
-  { name: 'LÓMIËL-CLASS INTERCEPTOR',    shortName: 'Lómiël',     tier: 'Interceptor',  size: 1 },
-  { name: 'ELENIR-CLASS LANCEWING',       shortName: 'Elenir',     tier: 'Lancewing',    size: 2 },
-  { name: 'SENTINEL-Θ AUTONOMOUS UNIT',   shortName: 'Sentinel-Θ', tier: 'Autonomous',   size: 3 },
-  { name: 'TALASIR-CLASS TRANSPORT',      shortName: 'Talasir',    tier: 'Transport',    size: 4 },
-  { name: 'ERYNDOR-CLASS CORVETTE',       shortName: 'Eryndor',    tier: 'Corvette',     size: 5 },
-  { name: 'THALANIS-CLASS PHANTOM',       shortName: 'Thalanis',   tier: 'Frigate',      size: 6 },
-  { name: 'THALASRËN-CLASS LIGHT FRIGATE',shortName: 'Thalasrën',  tier: 'Lt Frigate',   size: 7 },
-  { name: 'AELINDOR-CLASS FRIGATE',       shortName: 'Aelindor',   tier: 'Frigate',      size: 8 },
-  { name: 'VAELISAR-CLASS DESTROYER',     shortName: 'Vaelisar',   tier: 'Destroyer',    size: 9 },
-  { name: 'CALARION-CLASS CRUISER',       shortName: 'Calarion',   tier: 'Cruiser',      size: 10 },
-  { name: 'SILVARON-CLASS CARRIER',       shortName: 'Silvaron',   tier: 'Carrier',      size: 11 },
-  { name: 'TIRION-CLASS BATTLESHIP',      shortName: 'Tirion',     tier: 'Battleship',   size: 12 },
-  { name: 'AERANDOR-CLASS SUPERCARRIER',  shortName: 'Aerandor',   tier: 'Supercarrier', size: 13 },
-];
-
-const FLEET_STATUSES = ['Stationed', 'In Transit', 'Patrol', 'Combat'];
-
-let fleets = [];
-let activeFleetId = null;
-let fleetViewMode = 'list'; // 'list' | 'detail' | 'edit'
-
-const FLEET_STORE_KEY = 'sgn_fleets_v1';
-
-function loadFleets() {
-  try {
-    const raw = localStorage.getItem(FLEET_STORE_KEY);
-    fleets = raw ? JSON.parse(raw) : [];
-  } catch { fleets = []; }
-}
-
-function saveFleets() {
-  try { localStorage.setItem(FLEET_STORE_KEY, JSON.stringify(fleets)); } catch {}
-  updateFleetStatusBar();
-}
-
-function updateFleetStatusBar() {
-  const el = document.getElementById('sb-fleets-ct');
-  if (el) el.textContent = `${fleets.length} FLEET${fleets.length !== 1 ? 'S' : ''}`;
-}
-
-function generateFleetId() {
-  return 'FLT_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,6).toUpperCase();
-}
-
-function getTotalShips(fleet) {
-  return (fleet.ships || []).reduce((sum, s) => sum + (s.qty || 0), 0);
-}
-
-function getFleetSystemName(systemId) {
-  if (!systemId) return '—';
-  const sys = systems.find(s => s.id === systemId);
-  return sys?.name || systemId;
-}
-
-function renderFleetsPane(systemId) {
-  const pane = document.getElementById('pane-fleets');
-  if (!pane) return;
-
-  const systemFleets = fleets.filter(f => f.systemId === systemId);
-  const otherFleets = fleets.filter(f => f.systemId !== systemId);
-
-  if (fleetViewMode === 'detail' && activeFleetId) {
-    const fleet = fleets.find(f => f.id === activeFleetId);
-    if (fleet) {
-      renderFleetDetail(pane, fleet);
-      return;
-    }
-  }
-  if (fleetViewMode === 'edit') {
-    const fleet = activeFleetId ? fleets.find(f => f.id === activeFleetId) : null;
-    renderFleetEditor(pane, fleet, systemId);
+  if (!items.length) {
+    postList.innerHTML = '<div class="empty-state" style="padding:30px 0;"><div class="empty-state-text">// NO ENTRIES FOUND</div></div>';
     return;
   }
 
-  fleetViewMode = 'list';
-  activeFleetId = null;
-
-  let html = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <span class="bodies-count">${systemFleets.length} FLEET${systemFleets.length!==1?'S':''} AT ${getFleetSystemName(systemId).toUpperCase()}</span>
-      <button class="pbtn primary" id="fleet-add-btn" style="padding:4px 10px;">+ NEW FLEET</button>
+  postList.innerHTML = items.map(e => `
+    <div class="post-item${e.id===activeId?' active':''}" data-id="${e.id}">
+      <div class="post-item-title">${esc(e.title || 'Untitled')}</div>
+      <div class="post-item-meta">
+        <span class="post-item-cat ${e.category}">${(e.category||'freeform').toUpperCase()}</span>
+        <span>${e.designation ? esc(e.designation) : ''}</span>
+        <span>${e.updated ? new Date(e.updated).toLocaleDateString() : ''}</span>
+      </div>
     </div>
-  `;
+  `).join('');
+}
 
-  if (systemFleets.length > 0) {
-    html += systemFleets.map(f => fleetListItemHTML(f)).join('');
+postList.addEventListener('click', e => {
+  const item = e.target.closest('.post-item');
+  if (!item) return;
+  activeId = item.dataset.id;
+  renderList();
+  viewEntry(activeId);
+});
+
+searchEl.addEventListener('input', renderList);
+
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.sb-filter');
+  if (!btn) return;
+  filterCat = btn.dataset.cat;
+  document.querySelectorAll('.sb-filter').forEach(b => b.classList.toggle('active', b === btn));
+  renderList();
+});
+
+document.getElementById('btn-new').addEventListener('click', () => {
+  if (!requireEditor()) return;
+  showNewEntryPicker();
+});
+
+document.getElementById('btn-export-all').addEventListener('click', () => {
+  if (!requireEditor()) return;
+  const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sgn_codex.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+/* ══════════════════════════════════════════
+   VIEW ENTRY (DOSSIER)
+   ══════════════════════════════════════════ */
+const main = document.getElementById('main');
+
+function viewEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  const cat = e.category || 'freeform';
+  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',lore:'LORE & HISTORY',doctrine:'DOCTRINE & ORGANIZATION',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
+
+  let statsHTML = '';
+  if (e.stats && e.stats.length) {
+    const statsLabel = {technology:'Technical Summary',ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance',doctrine:'Key Parameters'}[cat] || 'Specifications';
+    statsHTML = `<div class="dossier-section-label">${statsLabel}</div>
+      <div class="dossier-stats">${e.stats.map(s => `
+        <div class="dossier-stat">
+          <div class="dossier-stat-key">${esc(s.key)}</div>
+          <div class="dossier-stat-val">${esc(s.val)}</div>
+        </div>`).join('')}
+      </div>`;
   }
 
-  if (otherFleets.length > 0) {
-    html += `<div style="margin-top:18px;margin-bottom:10px;" class="fleet-section-title">ALL OTHER FLEETS (${otherFleets.length})</div>`;
-    html += otherFleets.map(f => fleetListItemHTML(f)).join('');
+  /* ── Structured metadata header (tech + ship/vehicle/soldier/doctrine) ── */
+  let metaHeaderHTML = '';
+  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') {
+    const fields = [
+      e.opStatus   ? ['Operational Status', e.opStatus] : null,
+      e.accessLevel? ['Access Level', e.accessLevel] : null,
+      e.origin     ? ['Origin', e.origin] : null,
+    ].filter(Boolean);
+    /* doctrine has extra fields: distribution, scope, authority */
+    if (cat === 'doctrine') {
+      if (e.distribution) fields.splice(2, 0, ['Distribution', e.distribution]);
+      if (e.scope) fields.push(['Scope', e.scope]);
+      if (e.authority) fields.push(['Authority', e.authority]);
+    }
+    if (fields.length) {
+      metaHeaderHTML = `<div class="dossier-tech-meta">
+        ${fields.map(([k,v]) => `<div class="dossier-tech-row"><span class="dossier-tech-key">${esc(k)}</span><span class="dossier-tech-val">${esc(v)}</span></div>`).join('')}
+      </div>`;
+    }
   }
 
-  if (systemFleets.length === 0 && otherFleets.length === 0) {
-    html += `<div class="empty-state" style="padding-top:16px;">
-      <div class="empty-state-icon">⬡</div>
-      <div class="empty-state-text">// NO FLEETS REGISTERED<br>// USE + NEW FLEET TO CREATE ONE</div>
+  /* ── Document classification footer (tech + ship/vehicle/soldier/doctrine) ── */
+  let docFooterHTML = '';
+  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') && (e.docClass || e.revision)) {
+    docFooterHTML = `<div class="dossier-doc-footer">
+      ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
+      ${e.revision ? `<div class="dossier-doc-rev">Revision: ${esc(e.revision)}</div>` : ''}
     </div>`;
   }
 
-  pane.innerHTML = html;
+  /* ── Lore-specific header ── */
+  let loreHeaderHTML = '';
+  if (cat === 'lore') {
+    const ctx = [
+      e.era    ? ['Era / Period', e.era] : null,
+      e.region ? ['Region / Domain', e.region] : null,
+    ].filter(Boolean);
+    loreHeaderHTML = `
+      ${ctx.length ? `<div class="dossier-lore-context">
+        ${ctx.map(([k,v]) => `<div class="dossier-lore-field"><span class="dossier-lore-key">${esc(k)}</span><span class="dossier-lore-val">${esc(v)}</span></div>`).join('')}
+      </div>` : ''}
+      ${e.summary ? `<div class="dossier-lore-summary"><div class="dossier-lore-summary-label">Summary</div><p>${esc(e.summary)}</p></div>` : ''}
+    `;
+  }
 
-  pane.querySelector('#fleet-add-btn')?.addEventListener('click', () => {
-    activeFleetId = null;
-    fleetViewMode = 'edit';
-    renderFleetsPane(systemId);
-  });
+  /* ── Divider accent by category ── */
+  const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : (cat==='doctrine' ? ' slate' : ''));
 
-  pane.querySelectorAll('.fleet-list-item').forEach(el => {
-    el.addEventListener('click', () => {
-      activeFleetId = el.dataset.fleetId;
-      fleetViewMode = 'detail';
-      renderFleetsPane(systemId);
-    });
+  main.innerHTML = `
+    <div class="dossier">
+      <div class="dossier-class-bar">
+        <span class="dossier-class-tag ${cat}">${catLabel}</span>
+        <span>${esc(e.id)}</span>
+        <span>${e.classification ? '— ' + esc(e.classification) : ''}</span>
+      </div>
+      <div class="dossier-title">${esc(e.title || 'Untitled')}</div>
+      <div class="dossier-subtitle">${esc(e.designation || '')}</div>
+      <div class="dossier-divider${divAccent}"></div>
+      ${metaHeaderHTML}
+      ${loreHeaderHTML}
+      ${e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
+      ${statsHTML}
+      ${e.body ? `<div class="dossier-divider${divAccent}"></div><div class="dossier-body">${e.body}</div>` : ''}
+      ${docFooterHTML}
+      <div class="dossier-actions">
+        <button class="pbtn primary" id="d-edit">✎ EDIT</button>
+        <button class="pbtn" id="d-dup">⧉ DUPLICATE</button>
+        <button class="pbtn danger" id="d-del">✕ DELETE</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('d-edit').onclick = () => { if(requireEditor()) editEntry(id); };
+  document.getElementById('d-dup').onclick = () => {
+    if(!requireEditor()) return;
+    const clone = JSON.parse(JSON.stringify(e));
+    clone.id = genId(); clone.title += ' (Copy)'; clone.updated = Date.now();
+    entries.push(clone); save(); activeId = clone.id; renderList(); viewEntry(clone.id); toast('Entry duplicated');
+  };
+  document.getElementById('d-del').onclick = () => {
+    if(!requireEditor()) return;
+    if(!confirm('Delete "'+e.title+'"?')) return;
+    entries = entries.filter(x => x.id !== id); save(); activeId = null; renderList();
+    main.innerHTML = document.getElementById('empty-view')?.outerHTML || '';
+    toast('Entry deleted');
+  };
+}
+
+/* ══════════════════════════════════════════
+   NEW ENTRY PICKER
+   ══════════════════════════════════════════ */
+function showNewEntryPicker() {
+  main.innerHTML = `
+    <div class="editor-page">
+      <div class="editor-title">Create New Entry</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;">
+        <div class="template-card" data-tpl="ship">
+          <div style="font-size:28px;margin-bottom:8px;">⬡</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--cyan);">Ship Dossier</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Naval combat asset with structured specs.</div>
+        </div>
+        <div class="template-card" data-tpl="vehicle">
+          <div style="font-size:28px;margin-bottom:8px;">◈</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--gold);">Vehicle Dossier</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Ground, air, or orbital vehicle.</div>
+        </div>
+        <div class="template-card" data-tpl="soldier">
+          <div style="font-size:28px;margin-bottom:8px;">◉</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--green);">Soldier / Unit</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Personnel type or combat role.</div>
+        </div>
+        <div class="template-card" data-tpl="technology">
+          <div style="font-size:28px;margin-bottom:8px;">⚙</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--purple);">Technology</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Weapons, shields, propulsion, materials, sensors — any tech system.</div>
+        </div>
+        <div class="template-card" data-tpl="lore">
+          <div style="font-size:28px;margin-bottom:8px;">📜</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--amber);">Lore & History</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Factions, events, mythology, culture, places, timelines.</div>
+        </div>
+        <div class="template-card" data-tpl="doctrine">
+          <div style="font-size:28px;margin-bottom:8px;">📋</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--slate);">Doctrine & Org</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Rank structures, formations, SOPs, fleet manuals, codex directives.</div>
+        </div>
+        <div class="template-card" data-tpl="freeform">
+          <div style="font-size:28px;margin-bottom:8px;">✦</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--text);">Freeform Entry</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Full rich-text editor, no template.</div>
+        </div>
+      </div>
+    </div>
+    <style>
+      .template-card{background:rgba(8,13,24,.6);border:1px solid var(--border);border-radius:4px;padding:20px;cursor:pointer;transition:all .15s;text-align:center;}
+      .template-card:hover{border-color:var(--border2);background:rgba(56,232,255,.03);transform:translateY(-2px);}
+    </style>
+  `;
+  main.querySelectorAll('.template-card').forEach(card => {
+    card.onclick = () => editEntry(null, card.dataset.tpl);
   });
 }
 
-function fleetListItemHTML(f) {
-  const total = getTotalShips(f);
-  const statusClass = (f.status || 'Stationed').toLowerCase().replace(/\s/g,'-');
-  return `<div class="fleet-list-item" data-fleet-id="${f.id}">
-    <div class="fleet-emblem">⬡</div>
-    <div class="fleet-info">
-      <div class="fleet-name">${f.name || 'Unnamed Fleet'}</div>
-      <div class="fleet-subtitle">${f.captain || '—'} · <span class="fleet-status-badge ${statusClass}">${f.status || 'Stationed'}</span></div>
-    </div>
-    <div class="fleet-ship-count">${total}<br><span style="font-size:9px;color:var(--text-muted);">SHIPS</span></div>
+/* ══════════════════════════════════════════
+   RICH TEXT TOOLBAR + EDITOR
+   ══════════════════════════════════════════ */
+function buildToolbar() {
+  return `<div class="toolbar" id="toolbar">
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h1" title="">H1</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h2" title="">H2</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h3" title="">H3</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="h4" title="">H4</button>
+    <button class="tb-btn" data-cmd="formatBlock" data-val="p" title="">¶</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="bold" title=""><b>B</b></button>
+    <button class="tb-btn" data-cmd="italic" title=""><i>I</i></button>
+    <button class="tb-btn" data-cmd="underline" title=""><u>U</u></button>
+    <button class="tb-btn" data-cmd="strikeThrough" title="">S̶</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="insertUnorderedList" title="">•</button>
+    <button class="tb-btn" data-cmd="insertOrderedList" title="">1.</button>
+    <button class="tb-btn" data-action="blockquote" title="">❝</button>
+    <button class="tb-btn" data-action="code" title="">⟨⟩</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-action="table" title="">⊞</button>
+    <button class="tb-btn" data-action="hr" title="">―</button>
+    <button class="tb-btn" data-action="link" title="">🔗</button>
+    <button class="tb-btn" data-action="image-upload" title="">🖼</button>
+    <input type="file" id="tb-img-upload" accept="image/*" style="display:none;" multiple/>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="removeFormat" title="">✕</button>
   </div>`;
 }
 
-function renderFleetDetail(pane, fleet) {
-  const total = getTotalShips(fleet);
-  const systemName = getFleetSystemName(fleet.systemId);
-  const statusClass = (fleet.status || 'Stationed').toLowerCase().replace(/\s/g,'-');
-  const destName = fleet.destinationId ? getFleetSystemName(fleet.destinationId) : null;
-
-  let shipsHTML = '';
-  if (fleet.ships && fleet.ships.length > 0) {
-    shipsHTML = fleet.ships.filter(s => s.qty > 0).map(s => {
-      const cls = ELVISH_SHIP_CLASSES.find(c => c.name === s.className) || {};
-      return `<div class="ship-line">
-        <span class="ship-tier-badge">${cls.tier || '—'}</span>
-        <span class="ship-class-name">${s.className}</span>
-        <span class="ship-qty">×${s.qty}</span>
-      </div>`;
-    }).join('');
-  } else {
-    shipsHTML = '<div style="color:var(--text-muted);font-size:13px;font-style:italic;">No vessels assigned</div>';
-  }
-
-  pane.innerHTML = `
-    <div style="margin-bottom:10px;">
-      <button class="pbtn" id="fleet-back-btn" style="padding:4px 10px;font-size:10px;">← FLEET LIST</button>
-    </div>
-    <div class="fleet-detail-header">
-      <div class="fleet-detail-emblem">⬡</div>
-      <div>
-        <div class="fleet-detail-title">${fleet.name || 'Unnamed Fleet'}</div>
-        <div class="fleet-detail-sub">${fleet.id}</div>
-      </div>
-    </div>
-    <div class="stats-grid" style="margin-bottom:14px;">
-      <div class="stat-cell">
-        <div class="stat-key">Captain</div>
-        <div class="stat-val" style="font-size:15px;color:var(--gold);">${fleet.captain || '—'}</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Vessels</div>
-        <div class="stat-val gold">${total}</div>
-        <div class="stat-sub">${(fleet.ships || []).filter(s=>s.qty>0).length} CLASSES</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Status</div>
-        <div style="margin-top:4px;"><span class="fleet-status-badge ${statusClass}">${fleet.status || 'Stationed'}</span></div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-key">Location</div>
-        <div class="stat-val" style="font-size:14px;"><span class="fleet-location-chip" data-sys="${fleet.systemId || ''}">${systemName}</span></div>
-      </div>
-    </div>
-    ${destName ? `<div class="meta-row"><span class="mk">Destination</span><span class="mv go">${destName}</span></div>` : ''}
-    ${fleet.designation ? `<div class="meta-row"><span class="mk">Designation</span><span class="mv">${fleet.designation}</span></div>` : ''}
-    <div class="fleet-section" style="margin-top:14px;">
-      <div class="fleet-section-title">Ship Manifest</div>
-      ${shipsHTML}
-    </div>
-    <div class="fleet-section">
-      <div class="fleet-section-title">Fleet Notes</div>
-      <div class="fleet-notes-box">${fleet.notes || ''}</div>
-    </div>
-    <div class="edit-actions" style="margin-top:10px;">
-      <button class="pbtn primary" id="fleet-edit-btn" style="flex:1;padding:8px;">✎ EDIT FLEET</button>
-      <button class="pbtn danger" id="fleet-delete-btn" style="padding:8px 12px;">✕ DELETE</button>
-    </div>
-  `;
-
-  pane.querySelector('#fleet-back-btn').addEventListener('click', () => {
-    fleetViewMode = 'list';
-    activeFleetId = null;
-    renderFleetsPane(selectedId);
-  });
-
-  pane.querySelector('#fleet-edit-btn').addEventListener('click', () => {
-    fleetViewMode = 'edit';
-    renderFleetsPane(selectedId);
-  });
-
-  pane.querySelector('#fleet-delete-btn').addEventListener('click', () => {
-    if (!confirm(`Delete fleet "${fleet.name}"?`)) return;
-    fleets = fleets.filter(f => f.id !== fleet.id);
-    saveFleets();
-    fleetViewMode = 'list';
-    activeFleetId = null;
-    renderFleetsPane(selectedId);
-  });
-
-  pane.querySelectorAll('.fleet-location-chip').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const sysId = el.dataset.sys;
-      if (sysId && sysId !== selectedId) {
-        selectedId = sysId;
-        ensureSystemDetails(sysId).then(det => renderPanel(sysId, det));
+function wireToolbar() {
+  const tb = document.getElementById('toolbar');
+  if (!tb) return;
+  tb.addEventListener('mousedown', e => e.preventDefault());
+  tb.addEventListener('click', e => {
+    const btn = e.target.closest('.tb-btn');
+    if (!btn) return;
+    const ed = document.getElementById('editor-area');
+    ed.focus();
+    const cmd = btn.dataset.cmd;
+    const action = btn.dataset.action;
+    if (cmd === 'formatBlock') {
+      document.execCommand('formatBlock', false, '<' + btn.dataset.val + '>');
+    } else if (cmd) {
+      document.execCommand(cmd, false, null);
+    } else if (action === 'table') {
+      const cols = prompt('Columns:','3'), rows = prompt('Rows:','3');
+      if (!cols || !rows) return;
+      let html = '<table><thead><tr>';
+      for (let c=0;c<+cols;c++) html += '<th>Header</th>';
+      html += '</tr></thead><tbody>';
+      for (let r=0;r<+rows;r++) { html += '<tr>'; for(let c=0;c<+cols;c++) html += '<td>&nbsp;</td>'; html += '</tr>'; }
+      html += '</tbody></table><p><br></p>';
+      document.execCommand('insertHTML', false, html);
+    } else if (action === 'hr') {
+      document.execCommand('insertHTML', false, '<hr><p><br></p>');
+    } else if (action === 'link') {
+      const url = prompt('URL:','https://');
+      if (url) document.execCommand('createLink', false, url);
+    } else if (action === 'image-upload') {
+      document.getElementById('tb-img-upload').click();
+    } else if (action === 'blockquote') {
+      document.execCommand('formatBlock', false, '<blockquote>');
+    } else if (action === 'code') {
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        const text = range.toString();
+        if (text.includes('\n') || text.length > 60) {
+          document.execCommand('insertHTML', false, '<pre><code>'+esc(text)+'</code></pre><p><br></p>');
+        } else {
+          document.execCommand('insertHTML', false, '<code>'+esc(text)+'</code>');
+        }
       }
+    }
+  });
+
+  /* ── File upload handler for images ── */
+  const fileInput = document.getElementById('tb-img-upload');
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files);
+      files.forEach(f => insertImageFile(f));
+      fileInput.value = '';
     });
+  }
+}
+
+/* ── Image utilities ── */
+const MAX_IMG_WIDTH = 800;
+const MAX_IMG_BYTES = 400000; // aim for <400KB per image to preserve localStorage space
+
+function insertImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      let dataUrl;
+      if (img.width > MAX_IMG_WIDTH || file.size > MAX_IMG_BYTES) {
+        dataUrl = resizeImage(img, MAX_IMG_WIDTH);
+      } else {
+        dataUrl = reader.result;
+      }
+      const ed = document.getElementById('editor-area');
+      ed.focus();
+      document.execCommand('insertHTML', false, '<img src="'+dataUrl.replace(/"/g,'&quot;')+'" alt="'+esc(file.name)+'"/><p><br></p>');
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resizeImage(img, maxW) {
+  const ratio = Math.min(maxW / img.width, 1);
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  // try webp first for smaller size, fall back to jpeg
+  let dataUrl = cvs.toDataURL('image/webp', 0.82);
+  if (dataUrl.length < 50) dataUrl = cvs.toDataURL('image/jpeg', 0.82);
+  return dataUrl;
+}
+
+function setupEditorImageHandlers(editorEl) {
+  /* ── Drag & drop images into editor ── */
+  editorEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  editorEl.addEventListener('drop', e => {
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    e.preventDefault();
+    files.forEach(f => insertImageFile(f));
+  });
+
+  /* ── Paste images from clipboard ── */
+  editorEl.addEventListener('paste', ev => {
+    const items = Array.from(ev.clipboardData.items || []);
+    const imageItems = items.filter(i => i.type.startsWith('image/'));
+    if (imageItems.length) {
+      ev.preventDefault();
+      imageItems.forEach(item => {
+        const file = item.getAsFile();
+        if (file) insertImageFile(file);
+      });
+      return;
+    }
+    // fallback: paste HTML or text
+    ev.preventDefault();
+    const html = ev.clipboardData.getData('text/html') || ev.clipboardData.getData('text/plain');
+    document.execCommand('insertHTML', false, html);
   });
 }
 
-function renderFleetEditor(pane, fleet, systemId) {
-  const isNew = !fleet;
-  const f = fleet || { id: generateFleetId(), name: '', captain: '', status: 'Stationed', systemId: systemId, destinationId: '', designation: '', ships: [], notes: '' };
+/* ══════════════════════════════════════════
+   EDIT ENTRY
+   ══════════════════════════════════════════ */
+function editEntry(id, tpl) {
+  const isNew = !id;
+  const e = id ? entries.find(x => x.id === id) : {
+    id:genId(), category:tpl||'freeform', title:'', designation:'', classification:'',
+    role:'', stats:[], body:'', updated:Date.now(),
+    /* tech-specific */ opStatus:'', accessLevel:'', origin:'', docClass:'', revision:'',
+    /* lore-specific */ era:'', region:'', summary:'',
+    /* doctrine-specific */ distribution:'', scope:'', authority:''
+  };
+  const cat = e.category || 'freeform';
 
-  const shipClassOptions = ELVISH_SHIP_CLASSES.map(c => `<option value="${c.name}">${c.shortName} — ${c.tier}</option>`).join('');
-  const statusOptions = FLEET_STATUSES.map(s => `<option value="${s}" ${f.status===s?'selected':''}>${s}</option>`).join('');
-  const systemOptions = systems.map(s => `<option value="${s.id}" ${f.systemId===s.id?'selected':''}>${s.name || s.id}</option>`).join('');
-  const destOptions = `<option value="">— None —</option>` + systems.map(s => `<option value="${s.id}" ${f.destinationId===s.id?'selected':''}>${s.name || s.id}</option>`).join('');
+  let templateFields = '';
 
-  let shipsHTML = '';
-  (f.ships || []).forEach((s, i) => {
-    shipsHTML += fleetShipEditorRow(s, i, shipClassOptions);
-  });
-
-  pane.innerHTML = `
-    <div style="margin-bottom:10px;">
-      <button class="pbtn" id="fleet-back-btn" style="padding:4px 10px;font-size:10px;">← CANCEL</button>
-    </div>
-    <div class="fleet-section-title" style="margin-bottom:12px;">${isNew ? 'CREATE NEW FLEET' : 'EDIT FLEET'}</div>
-    <div class="edit-section">
-      <div class="edit-section-title">Fleet Identity</div>
-      <div class="form-row"><span class="fl">Name</span><input id="fe-name" class="sci-input" type="text" value="${(f.name||'').replace(/"/g,'&quot;')}" placeholder="Fleet name..."/></div>
-      <div class="form-row"><span class="fl">Captain</span><input id="fe-captain" class="sci-input" type="text" value="${(f.captain||'').replace(/"/g,'&quot;')}" placeholder="Commanding officer..."/></div>
-      <div class="form-row"><span class="fl">Designation</span><input id="fe-designation" class="sci-input" type="text" value="${(f.designation||'').replace(/"/g,'&quot;')}" placeholder="e.g. 3rd Expeditionary"/></div>
-      <div class="form-row"><span class="fl">Status</span><select id="fe-status" class="sci-select">${statusOptions}</select></div>
-      <div class="form-row"><span class="fl">System</span><select id="fe-system" class="sci-select">${systemOptions}</select></div>
-      <div class="form-row"><span class="fl">Destination</span><select id="fe-dest" class="sci-select">${destOptions}</select></div>
-    </div>
-    <div class="edit-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Ship Composition</div>
-        <button id="fe-add-ship" class="pbtn primary" style="margin-bottom:10px;padding:3px 8px;font-size:10px;">+ ADD CLASS</button>
+  if (cat === 'technology') {
+    const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">System Identification</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. ICAS-AURION — Shipborne AI Command Model"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Strategic AI / Integrated Command Assistant"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${esc(e.opStatus||'')}" placeholder="e.g. Active Service — Fleetwide Standard"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Vanyamar Orbital Research Foundry"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Primary function and operational purpose...">${esc(e.role||'')}</textarea></div>
       </div>
-      <div id="fe-ship-list" style="margin-top:6px;">
-        ${shipsHTML}
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Technical Summary</div>
+          <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ SPEC</button>
+        </div>
+        <div id="stat-list">${statsHTML}</div>
       </div>
-    </div>
-    <div class="edit-section">
-      <div class="edit-section-title">Notes</div>
-      <textarea id="fe-notes" class="fleet-textarea" placeholder="Fleet notes, mission briefing, orders...">${f.notes || ''}</textarea>
-    </div>
-    <div class="edit-actions">
-      <button id="fe-save" class="pbtn success" style="flex:1;padding:8px;">✓ ${isNew ? 'CREATE FLEET' : 'SAVE CHANGES'}</button>
-      <button id="fe-cancel" class="pbtn danger" style="padding:8px 12px;">✕</button>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — CYBERNETICS DIVISION"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. ICAS-AURION-SYS-013-B"/></div>
+      </div>
+    `;
+  } else if (cat === 'lore') {
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">Context</div>
+        <div class="form-row"><span class="fl">Subject</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. The Sundering of Calandorë"/></div>
+        <div class="form-row"><span class="fl">Era / Period</span><input id="ed-era" class="sci-input" type="text" value="${esc(e.era||'')}" placeholder="e.g. Second Age of Stars / Pre-Expansion"/></div>
+        <div class="form-row"><span class="fl">Region</span><input id="ed-region" class="sci-input" type="text" value="${esc(e.region||'')}" placeholder="e.g. Arandorë Eldainë / Vanyamar System"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Historical Event / Mythology / Cultural Tradition"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-summary" class="sci-textarea" style="min-height:80px;" placeholder="Brief overview — the essential facts before the full account...">${esc(e.summary||'')}</textarea></div>
+      </div>
+    `;
+  } else if (cat === 'doctrine') {
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">Document Header</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. Doctrine, Structure & Fleet Operating Manual"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
+        <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${esc(e.distribution||'')}" placeholder="e.g. Restricted — AEN Command, Fleet Staff, Authorized Personnel Only"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Purpose</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="What this document provides — executive summary of its function...">${esc(e.role||'')}</textarea></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Scope</span><textarea id="ed-scope" class="sci-textarea" style="min-height:60px;" placeholder="What areas this document covers...">${esc(e.scope||'')}</textarea></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Authority</span><textarea id="ed-authority" class="sci-textarea" style="min-height:40px;" placeholder="Issuing authority and binding status...">${esc(e.authority||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Prepared By</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Doctrine & Fleet Employment Office, Anorvalas Naval Command"/></div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. AEN-DOCTRINE-OVR-001-A"/></div>
+      </div>
+    `;
+  } else if (cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
+    const detailLabel = {ship:'Ship Identification',vehicle:'Vehicle Identification',soldier:'Unit Identification'}[cat];
+    const desigPlaceholder = {ship:'e.g. Thalasrën-Class Light Frigate — Troop Transport & Close-Support Frigate',vehicle:'e.g. Velendril "Wardancer" — Tracked IFV / Mechanized Assault Carrier',soldier:'e.g. Caelyndor Marinyr Clone Trooper Corps (CM-CTC)'}[cat];
+    const classPlaceholder = {ship:'e.g. Light Frigate / Troop Transport / Close Bombardment Support',vehicle:'e.g. Infantry Fighting Vehicle / Mechanized Assault Carrier',soldier:'e.g. Elite Naval Infantry / Biogenic Troopers'}[cat];
+    const rolePlaceholder = {ship:'e.g. Fast, well-protected troop transport and close-support combatant...',vehicle:'e.g. Protected mechanized transport and close-support IFV...',soldier:'e.g. Shipborne assault infantry designed for void operations, hull breaching...'}[cat];
+    const statsLabel = {ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance Metrics'}[cat];
+    const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">${detailLabel}</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="${desigPlaceholder}"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="${classPlaceholder}"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${esc(e.opStatus||'')}" placeholder="e.g. Active Service — AEN Fleet Standard"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Restricted — AEN Command & Engineering Division Only"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Calandorë Orbital Shipworks"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="${rolePlaceholder}">${esc(e.role||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">${statsLabel}</div>
+          <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ STAT</button>
+        </div>
+        <div id="stat-list">${statsHTML}</div>
+      </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — MEDICAL & BIOLOGICS COMMAND"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. VANY-CMCTC-001-B"/></div>
+      </div>
+    `;
+  }
+
+  const bodyLabel = {
+    technology:'System Overview / Capabilities / Security',
+    lore:'Full Account',
+    freeform:'Content',
+    doctrine:'Ranks / Formations / Procedures / Tables',
+    ship:'Purpose / Armament / Armor / Systems / Complement',
+    vehicle:'Purpose / Armament / Armor / Defensive Systems / Crew Support',
+    soldier:'Overview / Enhancements / Equipment / Safeguards'
+  }[cat] || 'Extended Content';
+
+  main.innerHTML = `
+    <div class="editor-page">
+      <div class="editor-title">${isNew ? 'NEW ' + cat.toUpperCase() + ' ENTRY' : 'EDIT ENTRY'}</div>
+      <div class="edit-section">
+        <div class="edit-section-title">Identity</div>
+        <div class="form-row"><span class="fl">Title</span><input id="ed-title" class="sci-input" type="text" value="${esc(e.title||'')}" placeholder="Entry title..."/></div>
+        ${cat==='freeform' ? `<div class="form-row"><span class="fl">Subtitle</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="Optional subtitle..."/></div>` : ''}
+      </div>
+      ${templateFields}
+      <div class="edit-section">
+        <div class="edit-section-title">${bodyLabel}</div>
+        ${buildToolbar()}
+        <div contenteditable="true" id="editor-area">${e.body||'<p><br></p>'}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="pbtn success" id="ed-save" style="flex:1;padding:8px;">✓ ${isNew?'CREATE':'SAVE'}</button>
+        <button class="pbtn" id="ed-cancel" style="padding:8px 14px;">CANCEL</button>
+      </div>
     </div>
   `;
 
-  const shipList = pane.querySelector('#fe-ship-list');
+  wireToolbar();
 
-  pane.querySelector('#fe-add-ship').addEventListener('click', () => {
-    const idx = shipList.querySelectorAll('.fleet-edit-ship-row').length;
+  // stat rows (ship/vehicle/soldier/technology)
+  const statList = document.getElementById('stat-list');
+  document.getElementById('add-stat')?.addEventListener('click', () => {
+    const idx = statList?.querySelectorAll('.stat-editor-row').length || 0;
     const tmp = document.createElement('div');
-    tmp.innerHTML = fleetShipEditorRow({ className: ELVISH_SHIP_CLASSES[0].name, qty: 1 }, idx, shipClassOptions);
-    shipList.appendChild(tmp.firstElementChild);
+    tmp.innerHTML = statRow('','',idx);
+    statList.appendChild(tmp.firstElementChild);
+  });
+  statList?.addEventListener('click', ev => {
+    if (ev.target.closest('.stat-del')) ev.target.closest('.stat-editor-row').remove();
   });
 
-  shipList.addEventListener('click', e => {
-    if (e.target?.matches('.del-ship-btn')) {
-      e.target.closest('.fleet-edit-ship-row').remove();
-    }
-  });
-
-  const goBack = () => {
-    if (isNew) {
-      fleetViewMode = 'list';
-      activeFleetId = null;
-    } else {
-      fleetViewMode = 'detail';
-    }
-    renderFleetsPane(selectedId);
+  // save
+  document.getElementById('ed-save').onclick = () => {
+    const updated = {
+      id: e.id,
+      category: cat,
+      title: document.getElementById('ed-title').value.trim() || 'Untitled',
+      designation: document.getElementById('ed-desig')?.value.trim() || '',
+      classification: document.getElementById('ed-class')?.value.trim() || '',
+      role: document.getElementById('ed-role')?.value.trim() || '',
+      stats: statList ? Array.from(statList.querySelectorAll('.stat-editor-row')).map(row => ({
+        key: row.querySelector('.sk').value.trim(),
+        val: row.querySelector('.sv').value.trim()
+      })).filter(s => s.key || s.val) : (e.stats || []),
+      body: document.getElementById('editor-area').innerHTML,
+      updated: Date.now(),
+      /* tech fields */
+      opStatus: document.getElementById('ed-opstatus')?.value.trim() || '',
+      accessLevel: document.getElementById('ed-access')?.value.trim() || '',
+      origin: document.getElementById('ed-origin')?.value.trim() || '',
+      docClass: document.getElementById('ed-docclass')?.value.trim() || '',
+      revision: document.getElementById('ed-revision')?.value.trim() || '',
+      /* lore fields */
+      era: document.getElementById('ed-era')?.value.trim() || '',
+      region: document.getElementById('ed-region')?.value.trim() || '',
+      summary: document.getElementById('ed-summary')?.value.trim() || '',
+      /* doctrine fields */
+      distribution: document.getElementById('ed-distribution')?.value.trim() || '',
+      scope: document.getElementById('ed-scope')?.value.trim() || '',
+      authority: document.getElementById('ed-authority')?.value.trim() || ''
+    };
+    if (isNew) { entries.push(updated); } else { const idx=entries.findIndex(x=>x.id===e.id); if(idx>=0) entries[idx]=updated; }
+    save(); activeId = updated.id; renderList(); viewEntry(updated.id); toast(isNew?'Entry created':'Entry saved');
   };
 
-  pane.querySelector('#fleet-back-btn').addEventListener('click', goBack);
-  pane.querySelector('#fe-cancel').addEventListener('click', goBack);
+  document.getElementById('ed-cancel').onclick = () => {
+    if (activeId) viewEntry(activeId);
+    else { main.innerHTML = ''; activeId = null; }
+  };
 
-  pane.querySelector('#fe-save').addEventListener('click', () => {
-    if (!requireEditor()) return;
-    const newFleet = {
-      id: f.id,
-      name: pane.querySelector('#fe-name').value.trim() || 'Unnamed Fleet',
-      captain: pane.querySelector('#fe-captain').value.trim(),
-      designation: pane.querySelector('#fe-designation').value.trim(),
-      status: pane.querySelector('#fe-status').value,
-      systemId: pane.querySelector('#fe-system').value,
-      destinationId: pane.querySelector('#fe-dest').value || '',
-      notes: pane.querySelector('#fe-notes').value,
-      ships: Array.from(shipList.querySelectorAll('.fleet-edit-ship-row')).map(row => ({
-        className: row.querySelector('.fe-ship-class').value,
-        qty: Math.max(0, parseInt(row.querySelector('.fe-ship-qty').value) || 0)
-      })).filter(s => s.qty > 0)
-    };
-
-    if (isNew) {
-      fleets.push(newFleet);
-    } else {
-      const idx = fleets.findIndex(fl => fl.id === f.id);
-      if (idx >= 0) fleets[idx] = newFleet;
-    }
-    saveFleets();
-    activeFleetId = newFleet.id;
-    fleetViewMode = 'detail';
-    renderFleetsPane(selectedId);
-  });
+  setupEditorImageHandlers(document.getElementById('editor-area'));
 }
 
-function fleetShipEditorRow(ship, idx, classOptions) {
-  const selected = ship.className || ELVISH_SHIP_CLASSES[0].name;
-  const opts = ELVISH_SHIP_CLASSES.map(c => `<option value="${c.name}" ${c.name===selected?'selected':''}>${c.shortName} — ${c.tier}</option>`).join('');
-  return `<div class="fleet-edit-ship-row">
-    <select class="fe-ship-class sci-select" style="font-size:12px;">${opts}</select>
-    <input class="fe-ship-qty sci-input" type="number" min="0" value="${ship.qty || 1}" style="text-align:center;"/>
-    <button type="button" class="del-ship-btn" title="Remove">✕</button>
+function statRow(key, val, idx) {
+  return `<div class="stat-editor-row">
+    <input class="sk sci-input" type="text" value="${esc(key)}" placeholder="Stat name (e.g. Length)"/>
+    <input class="sv sci-input" type="text" value="${esc(val)}" placeholder="Value (e.g. 18 meters)"/>
+    <button type="button" class="stat-del" title="Remove">✕</button>
   </div>`;
 }
 
-/* ── FLEET MAP ICONS ── */
-
-const fleetIconsLayer = document.getElementById('fleet-icons-layer');
-let fleetIconElements = new Map();
-
-function updateFleetMapIcons(mvp) {
-  if (!fleetIconsLayer) return;
-
-  // Group fleets by system
-  const bySystem = new Map();
-  for (const f of fleets) {
-    if (!f.systemId) continue;
-    if (!bySystem.has(f.systemId)) bySystem.set(f.systemId, []);
-    bySystem.get(f.systemId).push(f);
-  }
-
-  // Track which systems still have fleets
-  const activeKeys = new Set();
-
-  for (const [sysId, sysFleets] of bySystem) {
-    const pos = idToWorld.get(sysId);
-    if (!pos) continue;
-
-    const screen = projectToScreen(pos[0], pos[1], pos[2], mvp);
-    if (!screen || screen[2] < -1 || screen[2] > 1) {
-      // Off screen
-      for (const f of sysFleets) {
-        const el = fleetIconElements.get(f.id);
-        if (el) el.style.display = 'none';
-      }
-      continue;
-    }
-
-    const sx = screen[0] / (canvas.width / canvas.clientWidth);
-    const sy = screen[1] / (canvas.height / canvas.clientHeight);
-
-    const totalFleets = sysFleets.length;
-    sysFleets.forEach((f, i) => {
-      activeKeys.add(f.id);
-      let el = fleetIconElements.get(f.id);
-      if (!el) {
-        el = createFleetIconElement(f);
-        fleetIconsLayer.appendChild(el);
-        fleetIconElements.set(f.id, el);
-      }
-
-      // Position: offset to the right/left of the star
-      const offsetX = 20 + i * 18;
-      const offsetY = -6;
-      el.style.left = (sx + offsetX) + 'px';
-      el.style.top = (sy + offsetY) + 'px';
-      el.style.display = 'flex';
-
-      const statusClass = (f.status || 'Stationed').toLowerCase().replace(/\s/g,'-');
-      el.className = 'fleet-map-icon' + (statusClass === 'in-transit' ? ' in-transit' : '');
-
-      // Update label
-      const labelEl = el.querySelector('.fmi-label');
-      if (labelEl) labelEl.textContent = f.name || 'FLT';
-      const countEl = el.querySelector('.fmi-count');
-      if (countEl) countEl.textContent = getTotalShips(f) + ' ships';
-    });
-  }
-
-  // Hide removed fleet icons
-  for (const [fid, el] of fleetIconElements) {
-    if (!activeKeys.has(fid)) {
-      el.style.display = 'none';
-    }
-  }
-}
-
-function createFleetIconElement(fleet) {
-  const el = document.createElement('div');
-  el.className = 'fleet-map-icon';
-  el.innerHTML = `
-    <div class="fmi-diamond"></div>
-    <div class="fmi-label">${fleet.name || 'FLT'}</div>
-    <div class="fmi-count">${getTotalShips(fleet)} ships</div>
-  `;
-  el.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (fleet.systemId) {
-      selectedId = fleet.systemId;
-      activeFleetId = fleet.id;
-      fleetViewMode = 'detail';
-      ensureSystemDetails(fleet.systemId).then(det => {
-        renderPanel(fleet.systemId, det);
-        // Switch to fleets tab
-        document.querySelector('#sp-tabs .tab[data-tab="fleets"]')?.click();
-      });
-    }
-  });
-  return el;
-}
-
-// Also export fleets when pressing X in editor mode
-const _origKeydown = null;
-window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'x' && editMode && editorOK) {
-    // The existing X handler saves systems.json; we also include fleets
-    // We let the original handler fire, and additionally save fleets into the JSON
-  }
-});
-
-// Override the X export to include fleets
-const origXHandler = window.addEventListener;
-// Patch into the existing X key export by wrapping initFromData's export
-// Actually, let's just modify the existing key handler indirectly.
-// The simplest approach: store fleets alongside systems in the export.
-
-// We'll hook into the existing 'x' key by also exporting a fleets.json
-window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'f' && !editMode && !addMode) {
-    // F key toggles fleet tab if panel is open
-    if (panel.style.transform === 'translateX(0)' || panel.style.transform === 'translateX(0px)') {
-      document.querySelector('#sp-tabs .tab[data-tab="fleets"]')?.click();
-    }
-  }
-});
+/* ══════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════ */
+load();
+renderList();
+updateCount();
+</script>
+</body>
+</html>
