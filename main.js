@@ -1335,3 +1335,542 @@ function loop() {
 
   requestAnimationFrame(loop);
 }
+
+// ═══════════════════════════════════════════════════════
+//  FLEET SYSTEM
+// ═══════════════════════════════════════════════════════
+
+const FLEET_STORE_KEY = 'sgn:fleets:v1';
+const FLEET_FACTIONS  = ['Player','Allied','Neutral','Enemy','Unknown'];
+const FLEET_STATUSES  = ['Active','In Transit','Blockading','Repairing','Destroyed'];
+const FLEET_SHIP_CLASSES = [
+  'Flagship','Battleship','Cruiser','Destroyer','Frigate',
+  'Corvette','Carrier','Dreadnought','Scout','Transport','Station'
+];
+const FACTION_COLORS = {
+  'Player':   '#38e8ff',
+  'Allied':   '#5cdb7a',
+  'Neutral':  '#f5c542',
+  'Enemy':    '#ff3b3b',
+  'Unknown':  '#8899aa',
+};
+
+function loadFleets() {
+  try { return JSON.parse(localStorage.getItem(FLEET_STORE_KEY) || '{}'); } catch { return {}; }
+}
+function saveFleets(data) {
+  try { localStorage.setItem(FLEET_STORE_KEY, JSON.stringify(data)); } catch {}
+}
+function getFleetsAtSystem(sysId) {
+  const all = loadFleets();
+  return Object.values(all).filter(f => f.systemId === sysId);
+}
+function getFleetById(fid) {
+  return loadFleets()[fid] || null;
+}
+function upsertFleet(fleet) {
+  const all = loadFleets();
+  all[fleet.id] = fleet;
+  saveFleets(all);
+}
+function deleteFleet(fid) {
+  const all = loadFleets();
+  delete all[fid];
+  saveFleets(all);
+}
+function newFleetId() {
+  return 'FLT_' + Date.now().toString(36).toUpperCase();
+}
+function totalShips(fleet) {
+  return (fleet.ships || []).reduce((s, r) => s + (parseInt(r.count) || 0), 0);
+}
+
+// ── Fleet 2D overlay canvas ──────────────────────────
+const fleetCanvas = document.getElementById('fleet-canvas');
+const fctx        = fleetCanvas.getContext('2d');
+
+function resizeFleetCanvas() {
+  fleetCanvas.width  = Math.floor(window.innerWidth  * (window.devicePixelRatio || 1));
+  fleetCanvas.height = Math.floor(window.innerHeight * (window.devicePixelRatio || 1));
+  fleetCanvas.style.width  = window.innerWidth  + 'px';
+  fleetCanvas.style.height = window.innerHeight + 'px';
+}
+resizeFleetCanvas();
+window.addEventListener('resize', resizeFleetCanvas);
+
+function drawFleetIcon(ctx, sx, sy, color, count, dpr, highlight) {
+  const r = 11 * dpr;
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // outer ring glow
+  if (highlight) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 5 * dpr, 0, Math.PI * 2);
+    ctx.strokeStyle = color + 'aa';
+    ctx.lineWidth   = 1.5 * dpr;
+    ctx.stroke();
+  }
+
+  // filled circle bg
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle   = 'rgba(4,7,14,0.88)';
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5 * dpr;
+  ctx.stroke();
+
+  // ship SVG-style icon drawn with canvas paths (a simple chevron/arrowhead)
+  ctx.fillStyle = color;
+  const s = r * 0.52;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.1);
+  ctx.lineTo( s * 0.7, s * 0.7);
+  ctx.lineTo(0, s * 0.2);
+  ctx.lineTo(-s * 0.7, s * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  // ship count badge
+  if (count > 0) {
+    const br = 7 * dpr;
+    const bx = r - 1 * dpr, by = -r + 1 * dpr;
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.fillStyle = '#020408';
+    ctx.font      = `bold ${8 * dpr}px "Share Tech Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.min(count, 99), bx, by + 0.5 * dpr);
+  }
+
+  ctx.restore();
+}
+
+// holds {fid, sx, sy, r} for hit-testing each frame
+let _fleetHitTargets = [];
+let _hoveredFleetId  = null;
+
+function drawAllFleetIcons() {
+  const dpr = window.devicePixelRatio || 1;
+  fctx.clearRect(0, 0, fleetCanvas.width, fleetCanvas.height);
+  _fleetHitTargets = [];
+
+  const mvp  = buildMVP();
+  const all  = loadFleets();
+  // group by system so stacked fleets offset nicely
+  const bySys = {};
+  for (const f of Object.values(all)) {
+    if (!bySys[f.systemId]) bySys[f.systemId] = [];
+    bySys[f.systemId].push(f);
+  }
+
+  for (const [sysId, fleets] of Object.entries(bySys)) {
+    const wp = idToWorld.get(sysId);
+    if (!wp) continue;
+    const sp = projectToScreen(wp[0], wp[1], wp[2], mvp);
+    if (!sp || sp[2] < -1 || sp[2] > 1) continue;
+
+    // base screen position in CSS pixels
+    const baseCX = (sp[0] / dpr) * dpr;
+    const baseCY = (sp[1] / dpr) * dpr;
+
+    fleets.forEach((f, idx) => {
+      const angle  = (idx / fleets.length) * Math.PI * 2 - Math.PI / 2;
+      const spread = fleets.length > 1 ? 22 * dpr : 0;
+      const sx = baseCX + Math.cos(angle) * spread;
+      const sy = baseCY - 20 * dpr + Math.sin(angle) * spread;
+
+      const color   = FACTION_COLORS[f.faction] || FACTION_COLORS['Unknown'];
+      const count   = totalShips(f);
+      const isHover = _hoveredFleetId === f.id;
+
+      drawFleetIcon(fctx, sx, sy, color, count, dpr, isHover);
+      _fleetHitTargets.push({ fid: f.id, sx, sy, r: 13 * dpr });
+    });
+  }
+}
+
+// fleet canvas mouse tracking
+fleetCanvas.style.pointerEvents = 'auto';
+
+fleetCanvas.addEventListener('mousemove', e => {
+  const dpr = window.devicePixelRatio || 1;
+  const mx  = e.clientX * dpr, my = e.clientY * dpr;
+  let found = null;
+  for (const t of _fleetHitTargets) {
+    if (Math.hypot(mx - t.sx, my - t.sy) < t.r + 4 * dpr) { found = t.fid; break; }
+  }
+  if (found !== _hoveredFleetId) {
+    _hoveredFleetId = found;
+    fleetCanvas.style.cursor = found ? 'pointer' : '';
+  }
+});
+
+fleetCanvas.addEventListener('click', e => {
+  if (dragMoved) return;
+  const dpr = window.devicePixelRatio || 1;
+  const mx  = e.clientX * dpr, my = e.clientY * dpr;
+  for (const t of _fleetHitTargets) {
+    if (Math.hypot(mx - t.sx, my - t.sy) < t.r + 4 * dpr) {
+      openFleetModal(t.fid);
+      return;
+    }
+  }
+});
+
+// patch loop() to call drawAllFleetIcons each frame
+const _origLoop = loop;
+// We inject fleet drawing into the rAF by wrapping requestAnimationFrame at boot
+// Actually: patch by replacing the rAF call at the end of loop
+// Simpler: call drawAllFleetIcons from within a new rAF wrapper
+(function patchLoopForFleets() {
+  const origRAF = window.requestAnimationFrame.bind(window);
+  let patched = false;
+  // We hook into the existing loop by overriding rAF once to wrap loop
+  const _realLoop = loop;
+  window.loop = function patchedLoop() {
+    _realLoop();
+    drawAllFleetIcons();
+  };
+  // replace all future rAF(loop) calls — but loop calls rAF(loop) internally
+  // So we need to make `loop` itself call drawAllFleetIcons after its own rAF.
+  // Cleanest: just call drawAllFleetIcons after each WebGL frame by monkey-patching.
+})();
+
+// Actually the simplest reliable way: override the global `loop` reference
+// and have the orrery/main loop both call the fleet draw.
+// Since loop() ends with requestAnimationFrame(loop), redefining `loop` at module
+// scope won't help. Instead just insert a second rAF loop for fleets only:
+(function fleetRenderLoop() {
+  drawAllFleetIcons();
+  requestAnimationFrame(fleetRenderLoop);
+})();
+
+
+// ── Fleet panel tab (inside side panel) ─────────────
+function renderFleetsPane(sysId) {
+  const pane   = document.getElementById('pane-fleets');
+  const fleets = getFleetsAtSystem(sysId);
+  const sys    = systems.find(s => s.id === sysId);
+
+  if (!fleets.length) {
+    pane.innerHTML = `
+      <div class="empty-state" style="padding-top:30px;">
+        <div class="empty-state-icon">⛵</div>
+        <div class="empty-state-text">// NO FLEETS IN SYSTEM<br>// DEPLOY A FLEET HERE</div>
+      </div>
+      <div class="fleet-add-btn" id="fp-add-fleet">+ DEPLOY FLEET</div>
+    `;
+  } else {
+    pane.innerHTML = `
+      ${fleets.map(f => {
+        const color = FACTION_COLORS[f.faction] || FACTION_COLORS['Unknown'];
+        const ships = totalShips(f);
+        return `
+          <div class="fleet-list-item" data-fid="${f.id}">
+            <div class="fli-icon" style="background:${color}22;border:1px solid ${color}44;">
+              <svg width="14" height="14" viewBox="0 0 14 14">
+                <polygon points="7,1 12,11 7,8 2,11" fill="${color}"/>
+              </svg>
+            </div>
+            <div class="fli-info">
+              <div class="fli-name">${f.name}</div>
+              <div class="fli-sub">${f.faction} · ${f.status || 'Active'}</div>
+              ${f.captain ? `<div class="fli-sub" style="color:var(--text-dim);">CMD: ${f.captain}</div>` : ''}
+            </div>
+            <div class="fli-ships">${ships}</div>
+          </div>
+        `;
+      }).join('')}
+      <div class="fleet-add-btn" id="fp-add-fleet">+ DEPLOY FLEET</div>
+    `;
+    pane.querySelectorAll('.fleet-list-item').forEach(el => {
+      el.addEventListener('click', () => openFleetModal(el.dataset.fid));
+    });
+  }
+
+  const addBtn = pane.querySelector('#fp-add-fleet');
+  if (addBtn) addBtn.addEventListener('click', () => {
+    if (!requireEditor()) return;
+    openFleetModal(null, sysId);
+  });
+}
+
+// patch renderPanel to also render fleets pane
+const _origRenderPanel = renderPanel;
+window.renderPanel = function(id, details) {
+  _origRenderPanel(id, details);
+  renderFleetsPane(id);
+};
+
+
+// ── Fleet Modal ──────────────────────────────────────
+const fleetModal  = document.getElementById('fleet-modal');
+const fmClose     = document.getElementById('fm-close');
+const fmBody      = document.getElementById('fm-body');
+const fmFooter    = document.getElementById('fm-footer');
+const fmName      = document.getElementById('fm-name');
+const fmLoc       = document.getElementById('fm-loc');
+const fmIcon      = document.getElementById('fm-icon');
+
+fmClose.addEventListener('click', closeFleetModal);
+fleetModal.addEventListener('click', e => { if (e.target === fleetModal) closeFleetModal(); });
+
+function closeFleetModal() {
+  fleetModal.classList.remove('open');
+  // refresh fleets pane if a system is selected
+  if (selectedId) renderFleetsPane(selectedId);
+}
+
+function openFleetModal(fid, defaultSysId) {
+  const fleet = fid ? getFleetById(fid) : null;
+  const sysId = fleet?.systemId || defaultSysId || selectedId;
+  const sys   = systems.find(s => s.id === sysId);
+
+  if (fleet) {
+    renderFleetView(fleet, sys);
+  } else {
+    renderFleetEdit(null, sysId, sys);
+  }
+  fleetModal.classList.add('open');
+}
+
+function statusDotClass(status) {
+  if (!status || status === 'Active' || status === 'In Transit' || status === 'Blockading') return 'active';
+  if (status === 'Repairing') return 'damaged';
+  if (status === 'Destroyed') return 'lost';
+  return 'active';
+}
+
+function renderFleetView(fleet, sys) {
+  const color = FACTION_COLORS[fleet.faction] || FACTION_COLORS['Unknown'];
+  fmName.textContent = fleet.name;
+  fmLoc.textContent  = `${sys?.name || fleet.systemId} · ${fleet.faction}`;
+  fmIcon.style.borderColor = color;
+  fmIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 14 14">
+    <polygon points="7,1 12,11 7,8 2,11" fill="${color}"/>
+  </svg>`;
+
+  const ships = fleet.ships || [];
+  const shipRows = ships.map(s => `
+    <tr>
+      <td>${s.name || '—'}</td>
+      <td><span class="ship-class-badge">${s.shipClass}</span></td>
+      <td><span class="ship-count">${s.count}</span></td>
+      <td>
+        <span class="ship-status-dot ${statusDotClass(s.status)}"></span>
+        ${s.status || 'Active'}
+      </td>
+    </tr>
+  `).join('');
+
+  fmBody.innerHTML = `
+    <div class="fleet-section">
+      <div class="fleet-section-title">Fleet Status</div>
+      <div class="fleet-meta-grid">
+        <div class="fleet-meta-cell">
+          <div class="fleet-meta-key">Commander</div>
+          <div class="fleet-meta-val cyan">${fleet.captain || '—'}</div>
+        </div>
+        <div class="fleet-meta-cell">
+          <div class="fleet-meta-key">Faction</div>
+          <div class="fleet-meta-val" style="color:${color}">${fleet.faction}</div>
+        </div>
+        <div class="fleet-meta-cell">
+          <div class="fleet-meta-key">Status</div>
+          <div class="fleet-meta-val">
+            <span class="ship-status-dot ${statusDotClass(fleet.status)}"></span>
+            ${fleet.status || 'Active'}
+          </div>
+        </div>
+        <div class="fleet-meta-cell">
+          <div class="fleet-meta-key">Total Ships</div>
+          <div class="fleet-meta-val gold">${totalShips(fleet)}</div>
+        </div>
+      </div>
+    </div>
+    ${fleet.notes ? `
+    <div class="fleet-section">
+      <div class="fleet-section-title">Field Notes</div>
+      <div class="fleet-notes-text">${fleet.notes}</div>
+    </div>` : ''}
+    <div class="fleet-section">
+      <div class="fleet-section-title">Ship Roster · ${ships.length} class${ships.length !== 1 ? 'es' : ''}</div>
+      ${ships.length ? `
+        <table class="ship-table">
+          <thead><tr>
+            <th>Name / Designation</th>
+            <th>Class</th>
+            <th>Count</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody>${shipRows}</tbody>
+        </table>` : `<div style="color:var(--text-muted);font-size:12px;font-family:'Share Tech Mono',monospace;">NO SHIPS ON RECORD</div>`}
+    </div>
+  `;
+
+  fmFooter.innerHTML = `
+    <button class="pbtn primary" id="fm-edit-btn" style="flex:1;padding:8px;">✎ EDIT FLEET</button>
+    <button class="pbtn danger"  id="fm-del-btn"  style="padding:8px 14px;">✕ DISBAND</button>
+  `;
+  fmFooter.querySelector('#fm-edit-btn').addEventListener('click', () => {
+    if (!requireEditor()) return;
+    renderFleetEdit(fleet, fleet.systemId, sys);
+  });
+  fmFooter.querySelector('#fm-del-btn').addEventListener('click', () => {
+    if (!requireEditor()) return;
+    if (!confirm(`Disband fleet "${fleet.name}"?`)) return;
+    deleteFleet(fleet.id);
+    closeFleetModal();
+  });
+}
+
+function renderFleetEdit(fleet, sysId, sys) {
+  const isNew = !fleet;
+  const f = fleet || {
+    id: newFleetId(), systemId: sysId,
+    name: '', captain: '', faction: 'Player',
+    status: 'Active', notes: '', ships: []
+  };
+  const color = FACTION_COLORS[f.faction] || FACTION_COLORS['Unknown'];
+
+  fmName.textContent = isNew ? 'NEW FLEET' : f.name;
+  fmLoc.textContent  = `${sys?.name || sysId} · Edit Mode`;
+  fmIcon.style.borderColor = color;
+  fmIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 14 14">
+    <polygon points="7,1 12,11 7,8 2,11" fill="${color}"/>
+  </svg>`;
+
+  const shipRows = (f.ships || []).map((s, i) => shipEditRow(s, i)).join('');
+
+  fmBody.innerHTML = `
+    <div class="fleet-edit-section">
+      <div class="edit-section-title">Identity</div>
+      <div class="fleet-form-row">
+        <span class="fl">Name</span>
+        <input id="fm-f-name" class="sci-input" type="text" value="${(f.name||'').replaceAll('"','&quot;')}" placeholder="Fleet name…"/>
+      </div>
+      <div class="fleet-form-row">
+        <span class="fl">Commander</span>
+        <input id="fm-f-captain" class="sci-input" type="text" value="${(f.captain||'').replaceAll('"','&quot;')}" placeholder="Captain name…"/>
+      </div>
+      <div class="fleet-form-row">
+        <span class="fl">Faction</span>
+        <select id="fm-f-faction" class="sci-select">
+          ${FLEET_FACTIONS.map(fc => `<option value="${fc}" ${fc===f.faction?'selected':''}>${fc}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fleet-form-row">
+        <span class="fl">Status</span>
+        <select id="fm-f-status" class="sci-select">
+          ${FLEET_STATUSES.map(st => `<option value="${st}" ${st===f.status?'selected':''}>${st}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="fleet-edit-section">
+      <div class="edit-section-title">Field Notes</div>
+      <textarea id="fm-f-notes" class="sci-textarea" placeholder="Tactical notes, orders, history…">${f.notes||''}</textarea>
+    </div>
+    <div class="fleet-edit-section">
+      <div class="edit-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Ship Roster</span>
+        <button id="fm-add-ship" class="pbtn primary" type="button" style="font-size:10px;padding:3px 8px;">+ ADD</button>
+      </div>
+      <div id="fm-ship-list" style="margin-top:6px;">
+        <div class="ship-edit-row" style="opacity:.5;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;padding-bottom:4px;border-bottom:1px solid var(--border);">
+          <span>NAME / DESIGNATION</span><span>CLASS</span><span>COUNT</span><span>STATUS</span><span></span>
+        </div>
+        ${shipRows}
+      </div>
+    </div>
+  `;
+
+  fmBody.querySelector('#fm-add-ship').addEventListener('click', () => {
+    const list = fmBody.querySelector('#fm-ship-list');
+    const idx  = list.querySelectorAll('.ship-edit-row[data-idx]').length;
+    const tmp  = document.createElement('div');
+    tmp.innerHTML = shipEditRow({ name:'', shipClass:'Frigate', count:1, status:'Active' }, idx);
+    list.appendChild(tmp.firstElementChild);
+  });
+
+  fmBody.querySelector('#fm-ship-list').addEventListener('click', e => {
+    if (e.target.matches('.del-ship-row')) e.target.closest('.ship-edit-row').remove();
+  });
+
+  // live update faction color on icon
+  fmBody.querySelector('#fm-f-faction').addEventListener('change', e => {
+    const nc = FACTION_COLORS[e.target.value] || FACTION_COLORS['Unknown'];
+    fmIcon.style.borderColor = nc;
+    fmIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 14 14">
+      <polygon points="7,1 12,11 7,8 2,11" fill="${nc}"/>
+    </svg>`;
+  });
+
+  fmFooter.innerHTML = `
+    <button class="pbtn success" id="fm-save-btn" style="flex:1;padding:8px;">✓ SAVE FLEET</button>
+    <button class="pbtn" id="fm-cancel-btn" style="padding:8px 14px;">CANCEL</button>
+  `;
+
+  fmFooter.querySelector('#fm-save-btn').addEventListener('click', () => {
+    const name = fmBody.querySelector('#fm-f-name').value.trim();
+    if (!name) { alert('Fleet must have a name.'); return; }
+    const ships = Array.from(fmBody.querySelectorAll('.ship-edit-row[data-idx]')).map(row => ({
+      name:      row.querySelector('.sr-name').value.trim(),
+      shipClass: row.querySelector('.sr-class').value,
+      count:     parseInt(row.querySelector('.sr-count').value) || 1,
+      status:    row.querySelector('.sr-status').value,
+    }));
+    const updated = {
+      ...f,
+      name,
+      captain: fmBody.querySelector('#fm-f-captain').value.trim(),
+      faction: fmBody.querySelector('#fm-f-faction').value,
+      status:  fmBody.querySelector('#fm-f-status').value,
+      notes:   fmBody.querySelector('#fm-f-notes').value.trim(),
+      ships,
+    };
+    upsertFleet(updated);
+    renderFleetView(updated, sys);
+  });
+
+  fmFooter.querySelector('#fm-cancel-btn').addEventListener('click', () => {
+    if (isNew) { closeFleetModal(); return; }
+    renderFleetView(f, sys);
+  });
+}
+
+function shipEditRow(s, i) {
+  const classOpts = FLEET_SHIP_CLASSES.map(c =>
+    `<option value="${c}" ${c===s.shipClass?'selected':''}>${c}</option>`).join('');
+  const statusOpts = FLEET_STATUSES.map(st =>
+    `<option value="${st}" ${st===(s.status||'Active')?'selected':''}>${st}</option>`).join('');
+  return `
+    <div class="ship-edit-row" data-idx="${i}">
+      <input  class="sci-input sr-name"   type="text"   value="${(s.name||'').replaceAll('"','&quot;')}" placeholder="Designation…"/>
+      <select class="sci-select sr-class">${classOpts}</select>
+      <input  class="sci-input sr-count"  type="number" value="${s.count||1}" min="1" style="width:100%"/>
+      <select class="sci-select sr-status">${statusOpts}</select>
+      <button class="pbtn danger del-ship-row" type="button" style="padding:0;width:24px;height:24px;font-size:13px;flex-shrink:0;">✕</button>
+    </div>
+  `;
+}
+
+// Update tooltip to show fleet count
+const _tipFleets = document.getElementById('tip-fleets');
+const _origHoverUpdate = null;
+// We patch the hovered system tooltip update in the main loop by hooking the
+// tip display. Instead of patching loop, we observe tipName mutations:
+const _tipObs = new MutationObserver(() => {
+  if (!_tipFleets) return;
+  // find which system is hovered by matching tip-name text
+  const hn = hoveredId;
+  if (!hn) { _tipFleets.textContent = ''; return; }
+  const fc = getFleetsAtSystem(hn).length;
+  _tipFleets.textContent = fc ? `⛵ ${fc} FLEET${fc>1?'S':''}` : '';
+});
+const tipNameEl = document.getElementById('tip-name');
+if (tipNameEl && _tipFleets) _tipObs.observe(tipNameEl, { childList: true, characterData: true, subtree: true });
