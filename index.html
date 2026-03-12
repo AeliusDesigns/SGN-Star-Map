@@ -730,7 +730,13 @@
     .orrery-frame .oc.tr::after { right:0; left:auto; }
     .orrery-frame .oc.br::after { right:0; left:auto; }
 
-    #orrery-canvas { display:block; width:100%; height:100%; }
+    #orrery-canvas {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
 
     .orrery-hud {
       position: absolute; top:0; left:0; right:0;
