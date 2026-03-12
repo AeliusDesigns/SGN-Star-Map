@@ -173,8 +173,14 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('mousedown', e => {
   lx = e.clientX; ly = e.clientY;
   dragMoved = false;
+  _clickMoved = false;
   if (e.button === 2) panning = true;
-  else dragging = true;
+  else {
+    dragging = true;
+    if (e.button === 0) {
+      _clickDownId = hoveredId;
+    }
+  }
 });
 addEventListener('mouseup', () => { dragging = false; panning = false; });
 addEventListener('mousemove', e => {
@@ -303,12 +309,6 @@ function initFromData(data) {
   if (sbSys)   sbSys.textContent   = `${systems.length} NODES ACTIVE`;
   if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
 }
-
-canvas.addEventListener('mousedown', e => {
-  if (e.button !== 0) return;
-  _clickDownId = hoveredId;
-  _clickMoved  = false;
-});
 
 canvas.addEventListener('mouseup', async e => {
   if (e.button !== 0) return;
