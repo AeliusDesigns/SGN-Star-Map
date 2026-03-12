@@ -200,6 +200,27 @@
     .sb-dot.off  { background: var(--text-muted); box-shadow: none; animation: none; }
     .sb-dot.gold { background: var(--gold); box-shadow: 0 0 5px var(--gold); }
 
+    .sb-save-btn {
+      background: transparent;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      border-radius: 2px;
+      padding: 2px 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      pointer-events: all;
+      transition: all .12s;
+      white-space: nowrap;
+    }
+    .sb-save-btn:hover {
+      border-color: var(--gold);
+      background: rgba(245,197,66,.08);
+      box-shadow: 0 0 8px rgba(245,197,66,.2);
+    }
+
     @keyframes dotpulse {
       0%, 100% { opacity: 1; }
       50% { opacity: .25; }
@@ -1360,6 +1381,7 @@
     <div class="sb-item"><div class="sb-dot gold" id="dot-lanes"></div><span id="sb-lanes-ct">— LANES</span></div>
     <div class="sb-item"><div class="sb-dot gold" id="dot-fleets"></div><span id="sb-fleets-ct">0 FLEETS</span></div>
     <div class="sb-spacer"></div>
+    <button class="sb-save-btn" id="sb-save-repo" title="Download systems.json + fleets.json for your repo">↓ SAVE TO REPO</button>
     <div class="sb-item"><div class="sb-dot off"></div>E=LANES · A=ADD · ENTER=INSPECT</div>
   </div>
 
