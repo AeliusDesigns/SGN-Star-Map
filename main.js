@@ -474,17 +474,36 @@ const DEFAULT_DATA = {
 
 requestAnimationFrame(loop);
 
+const MAP_STORE_KEY = 'sgn_map_state_v1';
+
+function saveMapState() {
+  try {
+    const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
+    const state = { image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut };
+    localStorage.setItem(MAP_STORE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
 (async function boot() {
+  /* try localStorage first (user edits persist here) */
+  try {
+    const saved = localStorage.getItem(MAP_STORE_KEY);
+    if (saved) {
+      await initFromData(JSON.parse(saved));
+      return;
+    }
+  } catch {}
+  /* fallback to systems.json file */
   try {
     const r = await fetch('./systems.json', { cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    initFromData(await r.json());
+    await initFromData(await r.json());
   } catch {
-    initFromData(DEFAULT_DATA);
+    await initFromData(DEFAULT_DATA);
   }
 })();
 
-function initFromData(data) {
+async function initFromData(data) {
   imgW = data?.image_size?.width  ?? 1090;
   imgH = data?.image_size?.height ?? 1494;
   const SCALE = 2200;
@@ -517,7 +536,7 @@ function initFromData(data) {
   const sbLanes = document.getElementById('sb-lanes-ct');
   if (sbSys)   sbSys.textContent   = `${systems.length} NODES ACTIVE`;
   if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
-  loadFleets();
+  await loadFleets();
   updateFleetStatusBar();
 }
 
@@ -542,6 +561,7 @@ canvas.addEventListener('mouseup', async e => {
       systems.push(sys);
       idToWorld.set(newId, [wx, wy, 0]);
       rebuildStarsVBO();
+      saveMapState();
       selectedId = newId;
       renderPanel(newId, await ensureSystemDetails(newId));
     }
@@ -562,6 +582,7 @@ canvas.addEventListener('mouseup', async e => {
         if (lanesSet.has(key)) lanesSet.delete(key); else lanesSet.add(key);
         rebuildLinesVBOFromSet();
         updateLaneCounts();
+        saveMapState();
       }
       window._lanePickA = null;
       updateHUD();
@@ -612,6 +633,7 @@ canvas.addEventListener('auxclick', e => {
   const [mx, my] = mouseToCanvas(e);
   deleteNearestLane(mx, my, buildMVP());
   updateLaneCounts();
+  saveMapState();
 });
 
 const panel      = document.getElementById('sidePanel');
@@ -638,6 +660,24 @@ document.getElementById('sp-gen').onclick    = async () => {
 document.getElementById('sp-exp').onclick    = () => { if (selectedId && requireEditor()) exportSystemDetails(selectedId); };
 document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
 
+document.getElementById('sb-save-repo').onclick = () => {
+  if (!requireEditor()) return;
+  /* systems.json — the canonical map file */
+  const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
+  const sysBlob = new Blob([JSON.stringify({ image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut }, null, 2)], { type:'application/json' });
+  const a1 = document.createElement('a');
+  a1.href = URL.createObjectURL(sysBlob);
+  a1.download = 'systems.json';
+  a1.click();
+  URL.revokeObjectURL(a1.href);
+  /* fleets.json */
+  const fBlob = new Blob([JSON.stringify(fleets, null, 2)], { type:'application/json' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(fBlob);
+  a2.download = 'fleets.json';
+  setTimeout(() => { a2.click(); URL.revokeObjectURL(a2.href); }, 300);
+};
+
 canvas.addEventListener('dblclick', async e => {
   const id = findNearestSystemId(e.clientX, e.clientY, buildMVP(), 18);
   if (!id) return;
@@ -651,6 +691,7 @@ canvas.addEventListener('dblclick', async e => {
   if (nn && nn.trim()) {
     sys.name = nn.trim();
     rebuildStarsVBO();
+    saveMapState();
   }
 });
 
@@ -682,6 +723,7 @@ window.addEventListener('keydown', async e => {
     lanesSet.clear();
     rebuildLinesVBOFromSet();
     updateLaneCounts();
+    saveMapState();
   }
   if (k === 'r') {
     if (!confirm('Reset lanes to defaults?')) return;
@@ -689,6 +731,7 @@ window.addEventListener('keydown', async e => {
     (DEFAULT_DATA.lanes || []).forEach(([a,b]) => lanesSet.add([a,b].sort().join('::')));
     rebuildLinesVBOFromSet();
     updateLaneCounts();
+    saveMapState();
   }
   if (k === 'x') {
     const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
@@ -1345,6 +1388,7 @@ function renderEditPane(id, details, sys) {
       lanesSet.delete(key);
       rebuildLinesVBOFromSet();
       updateLaneCounts();
+      saveMapState();
       row.style.opacity = '0';
       row.style.height = row.offsetHeight + 'px';
       requestAnimationFrame(() => { row.style.height = '0'; row.style.padding = '0'; row.style.margin = '0'; row.style.overflow = 'hidden'; });
@@ -1365,7 +1409,7 @@ function renderEditPane(id, details, sys) {
       lanesSet.add(key);
       rebuildLinesVBOFromSet();
       updateLaneCounts();
-      /* re-render the edit pane to refresh lane list */
+      saveMapState();
       const det = getCachedSystem(id) || details;
       renderEditPane(id, det, sys);
       showEditToast('Lane connected');
@@ -1424,6 +1468,7 @@ function renderEditPane(id, details, sys) {
       sys.owner = newOwner || undefined;
       sys.tags = newTags.length ? newTags : undefined;
     }
+    saveMapState();
 
     showEditToast('Changes saved');
     setTimeout(() => {
@@ -1449,6 +1494,7 @@ function renderEditPane(id, details, sys) {
     try { localStorage.removeItem(sysKey(id)); } catch {}
     rebuildStarsVBO();
     updateLaneCounts();
+    saveMapState();
     selectedId = null;
     hidePanel();
   };
@@ -1779,11 +1825,22 @@ let fleetViewMode = 'list'; // 'list' | 'detail' | 'edit'
 
 const FLEET_STORE_KEY = 'sgn_fleets_v1';
 
-function loadFleets() {
+async function loadFleets() {
+  /* try localStorage first */
   try {
     const raw = localStorage.getItem(FLEET_STORE_KEY);
-    fleets = raw ? JSON.parse(raw) : [];
-  } catch { fleets = []; }
+    if (raw) { fleets = JSON.parse(raw); updateFleetStatusBar(); return; }
+  } catch {}
+  /* fall back to fleets.json file in repo */
+  try {
+    const r = await fetch('./fleets.json', { cache: 'no-store' });
+    if (r.ok) {
+      fleets = await r.json();
+      saveFleets(); /* cache into localStorage */
+      return;
+    }
+  } catch {}
+  fleets = [];
 }
 
 function saveFleets() {
