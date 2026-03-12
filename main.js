@@ -565,20 +565,26 @@ function drawOrrery() {
   const { planets, star, sm } = orreryData;
   if (!planets.length) return;
 
-  const allAU  = planets.map(p => p.semi_major_AU || 0.1);
-  const minAU  = Math.max(0.01, (star.inner_edge || 0.05) * 0.5);
-  const maxAU  = Math.max(...allAU) * 1.2;
-  const margin = 90 * dpr;
-  const maxR   = Math.min(cx, cy) - margin;
-  const logMin = Math.log(minAU), logMax = Math.log(maxAU);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+
+  const allAU   = planets.map(p => p.semi_major_AU || 0.1);
+  const minAU   = Math.max(0.01, (star.inner_edge || 0.05) * 0.5);
+  const maxAU   = Math.max(...allAU);
+  const labelPad = 52 * dpr;
+  const maxR    = Math.min(cx, cy) - labelPad;
+  const usableR = maxR * 0.82;
+  const logMin  = Math.log(minAU), logMax = Math.log(maxAU * 1.15);
 
   function auToR(au) {
     const t = (Math.log(Math.max(au, 0.001)) - logMin) / (logMax - logMin);
-    return 16 * dpr + t * (maxR - 16 * dpr);
+    return 14 * dpr + t * (usableR - 14 * dpr);
   }
 
   ctx.save();
-  for (let r = maxR * 0.25; r <= maxR; r += maxR * 0.25) {
+  for (let r = usableR * 0.25; r <= usableR; r += usableR * 0.25) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI*2);
     ctx.strokeStyle = 'rgba(56,232,255,0.04)';
@@ -670,6 +676,7 @@ function drawOrrery() {
   });
 
   orreryCanvas._planets = planetPositions;
+  ctx.restore();
 }
 
 orreryCanvas.addEventListener('mousemove', e => {
