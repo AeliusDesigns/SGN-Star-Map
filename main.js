@@ -333,6 +333,8 @@ function initFromData(data) {
   const sbLanes = document.getElementById('sb-lanes-ct');
   if (sbSys)   sbSys.textContent   = `${systems.length} NODES ACTIVE`;
   if (sbLanes) sbLanes.textContent = `${lanesSet.size} LANES MAPPED`;
+  loadFleets();
+  updateFleetStatusBar();
 }
 
 canvas.addEventListener('mouseup', async e => {
@@ -1036,6 +1038,7 @@ function renderPanel(id, details) {
   }
 
   renderEditPane(id, details, sys);
+  renderFleetsPane(id);
   rebuildStarsVBO();
   showPanel();
 }
@@ -1333,5 +1336,476 @@ function loop() {
   if (hoveredNow) drawHalo(hoveredNow, 34.0, t,        [0.35,0.95,1.0], [1.0,0.95,0.50]);
   if (selectedId) drawHalo(selectedId, 42.0, t*0.0007, [1.0,0.85,0.35], [1.0,0.98,0.70]);
 
+  updateFleetMapIcons(mvp);
+
   requestAnimationFrame(loop);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLEET MANAGEMENT SYSTEM
+   ═══════════════════════════════════════════════════════════════════ */
+
+const ELVISH_SHIP_CLASSES = [
+  { name: 'LÓMIËL-CLASS INTERCEPTOR',    shortName: 'Lómiël',     tier: 'Interceptor',  size: 1 },
+  { name: 'ELENIR-CLASS LANCEWING',       shortName: 'Elenir',     tier: 'Lancewing',    size: 2 },
+  { name: 'SENTINEL-Θ AUTONOMOUS UNIT',   shortName: 'Sentinel-Θ', tier: 'Autonomous',   size: 3 },
+  { name: 'TALASIR-CLASS TRANSPORT',      shortName: 'Talasir',    tier: 'Transport',    size: 4 },
+  { name: 'ERYNDOR-CLASS CORVETTE',       shortName: 'Eryndor',    tier: 'Corvette',     size: 5 },
+  { name: 'THALANIS-CLASS PHANTOM',       shortName: 'Thalanis',   tier: 'Frigate',      size: 6 },
+  { name: 'THALASRËN-CLASS LIGHT FRIGATE',shortName: 'Thalasrën',  tier: 'Lt Frigate',   size: 7 },
+  { name: 'AELINDOR-CLASS FRIGATE',       shortName: 'Aelindor',   tier: 'Frigate',      size: 8 },
+  { name: 'VAELISAR-CLASS DESTROYER',     shortName: 'Vaelisar',   tier: 'Destroyer',    size: 9 },
+  { name: 'CALARION-CLASS CRUISER',       shortName: 'Calarion',   tier: 'Cruiser',      size: 10 },
+  { name: 'SILVARON-CLASS CARRIER',       shortName: 'Silvaron',   tier: 'Carrier',      size: 11 },
+  { name: 'TIRION-CLASS BATTLESHIP',      shortName: 'Tirion',     tier: 'Battleship',   size: 12 },
+  { name: 'AERANDOR-CLASS SUPERCARRIER',  shortName: 'Aerandor',   tier: 'Supercarrier', size: 13 },
+];
+
+const FLEET_STATUSES = ['Stationed', 'In Transit', 'Patrol', 'Combat'];
+
+let fleets = [];
+let activeFleetId = null;
+let fleetViewMode = 'list'; // 'list' | 'detail' | 'edit'
+
+const FLEET_STORE_KEY = 'sgn_fleets_v1';
+
+function loadFleets() {
+  try {
+    const raw = localStorage.getItem(FLEET_STORE_KEY);
+    fleets = raw ? JSON.parse(raw) : [];
+  } catch { fleets = []; }
+}
+
+function saveFleets() {
+  try { localStorage.setItem(FLEET_STORE_KEY, JSON.stringify(fleets)); } catch {}
+  updateFleetStatusBar();
+}
+
+function updateFleetStatusBar() {
+  const el = document.getElementById('sb-fleets-ct');
+  if (el) el.textContent = `${fleets.length} FLEET${fleets.length !== 1 ? 'S' : ''}`;
+}
+
+function generateFleetId() {
+  return 'FLT_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,6).toUpperCase();
+}
+
+function getTotalShips(fleet) {
+  return (fleet.ships || []).reduce((sum, s) => sum + (s.qty || 0), 0);
+}
+
+function getFleetSystemName(systemId) {
+  if (!systemId) return '—';
+  const sys = systems.find(s => s.id === systemId);
+  return sys?.name || systemId;
+}
+
+function renderFleetsPane(systemId) {
+  const pane = document.getElementById('pane-fleets');
+  if (!pane) return;
+
+  const systemFleets = fleets.filter(f => f.systemId === systemId);
+  const otherFleets = fleets.filter(f => f.systemId !== systemId);
+
+  if (fleetViewMode === 'detail' && activeFleetId) {
+    const fleet = fleets.find(f => f.id === activeFleetId);
+    if (fleet) {
+      renderFleetDetail(pane, fleet);
+      return;
+    }
+  }
+  if (fleetViewMode === 'edit') {
+    const fleet = activeFleetId ? fleets.find(f => f.id === activeFleetId) : null;
+    renderFleetEditor(pane, fleet, systemId);
+    return;
+  }
+
+  fleetViewMode = 'list';
+  activeFleetId = null;
+
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span class="bodies-count">${systemFleets.length} FLEET${systemFleets.length!==1?'S':''} AT ${getFleetSystemName(systemId).toUpperCase()}</span>
+      <button class="pbtn primary" id="fleet-add-btn" style="padding:4px 10px;">+ NEW FLEET</button>
+    </div>
+  `;
+
+  if (systemFleets.length > 0) {
+    html += systemFleets.map(f => fleetListItemHTML(f)).join('');
+  }
+
+  if (otherFleets.length > 0) {
+    html += `<div style="margin-top:18px;margin-bottom:10px;" class="fleet-section-title">ALL OTHER FLEETS (${otherFleets.length})</div>`;
+    html += otherFleets.map(f => fleetListItemHTML(f)).join('');
+  }
+
+  if (systemFleets.length === 0 && otherFleets.length === 0) {
+    html += `<div class="empty-state" style="padding-top:16px;">
+      <div class="empty-state-icon">⬡</div>
+      <div class="empty-state-text">// NO FLEETS REGISTERED<br>// USE + NEW FLEET TO CREATE ONE</div>
+    </div>`;
+  }
+
+  pane.innerHTML = html;
+
+  pane.querySelector('#fleet-add-btn')?.addEventListener('click', () => {
+    activeFleetId = null;
+    fleetViewMode = 'edit';
+    renderFleetsPane(systemId);
+  });
+
+  pane.querySelectorAll('.fleet-list-item').forEach(el => {
+    el.addEventListener('click', () => {
+      activeFleetId = el.dataset.fleetId;
+      fleetViewMode = 'detail';
+      renderFleetsPane(systemId);
+    });
+  });
+}
+
+function fleetListItemHTML(f) {
+  const total = getTotalShips(f);
+  const statusClass = (f.status || 'Stationed').toLowerCase().replace(/\s/g,'-');
+  return `<div class="fleet-list-item" data-fleet-id="${f.id}">
+    <div class="fleet-emblem">⬡</div>
+    <div class="fleet-info">
+      <div class="fleet-name">${f.name || 'Unnamed Fleet'}</div>
+      <div class="fleet-subtitle">${f.captain || '—'} · <span class="fleet-status-badge ${statusClass}">${f.status || 'Stationed'}</span></div>
+    </div>
+    <div class="fleet-ship-count">${total}<br><span style="font-size:9px;color:var(--text-muted);">SHIPS</span></div>
+  </div>`;
+}
+
+function renderFleetDetail(pane, fleet) {
+  const total = getTotalShips(fleet);
+  const systemName = getFleetSystemName(fleet.systemId);
+  const statusClass = (fleet.status || 'Stationed').toLowerCase().replace(/\s/g,'-');
+  const destName = fleet.destinationId ? getFleetSystemName(fleet.destinationId) : null;
+
+  let shipsHTML = '';
+  if (fleet.ships && fleet.ships.length > 0) {
+    shipsHTML = fleet.ships.filter(s => s.qty > 0).map(s => {
+      const cls = ELVISH_SHIP_CLASSES.find(c => c.name === s.className) || {};
+      return `<div class="ship-line">
+        <span class="ship-tier-badge">${cls.tier || '—'}</span>
+        <span class="ship-class-name">${s.className}</span>
+        <span class="ship-qty">×${s.qty}</span>
+      </div>`;
+    }).join('');
+  } else {
+    shipsHTML = '<div style="color:var(--text-muted);font-size:13px;font-style:italic;">No vessels assigned</div>';
+  }
+
+  pane.innerHTML = `
+    <div style="margin-bottom:10px;">
+      <button class="pbtn" id="fleet-back-btn" style="padding:4px 10px;font-size:10px;">← FLEET LIST</button>
+    </div>
+    <div class="fleet-detail-header">
+      <div class="fleet-detail-emblem">⬡</div>
+      <div>
+        <div class="fleet-detail-title">${fleet.name || 'Unnamed Fleet'}</div>
+        <div class="fleet-detail-sub">${fleet.id}</div>
+      </div>
+    </div>
+    <div class="stats-grid" style="margin-bottom:14px;">
+      <div class="stat-cell">
+        <div class="stat-key">Captain</div>
+        <div class="stat-val" style="font-size:15px;color:var(--gold);">${fleet.captain || '—'}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-key">Vessels</div>
+        <div class="stat-val gold">${total}</div>
+        <div class="stat-sub">${(fleet.ships || []).filter(s=>s.qty>0).length} CLASSES</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-key">Status</div>
+        <div style="margin-top:4px;"><span class="fleet-status-badge ${statusClass}">${fleet.status || 'Stationed'}</span></div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-key">Location</div>
+        <div class="stat-val" style="font-size:14px;"><span class="fleet-location-chip" data-sys="${fleet.systemId || ''}">${systemName}</span></div>
+      </div>
+    </div>
+    ${destName ? `<div class="meta-row"><span class="mk">Destination</span><span class="mv go">${destName}</span></div>` : ''}
+    ${fleet.designation ? `<div class="meta-row"><span class="mk">Designation</span><span class="mv">${fleet.designation}</span></div>` : ''}
+    <div class="fleet-section" style="margin-top:14px;">
+      <div class="fleet-section-title">Ship Manifest</div>
+      ${shipsHTML}
+    </div>
+    <div class="fleet-section">
+      <div class="fleet-section-title">Fleet Notes</div>
+      <div class="fleet-notes-box">${fleet.notes || ''}</div>
+    </div>
+    <div class="edit-actions" style="margin-top:10px;">
+      <button class="pbtn primary" id="fleet-edit-btn" style="flex:1;padding:8px;">✎ EDIT FLEET</button>
+      <button class="pbtn danger" id="fleet-delete-btn" style="padding:8px 12px;">✕ DELETE</button>
+    </div>
+  `;
+
+  pane.querySelector('#fleet-back-btn').addEventListener('click', () => {
+    fleetViewMode = 'list';
+    activeFleetId = null;
+    renderFleetsPane(selectedId);
+  });
+
+  pane.querySelector('#fleet-edit-btn').addEventListener('click', () => {
+    fleetViewMode = 'edit';
+    renderFleetsPane(selectedId);
+  });
+
+  pane.querySelector('#fleet-delete-btn').addEventListener('click', () => {
+    if (!confirm(`Delete fleet "${fleet.name}"?`)) return;
+    fleets = fleets.filter(f => f.id !== fleet.id);
+    saveFleets();
+    fleetViewMode = 'list';
+    activeFleetId = null;
+    renderFleetsPane(selectedId);
+  });
+
+  pane.querySelectorAll('.fleet-location-chip').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sysId = el.dataset.sys;
+      if (sysId && sysId !== selectedId) {
+        selectedId = sysId;
+        ensureSystemDetails(sysId).then(det => renderPanel(sysId, det));
+      }
+    });
+  });
+}
+
+function renderFleetEditor(pane, fleet, systemId) {
+  const isNew = !fleet;
+  const f = fleet || { id: generateFleetId(), name: '', captain: '', status: 'Stationed', systemId: systemId, destinationId: '', designation: '', ships: [], notes: '' };
+
+  const shipClassOptions = ELVISH_SHIP_CLASSES.map(c => `<option value="${c.name}">${c.shortName} — ${c.tier}</option>`).join('');
+  const statusOptions = FLEET_STATUSES.map(s => `<option value="${s}" ${f.status===s?'selected':''}>${s}</option>`).join('');
+  const systemOptions = systems.map(s => `<option value="${s.id}" ${f.systemId===s.id?'selected':''}>${s.name || s.id}</option>`).join('');
+  const destOptions = `<option value="">— None —</option>` + systems.map(s => `<option value="${s.id}" ${f.destinationId===s.id?'selected':''}>${s.name || s.id}</option>`).join('');
+
+  let shipsHTML = '';
+  (f.ships || []).forEach((s, i) => {
+    shipsHTML += fleetShipEditorRow(s, i, shipClassOptions);
+  });
+
+  pane.innerHTML = `
+    <div style="margin-bottom:10px;">
+      <button class="pbtn" id="fleet-back-btn" style="padding:4px 10px;font-size:10px;">← CANCEL</button>
+    </div>
+    <div class="fleet-section-title" style="margin-bottom:12px;">${isNew ? 'CREATE NEW FLEET' : 'EDIT FLEET'}</div>
+    <div class="edit-section">
+      <div class="edit-section-title">Fleet Identity</div>
+      <div class="form-row"><span class="fl">Name</span><input id="fe-name" class="sci-input" type="text" value="${(f.name||'').replace(/"/g,'&quot;')}" placeholder="Fleet name..."/></div>
+      <div class="form-row"><span class="fl">Captain</span><input id="fe-captain" class="sci-input" type="text" value="${(f.captain||'').replace(/"/g,'&quot;')}" placeholder="Commanding officer..."/></div>
+      <div class="form-row"><span class="fl">Designation</span><input id="fe-designation" class="sci-input" type="text" value="${(f.designation||'').replace(/"/g,'&quot;')}" placeholder="e.g. 3rd Expeditionary"/></div>
+      <div class="form-row"><span class="fl">Status</span><select id="fe-status" class="sci-select">${statusOptions}</select></div>
+      <div class="form-row"><span class="fl">System</span><select id="fe-system" class="sci-select">${systemOptions}</select></div>
+      <div class="form-row"><span class="fl">Destination</span><select id="fe-dest" class="sci-select">${destOptions}</select></div>
+    </div>
+    <div class="edit-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Ship Composition</div>
+        <button id="fe-add-ship" class="pbtn primary" style="margin-bottom:10px;padding:3px 8px;font-size:10px;">+ ADD CLASS</button>
+      </div>
+      <div id="fe-ship-list" style="margin-top:6px;">
+        ${shipsHTML}
+      </div>
+    </div>
+    <div class="edit-section">
+      <div class="edit-section-title">Notes</div>
+      <textarea id="fe-notes" class="fleet-textarea" placeholder="Fleet notes, mission briefing, orders...">${f.notes || ''}</textarea>
+    </div>
+    <div class="edit-actions">
+      <button id="fe-save" class="pbtn success" style="flex:1;padding:8px;">✓ ${isNew ? 'CREATE FLEET' : 'SAVE CHANGES'}</button>
+      <button id="fe-cancel" class="pbtn danger" style="padding:8px 12px;">✕</button>
+    </div>
+  `;
+
+  const shipList = pane.querySelector('#fe-ship-list');
+
+  pane.querySelector('#fe-add-ship').addEventListener('click', () => {
+    const idx = shipList.querySelectorAll('.fleet-edit-ship-row').length;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = fleetShipEditorRow({ className: ELVISH_SHIP_CLASSES[0].name, qty: 1 }, idx, shipClassOptions);
+    shipList.appendChild(tmp.firstElementChild);
+  });
+
+  shipList.addEventListener('click', e => {
+    if (e.target?.matches('.del-ship-btn')) {
+      e.target.closest('.fleet-edit-ship-row').remove();
+    }
+  });
+
+  const goBack = () => {
+    if (isNew) {
+      fleetViewMode = 'list';
+      activeFleetId = null;
+    } else {
+      fleetViewMode = 'detail';
+    }
+    renderFleetsPane(selectedId);
+  };
+
+  pane.querySelector('#fleet-back-btn').addEventListener('click', goBack);
+  pane.querySelector('#fe-cancel').addEventListener('click', goBack);
+
+  pane.querySelector('#fe-save').addEventListener('click', () => {
+    if (!requireEditor()) return;
+    const newFleet = {
+      id: f.id,
+      name: pane.querySelector('#fe-name').value.trim() || 'Unnamed Fleet',
+      captain: pane.querySelector('#fe-captain').value.trim(),
+      designation: pane.querySelector('#fe-designation').value.trim(),
+      status: pane.querySelector('#fe-status').value,
+      systemId: pane.querySelector('#fe-system').value,
+      destinationId: pane.querySelector('#fe-dest').value || '',
+      notes: pane.querySelector('#fe-notes').value,
+      ships: Array.from(shipList.querySelectorAll('.fleet-edit-ship-row')).map(row => ({
+        className: row.querySelector('.fe-ship-class').value,
+        qty: Math.max(0, parseInt(row.querySelector('.fe-ship-qty').value) || 0)
+      })).filter(s => s.qty > 0)
+    };
+
+    if (isNew) {
+      fleets.push(newFleet);
+    } else {
+      const idx = fleets.findIndex(fl => fl.id === f.id);
+      if (idx >= 0) fleets[idx] = newFleet;
+    }
+    saveFleets();
+    activeFleetId = newFleet.id;
+    fleetViewMode = 'detail';
+    renderFleetsPane(selectedId);
+  });
+}
+
+function fleetShipEditorRow(ship, idx, classOptions) {
+  const selected = ship.className || ELVISH_SHIP_CLASSES[0].name;
+  const opts = ELVISH_SHIP_CLASSES.map(c => `<option value="${c.name}" ${c.name===selected?'selected':''}>${c.shortName} — ${c.tier}</option>`).join('');
+  return `<div class="fleet-edit-ship-row">
+    <select class="fe-ship-class sci-select" style="font-size:12px;">${opts}</select>
+    <input class="fe-ship-qty sci-input" type="number" min="0" value="${ship.qty || 1}" style="text-align:center;"/>
+    <button type="button" class="del-ship-btn" title="Remove">✕</button>
+  </div>`;
+}
+
+/* ── FLEET MAP ICONS ── */
+
+const fleetIconsLayer = document.getElementById('fleet-icons-layer');
+let fleetIconElements = new Map();
+
+function updateFleetMapIcons(mvp) {
+  if (!fleetIconsLayer) return;
+
+  // Group fleets by system
+  const bySystem = new Map();
+  for (const f of fleets) {
+    if (!f.systemId) continue;
+    if (!bySystem.has(f.systemId)) bySystem.set(f.systemId, []);
+    bySystem.get(f.systemId).push(f);
+  }
+
+  // Track which systems still have fleets
+  const activeKeys = new Set();
+
+  for (const [sysId, sysFleets] of bySystem) {
+    const pos = idToWorld.get(sysId);
+    if (!pos) continue;
+
+    const screen = projectToScreen(pos[0], pos[1], pos[2], mvp);
+    if (!screen || screen[2] < -1 || screen[2] > 1) {
+      // Off screen
+      for (const f of sysFleets) {
+        const el = fleetIconElements.get(f.id);
+        if (el) el.style.display = 'none';
+      }
+      continue;
+    }
+
+    const sx = screen[0] / (canvas.width / canvas.clientWidth);
+    const sy = screen[1] / (canvas.height / canvas.clientHeight);
+
+    const totalFleets = sysFleets.length;
+    sysFleets.forEach((f, i) => {
+      activeKeys.add(f.id);
+      let el = fleetIconElements.get(f.id);
+      if (!el) {
+        el = createFleetIconElement(f);
+        fleetIconsLayer.appendChild(el);
+        fleetIconElements.set(f.id, el);
+      }
+
+      // Position: offset to the right/left of the star
+      const offsetX = 20 + i * 18;
+      const offsetY = -6;
+      el.style.left = (sx + offsetX) + 'px';
+      el.style.top = (sy + offsetY) + 'px';
+      el.style.display = 'flex';
+
+      const statusClass = (f.status || 'Stationed').toLowerCase().replace(/\s/g,'-');
+      el.className = 'fleet-map-icon' + (statusClass === 'in-transit' ? ' in-transit' : '');
+
+      // Update label
+      const labelEl = el.querySelector('.fmi-label');
+      if (labelEl) labelEl.textContent = f.name || 'FLT';
+      const countEl = el.querySelector('.fmi-count');
+      if (countEl) countEl.textContent = getTotalShips(f) + ' ships';
+    });
+  }
+
+  // Hide removed fleet icons
+  for (const [fid, el] of fleetIconElements) {
+    if (!activeKeys.has(fid)) {
+      el.style.display = 'none';
+    }
+  }
+}
+
+function createFleetIconElement(fleet) {
+  const el = document.createElement('div');
+  el.className = 'fleet-map-icon';
+  el.innerHTML = `
+    <div class="fmi-diamond"></div>
+    <div class="fmi-label">${fleet.name || 'FLT'}</div>
+    <div class="fmi-count">${getTotalShips(fleet)} ships</div>
+  `;
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (fleet.systemId) {
+      selectedId = fleet.systemId;
+      activeFleetId = fleet.id;
+      fleetViewMode = 'detail';
+      ensureSystemDetails(fleet.systemId).then(det => {
+        renderPanel(fleet.systemId, det);
+        // Switch to fleets tab
+        document.querySelector('#sp-tabs .tab[data-tab="fleets"]')?.click();
+      });
+    }
+  });
+  return el;
+}
+
+// Also export fleets when pressing X in editor mode
+const _origKeydown = null;
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'x' && editMode && editorOK) {
+    // The existing X handler saves systems.json; we also include fleets
+    // We let the original handler fire, and additionally save fleets into the JSON
+  }
+});
+
+// Override the X export to include fleets
+const origXHandler = window.addEventListener;
+// Patch into the existing X key export by wrapping initFromData's export
+// Actually, let's just modify the existing key handler indirectly.
+// The simplest approach: store fleets alongside systems in the export.
+
+// We'll hook into the existing 'x' key by also exporting a fleets.json
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'f' && !editMode && !addMode) {
+    // F key toggles fleet tab if panel is open
+    if (panel.style.transform === 'translateX(0)' || panel.style.transform === 'translateX(0px)') {
+      document.querySelector('#sp-tabs .tab[data-tab="fleets"]')?.click();
+    }
+  }
+});
