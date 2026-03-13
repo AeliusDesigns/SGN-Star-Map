@@ -404,8 +404,10 @@ addEventListener('mousemove', e => {
     cursorEl.style.left = e.clientX + 'px';
     cursorEl.style.top  = e.clientY + 'px';
   }
-  /* show reticle only when NOT over a UI panel */
-  const overUI = e.target.closest('#sidePanel, #hud, #statusBar, #orrery-modal, .hud-nav, .sb-save-btn, .fleet-map-icon');
+  /* Determine if mouse is over any UI region using bounding rects,
+     since pointer-events:none containers won't register in e.target */
+  const overUI = isOverElement('hud', e) || isOverElement('sidePanel', e) ||
+                 isOverElement('statusBar', e) || isOverElement('orrery-modal', e);
   const shouldShow = !overUI;
   if (shouldShow !== cursorVisible) {
     cursorVisible = shouldShow;
@@ -413,6 +415,18 @@ addEventListener('mousemove', e => {
     document.body.classList.toggle('map-cursor', shouldShow);
   }
 });
+
+function isOverElement(id, e) {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  /* side panel: only counts when open (translateX(0)) */
+  if (id === 'sidePanel' && el.style.transform !== 'translateX(0px)' && el.style.transform !== 'translateX(0)') return false;
+  /* orrery: only when open */
+  if (id === 'orrery-modal' && !el.classList.contains('open')) return false;
+  const r = el.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+}
+
 canvas.addEventListener('mousedown', () => { if(cursorEl) cursorEl.classList.add('clicking'); });
 addEventListener('mouseup', () => { if(cursorEl) cursorEl.classList.remove('clicking'); });
 
