@@ -302,23 +302,52 @@ let _editorPW = null;
 let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 
 async function load() {
-  /* try localStorage first */
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) { entries = JSON.parse(raw) || []; return; }
-  } catch {}
-  /* fall back to codex.json file in repo */
+  let fileEntries = null;
+  let localEntries = null;
+
+  /* try codex.json file (canonical repo source) */
   try {
     const r = await fetch('./codex.json', { cache: 'no-store' });
-    if (r.ok) {
-      entries = await r.json();
-      save(); /* cache into localStorage */
-      return;
-    }
+    if (r.ok) fileEntries = await r.json();
   } catch {}
-  entries = [];
+
+  /* try localStorage (may have in-progress edits) */
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) localEntries = JSON.parse(raw) || [];
+  } catch {}
+
+  if (fileEntries && localEntries) {
+    /* merge: for each entry, keep whichever version has the newer 'updated' timestamp */
+    const merged = new Map();
+    for (const e of fileEntries) merged.set(e.id, e);
+    for (const e of localEntries) {
+      const existing = merged.get(e.id);
+      if (!existing || (e.updated || 0) > (existing.updated || 0)) {
+        merged.set(e.id, e);
+      }
+    }
+    entries = Array.from(merged.values());
+  } else if (fileEntries) {
+    entries = fileEntries;
+  } else if (localEntries) {
+    entries = localEntries;
+  } else {
+    entries = [];
+  }
 }
-function save()  { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); updateCount(); }
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(entries));
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      toast('⚠ Storage full — use SAVE TO REPO to download your data');
+      console.warn('localStorage quota exceeded. Total entries:', entries.length,
+        'Approx size:', Math.round(JSON.stringify(entries).length / 1024) + 'KB');
+    }
+  }
+  updateCount();
+}
 function genId() { return 'CX_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,5).toUpperCase(); }
 
 (async function loadPW() {
