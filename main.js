@@ -1833,7 +1833,7 @@ function loop() {
         const tags = Array.isArray(sys.tags) && sys.tags.length ? sys.tags : [];
         tipTags.innerHTML = tags.map(t => {
           const lc = t.toLowerCase();
-          const cls = ['contested','shipyard','capital','frontier','outpost','homeworld','fortress'].includes(lc) ? ' ' + lc : '';
+          const cls = ['contested','shipyard','capital','frontier','outpost','homeworld','fortress','colony'].includes(lc) ? ' ' + lc : '';
           return `<span class="tip-tag${cls}">${t}</span>`;
         }).join('');
       }
@@ -2360,6 +2360,7 @@ const ALERT_TAGS = {
   'frontier':   { icon: '◇', cls: 'hazard',     label: '◇' },
   'outpost':    { icon: '◎', cls: 'secure',     label: '◎' },
   'capital':    { icon: '⟐', cls: 'caution',    label: '⟐' },
+  'colony':     { icon: '⊙', cls: 'secure',     label: '⊙' },
 };
 
 const ALERT_TAG_DEFS = [
@@ -2376,6 +2377,7 @@ const ALERT_TAG_DEFS = [
   { key: 'frontier',   label: 'Frontier',   icon: '◇', cls: 'hazard',     color: 'var(--purple)',    rgb: '179,136,255' },
   { key: 'outpost',    label: 'Outpost',    icon: '◎', cls: 'secure',     color: 'var(--green)',     rgb: '92,219,122' },
   { key: 'capital',    label: 'Capital',    icon: '⟐', cls: 'caution',    color: 'var(--gold)',      rgb: '245,197,66' },
+  { key: 'colony',     label: 'Colony',     icon: '⊙', cls: 'secure',     color: 'var(--green)',     rgb: '92,219,122' },
 ];
 const ALERT_TAG_KEYS = ALERT_TAG_DEFS.map(a => a.key);
 
