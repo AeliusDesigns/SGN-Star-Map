@@ -2423,7 +2423,7 @@ function updateAlertIcons(mvp) {
 
     /* position above the star */
     el.style.left = sx + 'px';
-    el.style.top = (sy - 24) + 'px';
+    el.style.top = (sy - 34) + 'px';
     el.style.display = 'flex';
   }
 
