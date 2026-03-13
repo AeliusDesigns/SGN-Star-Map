@@ -1406,7 +1406,20 @@ function renderEditPane(id, details, sys) {
       </div>
       <div class="form-row">
         <label class="fl">Tags</label>
-        <input id="ed-tags" class="sci-input" type="text" value="${(sys?.tags||[]).join(', ')}" placeholder="comma separated..."/>
+        <input id="ed-tags" class="sci-input" type="text" value="${(sys?.tags||[]).filter(t => !ALERT_TAG_KEYS.includes(t.toLowerCase())).join(', ')}" placeholder="Custom tags (comma separated)..."/>
+      </div>
+      <div class="edit-section" style="margin-top:6px;">
+        <div class="edit-section-title">System Alerts</div>
+        <div id="ed-alert-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+          ${ALERT_TAG_DEFS.map(a => {
+            const checked = (sys?.tags||[]).some(t => t.toLowerCase() === a.key) ? 'checked' : '';
+            return `<label class="alert-check ${a.cls}" style="display:flex;align-items:center;gap:7px;padding:5px 8px;border:1px solid var(--border);border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:all .12s;background:${checked ? 'rgba('+a.rgb+',.06)' : 'transparent'};border-color:${checked ? 'rgba('+a.rgb+',.35)' : 'var(--border)'};">
+              <input type="checkbox" class="ed-alert-cb" data-tag="${a.key}" ${checked} style="accent-color:${a.color};"/>
+              <span style="color:${a.color};">${a.icon}</span>
+              <span style="color:${checked ? a.color : 'var(--text-dim)'};">${a.label}</span>
+            </label>`;
+          }).join('')}
+        </div>
       </div>
       <div class="form-row">
         <label class="fl">Notes</label>
@@ -1529,7 +1542,9 @@ function renderEditPane(id, details, sys) {
   pedit.querySelector('#ed-save').onclick = () => {
     const newName  = pedit.querySelector('#ed-name').value.trim();
     const newOwner = pedit.querySelector('#ed-owner').value.trim();
-    const newTags  = pedit.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const customTags = pedit.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const alertTags = Array.from(pedit.querySelectorAll('.ed-alert-cb:checked')).map(cb => cb.dataset.tag);
+    const newTags = [...alertTags, ...customTags];
     const newNotes = pedit.querySelector('#ed-notes').value.trim();
     const newKind  = pedit.querySelector('#ed-star').value;
     const newPlanets = Array.from(planetList.querySelectorAll('.ed-body-row')).map(row => ({
@@ -1867,6 +1882,7 @@ function loop() {
   }
 
   updateFleetMapIcons(mvp);
+  updateAlertIcons(mvp);
 
   requestAnimationFrame(loop);
 }
@@ -2324,6 +2340,97 @@ function createFleetIconElement(fleet) {
     }
   });
   return el;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SYSTEM ALERT ICONS (map overlay)
+   ══════════════════════════════════════════════════════════════════ */
+
+const ALERT_TAGS = {
+  'contested':  { icon: '⚠', cls: 'contested',  label: '!' },
+  'caution':    { icon: '⚠', cls: 'caution',    label: '!' },
+  'hazard':     { icon: '☢', cls: 'hazard',     label: '!' },
+  'secure':     { icon: '✓', cls: 'secure',     label: '✓' },
+  'classified': { icon: '◆', cls: 'classified', label: '◆' },
+  'blockade':   { icon: '⊘', cls: 'contested',  label: '⊘' },
+  'siege':      { icon: '⚔', cls: 'contested',  label: '⚔' },
+  'homeworld':  { icon: '★', cls: 'secure',     label: '★' },
+  'shipyard':   { icon: '⚓', cls: 'caution',    label: '⚓' },
+  'fortress':   { icon: '⛊', cls: 'classified', label: '⛊' },
+  'frontier':   { icon: '◇', cls: 'hazard',     label: '◇' },
+  'outpost':    { icon: '◎', cls: 'secure',     label: '◎' },
+  'capital':    { icon: '⟐', cls: 'caution',    label: '⟐' },
+};
+
+const ALERT_TAG_DEFS = [
+  { key: 'contested',  label: 'Contested',  icon: '⚠', cls: 'contested',  color: 'var(--red-alert)', rgb: '255,59,59' },
+  { key: 'caution',    label: 'Caution',    icon: '⚠', cls: 'caution',    color: 'var(--gold)',      rgb: '245,197,66' },
+  { key: 'hazard',     label: 'Hazard',     icon: '☢', cls: 'hazard',     color: 'var(--purple)',    rgb: '179,136,255' },
+  { key: 'blockade',   label: 'Blockade',   icon: '⊘', cls: 'contested',  color: 'var(--red-alert)', rgb: '255,59,59' },
+  { key: 'siege',      label: 'Siege',      icon: '⚔', cls: 'contested',  color: 'var(--red-alert)', rgb: '255,59,59' },
+  { key: 'classified', label: 'Classified', icon: '◆', cls: 'classified', color: 'var(--cyan)',      rgb: '56,232,255' },
+  { key: 'secure',     label: 'Secure',     icon: '✓', cls: 'secure',     color: 'var(--green)',     rgb: '92,219,122' },
+  { key: 'homeworld',  label: 'Homeworld',  icon: '★', cls: 'secure',     color: 'var(--gold)',      rgb: '245,197,66' },
+  { key: 'shipyard',   label: 'Shipyard',   icon: '⚓', cls: 'caution',    color: 'var(--gold)',      rgb: '245,197,66' },
+  { key: 'fortress',   label: 'Fortress',   icon: '⛊', cls: 'classified', color: 'var(--cyan)',      rgb: '56,232,255' },
+  { key: 'frontier',   label: 'Frontier',   icon: '◇', cls: 'hazard',     color: 'var(--purple)',    rgb: '179,136,255' },
+  { key: 'outpost',    label: 'Outpost',    icon: '◎', cls: 'secure',     color: 'var(--green)',     rgb: '92,219,122' },
+  { key: 'capital',    label: 'Capital',    icon: '⟐', cls: 'caution',    color: 'var(--gold)',      rgb: '245,197,66' },
+];
+const ALERT_TAG_KEYS = ALERT_TAG_DEFS.map(a => a.key);
+
+const alertIconsLayer = document.getElementById('alert-icons-layer');
+let alertIconElements = new Map();
+
+function updateAlertIcons(mvp) {
+  if (!alertIconsLayer) return;
+
+  const activeKeys = new Set();
+
+  for (const sys of systems) {
+    const tags = Array.isArray(sys.tags) ? sys.tags : [];
+    const alerts = tags.filter(t => ALERT_TAGS[t.toLowerCase()]);
+    if (!alerts.length) continue;
+
+    const pos = idToWorld.get(sys.id);
+    if (!pos) continue;
+    const screen = projectToScreen(pos[0], pos[1], pos[2], mvp);
+    if (!screen || screen[2] < -1 || screen[2] > 1) {
+      const el = alertIconElements.get(sys.id);
+      if (el) el.style.display = 'none';
+      continue;
+    }
+
+    const sx = screen[0] / (canvas.width / canvas.clientWidth);
+    const sy = screen[1] / (canvas.height / canvas.clientHeight);
+    const key = sys.id;
+    activeKeys.add(key);
+
+    let el = alertIconElements.get(key);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'sys-alert';
+      alertIconsLayer.appendChild(el);
+      alertIconElements.set(key, el);
+    }
+
+    /* render alert icons */
+    el.innerHTML = alerts.map(t => {
+      const a = ALERT_TAGS[t.toLowerCase()];
+      if (!a) return '';
+      return `<div class="sys-alert-icon ${a.cls}" title="${t}">${a.label}</div>`;
+    }).join('');
+
+    /* position above the star */
+    el.style.left = sx + 'px';
+    el.style.top = (sy - 18) + 'px';
+    el.style.display = 'flex';
+  }
+
+  /* hide removed alerts */
+  for (const [sid, el] of alertIconElements) {
+    if (!activeKeys.has(sid)) el.style.display = 'none';
+  }
 }
 
 // Also export fleets when pressing X in editor mode
