@@ -430,6 +430,75 @@
       max-width: 220px;
     }
 
+    /* ── System alert icons ── */
+    .sys-alert {
+      position: absolute;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      transform: translate(-50%, 0);
+      transition: opacity .15s;
+    }
+    .sys-alert-icon {
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      line-height: 1;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .sys-alert-icon.contested {
+      background: rgba(255,59,59,.15);
+      border: 1px solid rgba(255,59,59,.6);
+      color: var(--red-alert);
+      animation: alert-pulse-red 2s ease-in-out infinite;
+    }
+    .sys-alert-icon.caution {
+      background: rgba(245,197,66,.12);
+      border: 1px solid rgba(245,197,66,.5);
+      color: var(--gold);
+      animation: alert-pulse-gold 2.5s ease-in-out infinite;
+    }
+    .sys-alert-icon.hazard {
+      background: rgba(179,136,255,.12);
+      border: 1px solid rgba(179,136,255,.5);
+      color: var(--purple);
+      animation: alert-pulse-purple 3s ease-in-out infinite;
+    }
+    .sys-alert-icon.secure {
+      background: rgba(92,219,122,.1);
+      border: 1px solid rgba(92,219,122,.4);
+      color: var(--green);
+    }
+    .sys-alert-icon.classified {
+      background: rgba(56,232,255,.1);
+      border: 1px solid rgba(56,232,255,.4);
+      color: var(--cyan);
+      animation: alert-pulse-cyan 3s ease-in-out infinite;
+    }
+    @keyframes alert-pulse-red {
+      0%, 100% { box-shadow: 0 0 4px rgba(255,59,59,.2); }
+      50% { box-shadow: 0 0 10px rgba(255,59,59,.5); }
+    }
+    @keyframes alert-pulse-gold {
+      0%, 100% { box-shadow: 0 0 4px rgba(245,197,66,.15); }
+      50% { box-shadow: 0 0 8px rgba(245,197,66,.4); }
+    }
+    @keyframes alert-pulse-purple {
+      0%, 100% { box-shadow: 0 0 4px rgba(179,136,255,.15); }
+      50% { box-shadow: 0 0 8px rgba(179,136,255,.4); }
+    }
+    @keyframes alert-pulse-cyan {
+      0%, 100% { box-shadow: 0 0 4px rgba(56,232,255,.15); }
+      50% { box-shadow: 0 0 8px rgba(56,232,255,.4); }
+    }
+
     #sidePanel {
       position: fixed;
       top: 0; right: 0;
@@ -1546,6 +1615,7 @@
   </div>
 
   <div id="fleet-icons-layer" style="position:fixed;inset:0;z-index:10;pointer-events:none;"></div>
+  <div id="alert-icons-layer" style="position:fixed;inset:0;z-index:9;pointer-events:none;"></div>
 
   <div id="statusBar">
     <div class="sb-item"><div class="sb-dot" id="dot-sys"></div><span id="sb-sys">INITIALIZING</span></div>
