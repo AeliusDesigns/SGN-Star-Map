@@ -55,7 +55,21 @@
     .tab, .pbtn, .planet-card, .post-item, .fleet-list-item, .fleet-map-icon,
     input[type="submit"], .hud-nav, .sb-save-btn, .panel-close, .orrery-close,
     .speed-btn, .sb-filter, .template-card, .lane-row-del, .ed-body-head,
-    .ed-body-del, .stat-del, .del-ship-btn, .tb-btn {
+    .ed-body-del, .stat-del, .del-ship-btn, .tb-btn,
+    #sidePanel a, #sidePanel button, #sidePanel .pbtn, #sidePanel .tab,
+    #sidePanel .panel-close, #sidePanel select,
+    .panel-footer .pbtn, .edit-actions button {
+      cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.8' stroke-opacity='0.5' stroke-dasharray='2 2'/><polygon points='4,2 2,24 14,20' fill='%2338e8ff' fill-opacity='0.06'/><circle cx='4' cy='2' r='2.5' fill='%2338e8ff' fill-opacity='0.5'/><circle cx='4' cy='2' r='1.2' fill='%23fff'/></g></svg>") 4 2, pointer !important;
+    }
+    /* ensure UI regions never inherit map-cursor: none */
+    #sidePanel, #sidePanel *, #hud, #hud *, #statusBar, #statusBar * {
+      cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.6' stroke-opacity='0.3' stroke-dasharray='2 2'/><circle cx='4' cy='2' r='1.5' fill='%2338e8ff' fill-opacity='0.8'/><circle cx='4' cy='2' r='0.8' fill='%23fff'/></g></svg>") 4 2, auto !important;
+    }
+    #sidePanel a, #sidePanel button, #sidePanel .pbtn,
+    #sidePanel .tab, #sidePanel .panel-close, #sidePanel select,
+    #sidePanel .planet-card, #sidePanel .fleet-list-item,
+    #sidePanel .lane-row-del, #sidePanel .ed-body-head, #sidePanel .ed-body-del,
+    #hud a, #hud .hud-nav, #statusBar button, #statusBar .sb-save-btn {
       cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.8' stroke-opacity='0.5' stroke-dasharray='2 2'/><polygon points='4,2 2,24 14,20' fill='%2338e8ff' fill-opacity='0.06'/><circle cx='4' cy='2' r='2.5' fill='%2338e8ff' fill-opacity='0.5'/><circle cx='4' cy='2' r='1.2' fill='%23fff'/></g></svg>") 4 2, pointer !important;
     }
 
