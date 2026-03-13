@@ -516,42 +516,45 @@ function saveMapState() {
 }
 
 (async function boot() {
-  /* try localStorage first (user edits persist here) */
-  try {
-    const saved = localStorage.getItem(MAP_STORE_KEY);
-    if (saved) {
-      await initFromData(JSON.parse(saved));
-      await loadSolarSystems();
-      return;
-    }
-  } catch {}
-  /* fallback to systems.json file */
+  /* try systems.json file first (canonical repo source) */
+  let loaded = false;
   try {
     const r = await fetch('./systems.json', { cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    await initFromData(await r.json());
-  } catch {
+    if (r.ok) {
+      await initFromData(await r.json());
+      loaded = true;
+    }
+  } catch {}
+  /* fall back to localStorage if file not available */
+  if (!loaded) {
+    try {
+      const saved = localStorage.getItem(MAP_STORE_KEY);
+      if (saved) {
+        await initFromData(JSON.parse(saved));
+        loaded = true;
+      }
+    } catch {}
+  }
+  if (!loaded) {
     await initFromData(DEFAULT_DATA);
   }
   await loadSolarSystems();
 })();
 
 async function loadSolarSystems() {
-  /* For each system, if we don't have detail in localStorage, try solar_systems.json */
+  /* load solar_systems.json first (canonical repo source) */
   let fileSolarData = null;
+  try {
+    const r = await fetch('./solar_systems.json', { cache: 'no-store' });
+    if (r.ok) fileSolarData = await r.json();
+  } catch {}
+
   for (const sys of systems) {
-    if (getCachedSystem(sys.id)) continue; // already have it
-    /* lazy-load the file only once */
-    if (fileSolarData === null) {
-      try {
-        const r = await fetch('./solar_systems.json', { cache: 'no-store' });
-        if (r.ok) fileSolarData = await r.json();
-        else fileSolarData = {};
-      } catch { fileSolarData = {}; }
-    }
-    if (fileSolarData[sys.id]) {
+    /* prefer file data, fall back to localStorage cache */
+    if (fileSolarData && fileSolarData[sys.id]) {
       setCachedSystem(sys.id, fileSolarData[sys.id]);
     }
+    /* if still nothing, localStorage may already have it from a previous session */
   }
 }
 
@@ -1880,19 +1883,19 @@ let fleetViewMode = 'list'; // 'list' | 'detail' | 'edit'
 const FLEET_STORE_KEY = 'sgn_fleets_v1';
 
 async function loadFleets() {
-  /* try localStorage first */
-  try {
-    const raw = localStorage.getItem(FLEET_STORE_KEY);
-    if (raw) { fleets = JSON.parse(raw); updateFleetStatusBar(); return; }
-  } catch {}
-  /* fall back to fleets.json file in repo */
+  /* try fleets.json file first (canonical repo source) */
   try {
     const r = await fetch('./fleets.json', { cache: 'no-store' });
     if (r.ok) {
       fleets = await r.json();
-      saveFleets(); /* cache into localStorage */
+      updateFleetStatusBar();
       return;
     }
+  } catch {}
+  /* fall back to localStorage */
+  try {
+    const raw = localStorage.getItem(FLEET_STORE_KEY);
+    if (raw) { fleets = JSON.parse(raw); updateFleetStatusBar(); return; }
   } catch {}
   fleets = [];
 }
