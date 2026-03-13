@@ -396,6 +396,40 @@
       font-style: italic;
     }
 
+    .tip-tags {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .tip-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 1px 6px;
+      border-radius: 2px;
+      border: 1px solid var(--border2);
+      color: var(--text-muted);
+      background: rgba(56,232,255,.03);
+    }
+    .tip-tag.contested { border-color: rgba(255,59,59,.3); color: var(--red-alert); background: rgba(255,59,59,.04); }
+    .tip-tag.shipyard  { border-color: rgba(245,197,66,.3); color: var(--gold); background: rgba(245,197,66,.04); }
+    .tip-tag.capital   { border-color: rgba(245,197,66,.3); color: var(--gold); background: rgba(245,197,66,.04); }
+    .tip-tag.frontier  { border-color: rgba(179,136,255,.3); color: var(--purple); background: rgba(179,136,255,.04); }
+    .tip-tag.outpost   { border-color: rgba(92,219,122,.3); color: var(--green); background: rgba(92,219,122,.04); }
+    .tip-tag.homeworld { border-color: rgba(245,197,66,.4); color: var(--gold); background: rgba(245,197,66,.06); }
+    .tip-tag.fortress  { border-color: rgba(56,232,255,.3); color: var(--cyan); background: rgba(56,232,255,.04); }
+
+    .tip-notes {
+      font-family: 'Exo 2', sans-serif;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.4;
+      max-width: 220px;
+    }
+
     #sidePanel {
       position: fixed;
       top: 0; right: 0;
@@ -1529,6 +1563,8 @@
       <div class="tip-name"  id="tip-name">—</div>
       <div class="tip-id"    id="tip-id"></div>
       <div class="tip-owner" id="tip-owner"></div>
+      <div class="tip-tags"  id="tip-tags"></div>
+      <div class="tip-notes" id="tip-notes"></div>
     </div>
   </div>
 
