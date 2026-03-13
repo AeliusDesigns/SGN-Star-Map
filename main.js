@@ -311,6 +311,111 @@ const progPoints = makeProgram(VS_POINTS, FS_POINTS);
 const progLines  = makeProgram(VS_LINES, FS_LINES);
 const progHalo   = makeProgram(VS_HALO, FS_HALO);
 
+/* ── Territory overlay shader ── */
+const VS_TERR = `
+attribute vec2 position;
+varying vec2 vUV;
+void main(){
+  vUV = position * 0.5 + 0.5;
+  gl_Position = vec4(position, 0.0, 1.0);
+}`;
+const FS_TERR = `
+precision mediump float;
+varying vec2 vUV;
+uniform sampler2D uTex;
+uniform float uAlpha;
+void main(){
+  vec4 c = texture2D(uTex, vUV);
+  gl_FragColor = vec4(c.rgb, c.a * uAlpha);
+}`;
+const progTerr   = makeProgram(VS_TERR, FS_TERR);
+const aPosTerr   = gl.getAttribLocation(progTerr, 'position');
+const uTexTerr   = gl.getUniformLocation(progTerr, 'uTex');
+const uAlphaTerr = gl.getUniformLocation(progTerr, 'uAlpha');
+const terrVBO    = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, terrVBO);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+let terrTex   = null;
+let terrDirty = true;
+
+/* ── Faction color map (owner name → [r,g,b]) ── */
+const FACTION_COLORS = {
+  'arandorë eldainë':  [56, 232, 255],
+  'high realm':        [56, 232, 255],
+  'elves':             [56, 232, 255],
+  'dwarves':           [245, 197, 66],
+  'orcs':              [255, 59, 59],
+  'contested':         [179, 136, 255],
+  'neutral':           [90, 122, 153],
+  'unknown':           [60, 80, 100],
+};
+
+function getFactionColor(owner) {
+  if (!owner) return null;
+  const key = owner.toLowerCase();
+  for (const [k, v] of Object.entries(FACTION_COLORS)) {
+    if (key.includes(k) || k.includes(key)) return v;
+  }
+  /* hash fallback for unlisted factions */
+  let h = 0;
+  for (let i = 0; i < owner.length; i++) h = owner.charCodeAt(i) + ((h << 5) - h);
+  return [80 + ((h >> 0) & 0x7F), 80 + ((h >> 8) & 0x7F), 80 + ((h >> 16) & 0x7F)];
+}
+
+/* ── Territory texture (offscreen canvas → WebGL) ── */
+const TERR_RES = 512;
+const terrCanvas = document.createElement('canvas');
+terrCanvas.width = TERR_RES;
+terrCanvas.height = TERR_RES;
+const terrCtx = terrCanvas.getContext('2d');
+
+function rebuildTerritoryTexture(mvp) {
+  const W = canvas.width, H = canvas.height;
+  terrCtx.clearRect(0, 0, TERR_RES, TERR_RES);
+
+  const owned = [];
+  for (const sys of systems) {
+    if (!sys.owner) continue;
+    const p = idToWorld.get(sys.id);
+    if (!p) continue;
+    const s = projectToScreen(p[0], p[1], p[2], mvp);
+    if (!s) continue;
+    const tx = (s[0] / W) * TERR_RES;
+    const ty = (s[1] / H) * TERR_RES;
+    const color = getFactionColor(sys.owner);
+    if (!color) continue;
+    owned.push({ x: tx, y: ty, color });
+  }
+
+  if (owned.length) {
+    const radius = TERR_RES * 0.12;
+    for (const o of owned) {
+      const grad = terrCtx.createRadialGradient(o.x, o.y, 0, o.x, o.y, radius);
+      grad.addColorStop(0, `rgba(${o.color[0]},${o.color[1]},${o.color[2]},0.35)`);
+      grad.addColorStop(0.4, `rgba(${o.color[0]},${o.color[1]},${o.color[2]},0.15)`);
+      grad.addColorStop(1, `rgba(${o.color[0]},${o.color[1]},${o.color[2]},0)`);
+      terrCtx.fillStyle = grad;
+      terrCtx.fillRect(0, 0, TERR_RES, TERR_RES);
+    }
+  }
+
+  uploadTerrTexture();
+}
+
+function uploadTerrTexture() {
+  if (!terrTex) {
+    terrTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, terrTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  } else {
+    gl.bindTexture(gl.TEXTURE_2D, terrTex);
+  }
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, terrCanvas);
+}
+
 /* BG */
 const uTimeBG = gl.getUniformLocation(progBG, 'uTime');
 const uResBG  = gl.getUniformLocation(progBG, 'uRes');
@@ -360,7 +465,7 @@ canvas.addEventListener('mousedown', e => {
     }
   }
 });
-addEventListener('mouseup', () => { dragging = false; panning = false; });
+addEventListener('mouseup', () => { dragging = false; panning = false; terrDirty = true; });
 addEventListener('mousemove', e => {
   const dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
@@ -381,6 +486,7 @@ addEventListener('wheel', e => {
   if (e.target.closest('#sidePanel') || e.target.closest('#orrery-modal')) return;
   dist *= (1 + Math.sign(e.deltaY) * 0.12);
   dist = Math.max(300, Math.min(6000, dist));
+  terrDirty = true;
 });
 
 let starsVBO = null, starCount = 0;
@@ -394,6 +500,8 @@ const tip      = document.getElementById('tooltip');
 const tipName  = document.getElementById('tip-name');
 const tipId    = document.getElementById('tip-id');
 const tipOwner = document.getElementById('tip-owner');
+const tipTags  = document.getElementById('tip-tags');
+const tipNotes = document.getElementById('tip-notes');
 const cursorEl = document.getElementById('cursor-reticle');
 let mouseX = 0, mouseY = 0;
 let cursorVisible = false;
@@ -513,6 +621,7 @@ function saveMapState() {
     const state = { image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut };
     localStorage.setItem(MAP_STORE_KEY, JSON.stringify(state));
   } catch {}
+  terrDirty = true;
 }
 
 (async function boot() {
@@ -1407,6 +1516,10 @@ function renderEditPane(id, details, sys) {
         <input id="ed-tags" class="sci-input" type="text" value="${(sys?.tags||[]).join(', ')}" placeholder="comma separated..."/>
       </div>
       <div class="form-row">
+        <label class="fl">Notes</label>
+        <input id="ed-notes" class="sci-input" type="text" value="${(sys?.notes||'').replaceAll('"','&quot;')}" placeholder="One-liner shown on hover..."/>
+      </div>
+      <div class="form-row">
         <label class="fl">Star</label>
         <select id="ed-star" class="sci-select">${starOpts}</select>
       </div>
@@ -1524,6 +1637,7 @@ function renderEditPane(id, details, sys) {
     const newName  = pedit.querySelector('#ed-name').value.trim();
     const newOwner = pedit.querySelector('#ed-owner').value.trim();
     const newTags  = pedit.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const newNotes = pedit.querySelector('#ed-notes').value.trim();
     const newKind  = pedit.querySelector('#ed-star').value;
     const newPlanets = Array.from(planetList.querySelectorAll('.ed-body-row')).map(row => ({
       name:          row.querySelector('.ed-b-name').value.trim() || 'Body',
@@ -1540,6 +1654,7 @@ function renderEditPane(id, details, sys) {
       if (newName) sys.name = newName;
       sys.owner = newOwner || undefined;
       sys.tags = newTags.length ? newTags : undefined;
+      sys.notes = newNotes || undefined;
     }
     saveMapState();
 
@@ -1742,6 +1857,22 @@ function loop() {
 
   gl.enable(gl.BLEND);
 
+  /* ── 1b. Territory overlay ── */
+  if (terrDirty) { rebuildTerritoryTexture(mvp); terrDirty = false; }
+  if (terrTex) {
+    gl.useProgram(progTerr);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, terrTex);
+    gl.uniform1i(uTexTerr, 0);
+    gl.uniform1f(uAlphaTerr, 0.6);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.bindBuffer(gl.ARRAY_BUFFER, terrVBO);
+    gl.enableVertexAttribArray(aPosTerr);
+    gl.vertexAttribPointer(aPosTerr, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disableVertexAttribArray(aPosTerr);
+  }
+
   /* ── 2. Lanes — multi-pass glow using simple GL_LINES ── */
   if (linesVBO && lineVertCount > 0) {
     gl.useProgram(progLines);
@@ -1806,6 +1937,15 @@ function loop() {
       if (tipName)  tipName.textContent  = sys.name || sys.id;
       if (tipId)    tipId.textContent    = sys.id;
       if (tipOwner) tipOwner.textContent = sys.owner ? `◈ ${sys.owner}` : '';
+      if (tipTags) {
+        const tags = Array.isArray(sys.tags) && sys.tags.length ? sys.tags : [];
+        tipTags.innerHTML = tags.map(t => {
+          const lc = t.toLowerCase();
+          const cls = ['contested','shipyard','capital','frontier','outpost','homeworld','fortress'].includes(lc) ? ' ' + lc : '';
+          return `<span class="tip-tag${cls}">${t}</span>`;
+        }).join('');
+      }
+      if (tipNotes) tipNotes.textContent = sys.notes || '';
       tip.style.left    = mouseX + 'px';
       tip.style.top     = mouseY + 'px';
       tip.style.display = 'block';
