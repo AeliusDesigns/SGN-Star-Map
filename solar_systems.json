@@ -1,1 +1,644 @@
-
+{
+  "SGN-SYS-016": {
+    "version": "v2",
+    "system_id": "SGN-SYS-016",
+    "seeded": true,
+    "generated_at": "2026-03-12T13:52:17.262Z",
+    "star": {
+      "kind": "M-Dwarf",
+      "hz": [
+        0.1,
+        0.4
+      ],
+      "inner_edge": 0.05,
+      "outer_edge": 8,
+      "radius_hint": 3
+    },
+    "planets": [
+      {
+        "name": "Coria",
+        "semi_major_AU": 0.09,
+        "type": "Desert",
+        "zone": "habitable",
+        "radius_hint": 0.907,
+        "ecc": 0.105,
+        "angle_deg": 295.6,
+        "notes": ""
+      },
+      {
+        "name": "Arynia",
+        "semi_major_AU": 0.158,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 0.962,
+        "ecc": 0.146,
+        "angle_deg": 355.8,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-020": {
+    "version": "v2",
+    "system_id": "SGN-SYS-020",
+    "seeded": true,
+    "generated_at": "2026-03-12T15:20:23.062Z",
+    "star": {
+      "kind": "K-Dwarf",
+      "hz": [
+        0.4,
+        0.9
+      ],
+      "inner_edge": 0.08,
+      "outer_edge": 15,
+      "radius_hint": 4
+    },
+    "planets": [
+      {
+        "name": "Noxia",
+        "type": "Ice",
+        "semi_major_AU": 0.212,
+        "notes": ""
+      },
+      {
+        "name": "Seven",
+        "type": "Installation",
+        "semi_major_AU": 0.403,
+        "notes": "Orbital resonance detected"
+      },
+      {
+        "name": "Tarar",
+        "type": "Rocky",
+        "semi_major_AU": 0.751,
+        "notes": ""
+      },
+      {
+        "name": "Sithon",
+        "type": "Habitat",
+        "semi_major_AU": 1.234,
+        "notes": ""
+      },
+      {
+        "name": "Velax",
+        "type": "Ice",
+        "semi_major_AU": 2.559,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-025": {
+    "version": "v2",
+    "system_id": "SGN-SYS-025",
+    "seeded": true,
+    "generated_at": "2026-03-13T06:22:40.137Z",
+    "star": {
+      "kind": "K-Dwarf",
+      "hz": [
+        0.4,
+        0.9
+      ],
+      "inner_edge": 0.08,
+      "outer_edge": 15,
+      "radius_hint": 4
+    },
+    "planets": [
+      {
+        "name": "Tarum",
+        "semi_major_AU": 0.169,
+        "type": "Ice",
+        "zone": "fringe",
+        "radius_hint": 0.834,
+        "ecc": 0.171,
+        "angle_deg": 246.8,
+        "notes": ""
+      },
+      {
+        "name": "Coron",
+        "semi_major_AU": 0.302,
+        "type": "Ecumenopolis",
+        "zone": "habitable",
+        "radius_hint": 0.99,
+        "ecc": 0.001,
+        "angle_deg": 94.4,
+        "notes": "Orbital resonance detected"
+      },
+      {
+        "name": "Noxel",
+        "semi_major_AU": 0.504,
+        "type": "Ecumenopolis",
+        "zone": "habitable",
+        "radius_hint": 1.074,
+        "ecc": 0.04,
+        "angle_deg": 33.3,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-031": {
+    "version": "v2",
+    "system_id": "SGN-SYS-031",
+    "seeded": true,
+    "generated_at": "2026-03-12T01:28:54.898Z",
+    "star": {
+      "kind": "K-Dwarf",
+      "hz": [
+        0.4,
+        0.9
+      ],
+      "inner_edge": 0.08,
+      "outer_edge": 15,
+      "radius_hint": 4
+    },
+    "planets": [
+      {
+        "name": "Velos",
+        "semi_major_AU": 0.173,
+        "type": "Ice",
+        "zone": "fringe",
+        "radius_hint": 0.878,
+        "ecc": 0.15,
+        "angle_deg": 132.6,
+        "notes": ""
+      },
+      {
+        "name": "Sevos",
+        "semi_major_AU": 0.243,
+        "type": "Ice",
+        "zone": "fringe",
+        "radius_hint": 0.894,
+        "ecc": 0.014,
+        "angle_deg": 228.9,
+        "notes": "Orbital resonance detected"
+      },
+      {
+        "name": "Arynis",
+        "semi_major_AU": 0.347,
+        "type": "Rocky",
+        "zone": "habitable",
+        "radius_hint": 0.78,
+        "ecc": 0.125,
+        "angle_deg": 306.9,
+        "notes": ""
+      },
+      {
+        "name": "Tarar",
+        "semi_major_AU": 0.579,
+        "type": "Ecumenopolis",
+        "zone": "habitable",
+        "radius_hint": 1.091,
+        "ecc": 0.051,
+        "angle_deg": 28.5,
+        "notes": ""
+      },
+      {
+        "name": "Noxos",
+        "semi_major_AU": 1.053,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 0.994,
+        "ecc": 0.005,
+        "angle_deg": 44.5,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-037": {
+    "version": "v2",
+    "system_id": "SGN-SYS-037",
+    "seeded": true,
+    "generated_at": "2026-03-13T06:22:36.890Z",
+    "star": {
+      "kind": "M-Dwarf",
+      "hz": [
+        0.1,
+        0.4
+      ],
+      "inner_edge": 0.05,
+      "outer_edge": 8,
+      "radius_hint": 3
+    },
+    "planets": [
+      {
+        "name": "Noxia",
+        "semi_major_AU": 0.147,
+        "type": "Shield World",
+        "zone": "habitable",
+        "radius_hint": 1.096,
+        "ecc": 0.146,
+        "angle_deg": 41,
+        "notes": ""
+      },
+      {
+        "name": "Vorum",
+        "semi_major_AU": 0.267,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 1.049,
+        "ecc": 0.04,
+        "angle_deg": 134.2,
+        "notes": ""
+      },
+      {
+        "name": "Eldon",
+        "semi_major_AU": 0.468,
+        "type": "Installation",
+        "zone": "habitable",
+        "radius_hint": 0.568,
+        "ecc": 0.142,
+        "angle_deg": 140.7,
+        "notes": ""
+      },
+      {
+        "name": "Calar",
+        "semi_major_AU": 0.728,
+        "type": "Ice",
+        "zone": "outer",
+        "radius_hint": 0.855,
+        "ecc": 0.071,
+        "angle_deg": 208.1,
+        "notes": ""
+      },
+      {
+        "name": "Tarar",
+        "semi_major_AU": 1.385,
+        "type": "Ice",
+        "zone": "outer",
+        "radius_hint": 0.776,
+        "ecc": 0.01,
+        "angle_deg": 206.6,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-038": {
+    "version": "v2",
+    "system_id": "SGN-SYS-038",
+    "seeded": true,
+    "generated_at": "2026-03-12T15:16:39.314Z",
+    "star": {
+      "kind": "G-Dwarf",
+      "hz": [
+        0.8,
+        1.6
+      ],
+      "inner_edge": 0.15,
+      "outer_edge": 20,
+      "radius_hint": 5
+    },
+    "planets": [
+      {
+        "name": "Sevia",
+        "semi_major_AU": 0.194,
+        "type": "Rocky",
+        "zone": "inner",
+        "radius_hint": 0.84,
+        "ecc": 0.01,
+        "angle_deg": 347.5,
+        "notes": ""
+      },
+      {
+        "name": "Taron",
+        "semi_major_AU": 0.39,
+        "type": "Gas",
+        "zone": "fringe",
+        "radius_hint": 2.227,
+        "ecc": 0.131,
+        "angle_deg": 23.4,
+        "notes": ""
+      },
+      {
+        "name": "Tarel",
+        "semi_major_AU": 0.713,
+        "type": "Rocky",
+        "zone": "habitable",
+        "radius_hint": 0.949,
+        "ecc": 0.139,
+        "angle_deg": 316.7,
+        "notes": ""
+      },
+      {
+        "name": "Velel",
+        "semi_major_AU": 1.017,
+        "type": "Shield World",
+        "zone": "habitable",
+        "radius_hint": 0.914,
+        "ecc": 0.006,
+        "angle_deg": 32.9,
+        "notes": ""
+      },
+      {
+        "name": "Eldeth",
+        "semi_major_AU": 2.142,
+        "type": "Habitat",
+        "zone": "outer",
+        "radius_hint": 0.498,
+        "ecc": 0.034,
+        "angle_deg": 276.1,
+        "notes": ""
+      },
+      {
+        "name": "Calax",
+        "semi_major_AU": 3.523,
+        "type": "Habitat",
+        "zone": "outer",
+        "radius_hint": 0.44,
+        "ecc": 0.026,
+        "angle_deg": 288.8,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-050": {
+    "version": "v2",
+    "system_id": "SGN-SYS-050",
+    "seeded": true,
+    "generated_at": "2026-03-12T02:07:57.056Z",
+    "star": {
+      "kind": "F-Dwarf",
+      "hz": [
+        1.2,
+        2.5
+      ],
+      "inner_edge": 0.2,
+      "outer_edge": 25,
+      "radius_hint": 6
+    },
+    "planets": [
+      {
+        "name": "Voros",
+        "semi_major_AU": 0.236,
+        "type": "Desert",
+        "zone": "inner",
+        "radius_hint": 0.863,
+        "ecc": 0.119,
+        "angle_deg": 315.3,
+        "notes": ""
+      },
+      {
+        "name": "Velen",
+        "semi_major_AU": 0.356,
+        "type": "Gas",
+        "zone": "fringe",
+        "radius_hint": 2.432,
+        "ecc": 0.145,
+        "angle_deg": 294.2,
+        "notes": ""
+      },
+      {
+        "name": "Sithon",
+        "semi_major_AU": 0.619,
+        "type": "Ice",
+        "zone": "fringe",
+        "radius_hint": 0.906,
+        "ecc": 0.08,
+        "angle_deg": 221.3,
+        "notes": ""
+      },
+      {
+        "name": "Kethel",
+        "semi_major_AU": 1.073,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 1.072,
+        "ecc": 0.043,
+        "angle_deg": 24.6,
+        "notes": ""
+      },
+      {
+        "name": "Sevis",
+        "semi_major_AU": 2.079,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 0.922,
+        "ecc": 0.007,
+        "angle_deg": 3.1,
+        "notes": ""
+      },
+      {
+        "name": "Caleth",
+        "semi_major_AU": 3.041,
+        "type": "Installation",
+        "zone": "habitable",
+        "radius_hint": 0.531,
+        "ecc": 0.144,
+        "angle_deg": 130.3,
+        "notes": ""
+      },
+      {
+        "name": "Myrax",
+        "semi_major_AU": 7.13,
+        "type": "Habitat",
+        "zone": "outer",
+        "radius_hint": 0.456,
+        "ecc": 0.034,
+        "angle_deg": 266.2,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-051": {
+    "version": "v2",
+    "system_id": "SGN-SYS-051",
+    "seeded": true,
+    "generated_at": "2026-03-12T13:52:10.489Z",
+    "star": {
+      "kind": "Subgiant",
+      "hz": [
+        2,
+        5
+      ],
+      "inner_edge": 0.3,
+      "outer_edge": 40,
+      "radius_hint": 7
+    },
+    "planets": [
+      {
+        "name": "Noxis",
+        "semi_major_AU": 0.665,
+        "type": "Ice",
+        "zone": "fringe",
+        "radius_hint": 0.752,
+        "ecc": 0.105,
+        "angle_deg": 47.1,
+        "notes": ""
+      },
+      {
+        "name": "Calel",
+        "semi_major_AU": 1.534,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 1.15,
+        "ecc": 0.18,
+        "angle_deg": 34.9,
+        "notes": ""
+      },
+      {
+        "name": "Arynon",
+        "semi_major_AU": 2.651,
+        "type": "Desert",
+        "zone": "habitable",
+        "radius_hint": 0.75,
+        "ecc": 0.082,
+        "angle_deg": 326.1,
+        "notes": ""
+      },
+      {
+        "name": "Vorax",
+        "semi_major_AU": 4.192,
+        "type": "Shield World",
+        "zone": "habitable",
+        "radius_hint": 1.077,
+        "ecc": 0.134,
+        "angle_deg": 207.3,
+        "notes": ""
+      },
+      {
+        "name": "Noxos",
+        "semi_major_AU": 8.022,
+        "type": "Gas",
+        "zone": "outer",
+        "radius_hint": 2.52,
+        "ecc": 0.012,
+        "angle_deg": 341.2,
+        "notes": ""
+      },
+      {
+        "name": "Sevia",
+        "semi_major_AU": 13.416,
+        "type": "Habitat",
+        "zone": "outer",
+        "radius_hint": 0.566,
+        "ecc": 0.136,
+        "angle_deg": 351.5,
+        "notes": ""
+      }
+    ]
+  },
+  "SGN-SYS-054": {
+    "version": "v2",
+    "system_id": "SGN-SYS-054",
+    "seeded": true,
+    "generated_at": "2026-03-12T01:22:35.787Z",
+    "star": {
+      "kind": "G-Dwarf",
+      "hz": [
+        0.8,
+        1.6
+      ],
+      "inner_edge": 0.15,
+      "outer_edge": 20,
+      "radius_hint": 5
+    },
+    "planets": [
+      {
+        "name": "Velel",
+        "semi_major_AU": 0.278,
+        "type": "Gas",
+        "zone": "fringe",
+        "radius_hint": 2.284,
+        "ecc": 0.076,
+        "angle_deg": 327.9,
+        "notes": ""
+      },
+      {
+        "name": "Velia",
+        "semi_major_AU": 0.383,
+        "type": "Ice",
+        "zone": "fringe",
+        "radius_hint": 0.802,
+        "ecc": 0.035,
+        "angle_deg": 279,
+        "notes": ""
+      },
+      {
+        "name": "Kethum",
+        "semi_major_AU": 0.71,
+        "type": "Installation",
+        "zone": "habitable",
+        "radius_hint": 0.544,
+        "ecc": 0.122,
+        "angle_deg": 247.6,
+        "notes": ""
+      },
+      {
+        "name": "Eldon",
+        "semi_major_AU": 1.234,
+        "type": "Ocean",
+        "zone": "habitable",
+        "radius_hint": 1.032,
+        "ecc": 0.1,
+        "angle_deg": 90.5,
+        "notes": ""
+      },
+      {
+        "name": "Calar",
+        "semi_major_AU": 1.887,
+        "type": "Rocky",
+        "zone": "habitable",
+        "radius_hint": 0.964,
+        "ecc": 0.158,
+        "angle_deg": 131.4,
+        "notes": ""
+      }
+    ]
+  },
+  "SYS_89": {
+    "version": "v2",
+    "system_id": "SYS_89",
+    "seeded": true,
+    "generated_at": "2026-03-13T06:22:33.271Z",
+    "star": {
+      "kind": "Main Sequence",
+      "hz": [
+        0.1,
+        0.4
+      ],
+      "inner_edge": 0.05,
+      "outer_edge": 8,
+      "radius_hint": 3
+    },
+    "planets": [
+      {
+        "name": "Shield 001",
+        "type": "Shield World",
+        "semi_major_AU": 0.079,
+        "notes": ""
+      },
+      {
+        "name": "Shield 002",
+        "type": "Shield World",
+        "semi_major_AU": 0.146,
+        "notes": ""
+      },
+      {
+        "name": "Shield 003",
+        "type": "Shield World",
+        "semi_major_AU": 0.27,
+        "notes": ""
+      },
+      {
+        "name": "Shield 004",
+        "type": "Shield World",
+        "semi_major_AU": 0.497,
+        "notes": ""
+      },
+      {
+        "name": "Shield 005",
+        "type": "Shield World",
+        "semi_major_AU": 0.789,
+        "notes": ""
+      },
+      {
+        "name": "Shield 006",
+        "type": "Shield World",
+        "semi_major_AU": 1.553,
+        "notes": ""
+      },
+      {
+        "name": "Kalyndor Nolvarin",
+        "type": "Installation",
+        "semi_major_AU": 2.673,
+        "notes": "Shield World Foundry"
+      }
+    ]
+  }
+}
