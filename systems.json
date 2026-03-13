@@ -302,7 +302,10 @@
         "y": 689
       },
       "source": "extracted_from_map_image",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "tags": [
+        "fortress"
+      ]
     },
     {
       "id": "SGN-SYS-021",
@@ -557,7 +560,10 @@
         "y": 856
       },
       "source": "extracted_from_map_image",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "tags": [
+        "capital"
+      ]
     },
     {
       "id": "SGN-SYS-038",
@@ -1333,6 +1339,8 @@
         "z": 0
       },
       "tags": [
+        "classified",
+        "fortress",
         "manmade"
       ],
       "owner": "Arandorë Eldainë"
