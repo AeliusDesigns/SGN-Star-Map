@@ -762,6 +762,10 @@ canvas.addEventListener('dblclick', async e => {
 });
 
 window.addEventListener('keydown', async e => {
+  /* ignore shortcuts when typing in any form field */
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+
   const k = e.key.toLowerCase();
   if (k === 'e') {
     if (!requireEditor()) return;
@@ -821,7 +825,7 @@ let orreryData  = null;
 let orrerySpeed = 1;
 let orreryT     = 0;
 let lastTS      = null;
-const YEAR_SECS = 120;
+const YEAR_SECS = 40;
 
 orreryClose.onclick = closeOrrery;
 document.addEventListener('keydown', e => {
