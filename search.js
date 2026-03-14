@@ -379,7 +379,7 @@
             name: p.name || 'Unknown',
             meta: `${p.rankTitle || p.rank || ''} · ${p.branch || 'Navy'} · ${p.status || 'Active'}${p.posting ? ' · ' + p.posting : ''}`,
             href: './personnel.html',
-            searchText: [p.name, p.rank, p.rankTitle, p.branch, p.posting, p.system, p.command, p.faction, p.bio].filter(Boolean).join(' ')
+            searchText: [p.name, p.rank, p.rankTitle, p.branch, p.posting, p.system, p.command, p.faction, p.bio, ...(p.tags || [])].filter(Boolean).join(' ')
           });
         });
       }

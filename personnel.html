@@ -28,6 +28,7 @@
       --purple:     #b388ff;
       --purple-dim: #4a2e80;
       --amber:      #ff9e44;
+      --slate:      #8faabe;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html,body{height:100%;background:var(--void);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;}
@@ -93,6 +94,11 @@
     .char-avatar.marine{background:rgba(92,219,122,.08);color:var(--green);border-color:rgba(92,219,122,.25);}
     .char-avatar.intel{background:rgba(179,136,255,.08);color:var(--purple);border-color:rgba(179,136,255,.25);}
     .char-avatar.command{background:rgba(245,197,66,.08);color:var(--gold);border-color:rgba(245,197,66,.25);}
+    .char-avatar.nobility{background:rgba(255,158,68,.08);color:var(--amber);border-color:rgba(255,158,68,.25);}
+    .char-avatar.diplomacy{background:rgba(56,190,255,.08);color:#38beff;border-color:rgba(56,190,255,.25);}
+    .char-avatar.scholar{background:rgba(143,170,190,.08);color:var(--slate,#8faabe);border-color:rgba(143,170,190,.25);}
+    .char-avatar.merchant{background:rgba(218,180,100,.08);color:#dab464;border-color:rgba(218,180,100,.25);}
+    .char-avatar.clergy{background:rgba(255,220,150,.08);color:#ffdc96;border-color:rgba(255,220,150,.25);}
 
     .char-info{flex:1;min-width:0;}
     .char-name{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -103,6 +109,9 @@
     .char-status-dot.kia{background:var(--red-alert);}
     .char-status-dot.mia{background:var(--gold);}
     .char-status-dot.retired{background:var(--text-muted);}
+    .char-status-dot.exiled{background:var(--purple);}
+    .char-status-dot.deceased{background:var(--red-alert);}
+    .char-status-dot.imprisoned{background:var(--red-alert);}
 
     /* ── MAIN ── */
     #main{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
@@ -119,6 +128,11 @@
     .dossier-portrait.marine{background:rgba(92,219,122,.1);color:var(--green);border:2px solid rgba(92,219,122,.3);}
     .dossier-portrait.intel{background:rgba(179,136,255,.1);color:var(--purple);border:2px solid rgba(179,136,255,.3);}
     .dossier-portrait.command{background:rgba(245,197,66,.1);color:var(--gold);border:2px solid rgba(245,197,66,.3);}
+    .dossier-portrait.nobility{background:rgba(255,158,68,.1);color:var(--amber);border:2px solid rgba(255,158,68,.3);}
+    .dossier-portrait.diplomacy{background:rgba(56,190,255,.1);color:#38beff;border:2px solid rgba(56,190,255,.3);}
+    .dossier-portrait.scholar{background:rgba(143,170,190,.1);color:#8faabe;border:2px solid rgba(143,170,190,.3);}
+    .dossier-portrait.merchant{background:rgba(218,180,100,.1);color:#dab464;border:2px solid rgba(218,180,100,.3);}
+    .dossier-portrait.clergy{background:rgba(255,220,150,.1);color:#ffdc96;border:2px solid rgba(255,220,150,.3);}
 
     .dossier-identity{flex:1;}
     .dossier-branch{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;}
@@ -131,7 +145,15 @@
     .dossier-divider.green{background:linear-gradient(90deg,var(--green-dim),transparent 80%);}
     .dossier-divider.purple{background:linear-gradient(90deg,var(--purple-dim),transparent 80%);}
     .dossier-divider.gold{background:linear-gradient(90deg,var(--gold-dim),transparent 80%);}
+    .dossier-divider.amber{background:linear-gradient(90deg,rgba(255,158,68,.4),transparent 80%);}
+    .dossier-divider.blue{background:linear-gradient(90deg,rgba(56,190,255,.4),transparent 80%);}
+    .dossier-divider.slate{background:linear-gradient(90deg,rgba(143,170,190,.4),transparent 80%);}
+    .dossier-divider.warm{background:linear-gradient(90deg,rgba(218,180,100,.4),transparent 80%);}
 
+    .dossier-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px;}
+    .dossier-tag{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;border:1px solid var(--border2);color:var(--text-dim);background:rgba(56,232,255,.03);}
+    .dossier-tag.mil{border-color:rgba(56,232,255,.25);color:var(--cyan-dim);}
+    .dossier-tag.civ{border-color:rgba(255,158,68,.25);color:rgba(255,158,68,.7);}
     .dossier-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;}
     .dossier-stat{background:rgba(8,13,24,.6);border:1px solid var(--border);border-radius:3px;padding:10px 12px;position:relative;overflow:hidden;}
     .dossier-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--cyan-dim),transparent);opacity:.3;}
@@ -143,6 +165,10 @@
     .status-badge.kia{background:rgba(255,59,59,.08);border:1px solid rgba(255,59,59,.25);color:var(--red-alert);}
     .status-badge.mia{background:rgba(245,197,66,.08);border:1px solid rgba(245,197,66,.25);color:var(--gold);}
     .status-badge.retired{background:rgba(90,122,153,.08);border:1px solid rgba(90,122,153,.25);color:var(--text-dim);}
+    .status-badge.exiled{background:rgba(179,136,255,.08);border:1px solid rgba(179,136,255,.25);color:var(--purple);}
+    .status-badge.deceased{background:rgba(255,59,59,.08);border:1px solid rgba(255,59,59,.25);color:var(--red-alert);}
+    .status-badge.imprisoned{background:rgba(255,59,59,.08);border:1px solid rgba(255,59,59,.25);color:var(--red-alert);}
+    .status-badge.classified{background:rgba(56,232,255,.08);border:1px solid rgba(56,232,255,.25);color:var(--cyan);}
 
     .section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
     .bio-text{font-size:14px;line-height:1.7;color:var(--text-dim);}
@@ -220,10 +246,17 @@
       <input class="sb-search" id="search" placeholder="Search by name, rank, posting..."/>
       <div class="sb-filters" id="filters">
         <button class="sb-filter active" data-branch="all">ALL</button>
+        <button class="sb-filter" data-branch="military">MILITARY</button>
+        <button class="sb-filter" data-branch="civilian">CIVILIAN</button>
         <button class="sb-filter" data-branch="navy">NAVY</button>
         <button class="sb-filter" data-branch="marine">MARINE</button>
         <button class="sb-filter" data-branch="intel">INTEL</button>
-        <button class="sb-filter" data-branch="command">COMMAND</button>
+        <button class="sb-filter" data-branch="command">CMD</button>
+        <button class="sb-filter" data-branch="nobility">NOBLE</button>
+        <button class="sb-filter" data-branch="diplomacy">DIPLO</button>
+        <button class="sb-filter" data-branch="scholar">SCHOLAR</button>
+        <button class="sb-filter" data-branch="merchant">TRADE</button>
+        <button class="sb-filter" data-branch="clergy">CLERGY</button>
         <button class="sb-filter" data-branch="kia">KIA/MIA</button>
       </div>
     </div>
