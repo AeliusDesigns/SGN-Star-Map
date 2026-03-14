@@ -234,27 +234,21 @@
   function mount() {
     injectStyles();
 
-    /* Find the right container — different pages have different bars */
-    const targets = [
-      document.getElementById('statusBar'),   // index.html
-      document.getElementById('summary-bar'), // orbat.html
-    ];
-
-    /* For pages with a status/summary bar, insert before the spacer */
-    for (const bar of targets) {
-      if (!bar) continue;
-      const spacer = bar.querySelector('.sb-spacer, .sum-spacer');
+    /* Star Chart — has #statusBar (already full-width fixed), insert before the save button */
+    const statusBar = document.getElementById('statusBar');
+    if (statusBar) {
       const el = createStardateElement();
-      if (spacer) {
-        bar.insertBefore(el, spacer);
+      const saveBtn = statusBar.querySelector('.sb-save-btn');
+      if (saveBtn) {
+        statusBar.insertBefore(el, saveBtn);
       } else {
-        bar.appendChild(el);
+        statusBar.appendChild(el);
       }
       startTicking(el);
       return;
     }
 
-    /* Personnel and Codex pages don't have a status bar — create a minimal one */
+    /* ORBAT, Personnel, Codex — create a full-width fixed footer bar */
     const app = document.getElementById('app');
     if (app) {
       const bar = document.createElement('div');
