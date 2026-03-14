@@ -364,6 +364,7 @@ addEventListener('mouseup', () => { dragging = false; panning = false; });
 addEventListener('mousemove', e => {
   const dx = e.clientX - lx, dy = e.clientY - ly;
   lx = e.clientX; ly = e.clientY;
+  if (_fleetDrag) return; /* don't orbit while dragging a fleet */
   if (dragging) {
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1) { dragMoved = true; _clickMoved = true; }
     if (!addMode && dragMoved) {
@@ -2326,21 +2327,200 @@ function createFleetIconElement(fleet) {
     <div class="fmi-label">${fleet.name || 'FLT'}</div>
     <div class="fmi-count">${getTotalShips(fleet)} ships</div>
   `;
+
+  /* ── Left-click: open detail panel (only if not dragging) ── */
   el.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (el._wasDragged) { el._wasDragged = false; return; }
     if (fleet.systemId) {
       selectedId = fleet.systemId;
       activeFleetId = fleet.id;
       fleetViewMode = 'detail';
       ensureSystemDetails(fleet.systemId).then(det => {
         renderPanel(fleet.systemId, det);
-        // Switch to fleets tab
         document.querySelector('#sp-tabs .tab[data-tab="fleets"]')?.click();
       });
     }
   });
+
+  /* ── Drag-to-move ── */
+  el.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    startFleetDrag(fleet, el, e.clientX, e.clientY);
+  });
+
   return el;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   FLEET DRAG-TO-MOVE SYSTEM
+   ══════════════════════════════════════════════════════════════════ */
+
+let _fleetDrag = null; // { fleet, el, originSysId, originSX, originSY, startX, startY, hasMoved }
+
+const dragLine      = document.getElementById('drag-route-line');
+const dragOriginRing= document.getElementById('drag-origin-ring');
+const dragTargetRing= document.getElementById('drag-target-ring');
+const dragTargetFill= document.getElementById('drag-target-fill');
+const dragDropLabel = document.getElementById('drag-drop-label');
+
+function startFleetDrag(fleet, el, clientX, clientY) {
+  /* Find the screen position of the origin system */
+  const pos = idToWorld.get(fleet.systemId);
+  if (!pos) return;
+  const mvp = buildMVP();
+  const screen = projectToScreen(pos[0], pos[1], pos[2], mvp);
+  if (!screen) return;
+  const sx = screen[0] / (canvas.width / canvas.clientWidth);
+  const sy = screen[1] / (canvas.height / canvas.clientHeight);
+
+  _fleetDrag = {
+    fleet,
+    el,
+    originSysId: fleet.systemId,
+    originSX: sx,
+    originSY: sy,
+    startX: clientX,
+    startY: clientY,
+    hasMoved: false
+  };
+}
+
+addEventListener('mousemove', e => {
+  if (!_fleetDrag) return;
+  const dx = e.clientX - _fleetDrag.startX;
+  const dy = e.clientY - _fleetDrag.startY;
+
+  /* Require a minimum drag distance before activating */
+  if (!_fleetDrag.hasMoved) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    _fleetDrag.hasMoved = true;
+    _fleetDrag.el.classList.add('dragging');
+  }
+
+  const ox = _fleetDrag.originSX;
+  const oy = _fleetDrag.originSY;
+  const mx = e.clientX;
+  const my = e.clientY;
+
+  /* Show route line from origin star to cursor */
+  dragLine.setAttribute('x1', ox);
+  dragLine.setAttribute('y1', oy);
+  dragLine.setAttribute('x2', mx);
+  dragLine.setAttribute('y2', my);
+  dragLine.style.display = '';
+
+  /* Origin ring */
+  dragOriginRing.setAttribute('cx', ox);
+  dragOriginRing.setAttribute('cy', oy);
+  dragOriginRing.setAttribute('r', 16);
+  dragOriginRing.style.display = '';
+
+  /* Move the fleet icon to follow the cursor */
+  _fleetDrag.el.style.left = mx + 'px';
+  _fleetDrag.el.style.top = (my - 10) + 'px';
+
+  /* Check if cursor is near a target system */
+  const mvp = buildMVP();
+  const targetId = findNearestSystemId(mx, my, mvp, 40);
+
+  if (targetId && targetId !== _fleetDrag.originSysId) {
+    const tPos = idToWorld.get(targetId);
+    const tScreen = projectToScreen(tPos[0], tPos[1], tPos[2], mvp);
+    if (tScreen) {
+      const tx = tScreen[0] / (canvas.width / canvas.clientWidth);
+      const ty = tScreen[1] / (canvas.height / canvas.clientHeight);
+      const targetSys = systems.find(s => s.id === targetId);
+
+      /* Snap line to target */
+      dragLine.setAttribute('x2', tx);
+      dragLine.setAttribute('y2', ty);
+
+      /* Target ring */
+      dragTargetRing.setAttribute('cx', tx);
+      dragTargetRing.setAttribute('cy', ty);
+      dragTargetRing.setAttribute('r', 22);
+      dragTargetRing.style.display = '';
+
+      dragTargetFill.setAttribute('cx', tx);
+      dragTargetFill.setAttribute('cy', ty);
+      dragTargetFill.setAttribute('r', 22);
+      dragTargetFill.style.display = '';
+
+      /* Label */
+      dragDropLabel.setAttribute('x', tx);
+      dragDropLabel.setAttribute('y', ty + 36);
+      dragDropLabel.textContent = `MOVE TO ${(targetSys?.name || targetId).toUpperCase()}`;
+      dragDropLabel.style.display = '';
+    }
+  } else {
+    dragTargetRing.style.display = 'none';
+    dragTargetFill.style.display = 'none';
+    dragDropLabel.style.display = 'none';
+  }
+});
+
+addEventListener('mouseup', e => {
+  if (!_fleetDrag) return;
+
+  const fd = _fleetDrag;
+  _fleetDrag = null;
+
+  /* Hide all drag visuals */
+  dragLine.style.display = 'none';
+  dragOriginRing.style.display = 'none';
+  dragTargetRing.style.display = 'none';
+  dragTargetFill.style.display = 'none';
+  dragDropLabel.style.display = 'none';
+  fd.el.classList.remove('dragging');
+
+  if (!fd.hasMoved) return;
+  fd.el._wasDragged = true;
+
+  /* Check if dropped on a valid target system */
+  const mvp = buildMVP();
+  const targetId = findNearestSystemId(e.clientX, e.clientY, mvp, 40);
+
+  if (targetId && targetId !== fd.originSysId) {
+    if (!requireEditor()) return;
+    const targetSys = systems.find(s => s.id === targetId);
+    const originSys = systems.find(s => s.id === fd.originSysId);
+
+    /* Reassign the fleet */
+    const fleet = fleets.find(f => f.id === fd.fleet.id);
+    if (fleet) {
+      fleet.systemId = targetId;
+      /* Auto-set status to In Transit if moving between systems */
+      if (fleet.status === 'Stationed') {
+        fleet.status = 'In Transit';
+        fleet.destinationId = targetId;
+      }
+      saveFleets();
+
+      /* Show a confirmation toast in the status bar */
+      const sbSys = document.getElementById('sb-sys');
+      const origText = sbSys?.textContent;
+      if (sbSys) {
+        sbSys.textContent = `⬡ ${fd.fleet.name || 'Fleet'} → ${targetSys?.name || targetId}`;
+        sbSys.style.color = 'var(--gold)';
+        setTimeout(() => {
+          sbSys.textContent = origText;
+          sbSys.style.color = '';
+        }, 2500);
+      }
+
+      /* If the panel is open showing this fleet, refresh it */
+      if (selectedId === fd.originSysId || selectedId === targetId) {
+        if (activeFleetId === fd.fleet.id) {
+          fleetViewMode = 'detail';
+        }
+        ensureSystemDetails(selectedId).then(det => renderPanel(selectedId, det));
+      }
+    }
+  }
+});
 
 /* ══════════════════════════════════════════════════════════════════
    SYSTEM ALERT ICONS (map overlay)

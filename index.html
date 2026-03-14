@@ -1544,9 +1544,59 @@
     .fleet-map-icon.in-transit .fmi-diamond {
       animation: fleet-pulse 1.5s ease-in-out infinite;
     }
+    .fleet-map-icon.dragging {
+      opacity: .7;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .fleet-map-icon.dragging .fmi-diamond {
+      box-shadow: 0 0 18px rgba(245,197,66,1), 0 0 36px rgba(245,197,66,.5);
+      transform: rotate(45deg) scale(1.4);
+    }
     @keyframes fleet-pulse {
       0%, 100% { box-shadow: 0 0 8px rgba(245,197,66,.5), 0 0 16px rgba(245,197,66,.2); }
       50% { box-shadow: 0 0 14px rgba(245,197,66,.8), 0 0 28px rgba(245,197,66,.4); }
+    }
+
+    #fleet-drag-route {
+      position: fixed;
+      inset: 0;
+      z-index: 11;
+      pointer-events: none;
+    }
+    .drag-route-line {
+      stroke: var(--gold);
+      stroke-width: 2;
+      stroke-dasharray: 8 6;
+      stroke-linecap: round;
+      fill: none;
+      opacity: .7;
+      filter: drop-shadow(0 0 4px rgba(245,197,66,.4));
+    }
+    .drag-route-origin {
+      fill: none;
+      stroke: var(--gold);
+      stroke-width: 1.5;
+      stroke-dasharray: 4 3;
+      opacity: .5;
+    }
+    .drag-route-target {
+      fill: none;
+      stroke: var(--gold);
+      stroke-width: 2;
+      opacity: .8;
+      filter: drop-shadow(0 0 6px rgba(245,197,66,.5));
+    }
+    .drag-route-target-fill {
+      fill: rgba(245,197,66,.08);
+    }
+    .drag-drop-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      fill: var(--gold);
+      letter-spacing: 1.5px;
+      text-anchor: middle;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,.9));
     }
 
     .fleet-textarea {
@@ -1618,6 +1668,13 @@
   </div>
 
   <div id="fleet-icons-layer" style="position:fixed;inset:0;z-index:10;pointer-events:none;"></div>
+  <svg id="fleet-drag-route" xmlns="http://www.w3.org/2000/svg">
+    <circle class="drag-route-origin" id="drag-origin-ring" cx="0" cy="0" r="0" style="display:none"/>
+    <line class="drag-route-line" id="drag-route-line" x1="0" y1="0" x2="0" y2="0" style="display:none"/>
+    <circle class="drag-route-target-fill" id="drag-target-fill" cx="0" cy="0" r="0" style="display:none"/>
+    <circle class="drag-route-target" id="drag-target-ring" cx="0" cy="0" r="0" style="display:none"/>
+    <text class="drag-drop-label" id="drag-drop-label" x="0" y="0" style="display:none"></text>
+  </svg>
   <div id="alert-icons-layer" style="position:fixed;inset:0;z-index:9;pointer-events:none;"></div>
 
   <div id="statusBar">
