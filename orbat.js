@@ -149,14 +149,22 @@ function removeNode(parent,id){if(!parent||!parent.children)return false;const i
 /* ══════════════════════════════════════════
    FLEET IMPORT MODAL
    ══════════════════════════════════════════ */
-function loadFleets(){try{const r=localStorage.getItem('sgn_fleets_v1');return r?JSON.parse(r)||[]:[]}catch{return[];}}
-function loadSystems(){try{const r=localStorage.getItem('sgn_map_state_v1');if(r){const d=JSON.parse(r);return d.systems||[];}return[];}catch{return[];}}
+async function loadFleets(){
+  try{const r=localStorage.getItem('sgn_fleets_v1');if(r){const d=JSON.parse(r);if(Array.isArray(d)&&d.length)return d;}}catch{}
+  try{const r=await fetch('./fleets.json',{cache:'no-store'});if(r.ok){const d=await r.json();if(Array.isArray(d)&&d.length)return d;}}catch{}
+  return[];
+}
+async function loadSystems(){
+  try{const r=localStorage.getItem('sgn_map_state_v1');if(r){const d=JSON.parse(r);if(d.systems?.length)return d.systems;}}catch{}
+  try{const r=await fetch('./systems.json',{cache:'no-store'});if(r.ok){const d=await r.json();if(d.systems?.length)return d.systems;}}catch{}
+  return[];
+}
 function getSystemName(sid,sys){if(!sid)return'—';const s=sys.find(x=>x.id===sid);return s?.name||sid;}
 
-function openFleetImportModal(orbat,targetFmId){
+async function openFleetImportModal(orbat,targetFmId){
   const node=findNode(orbat.root,targetFmId);if(!node)return;
   const ft=FORMATION_TYPES.find(f=>f.key===node.type)||{};
-  const fleets=loadFleets(),systems=loadSystems();
+  const fleets=await loadFleets(),systems=await loadSystems();
   if(!fleets.length){toast('No fleets found — create fleets on the Star Chart first');return;}
   document.getElementById('fleet-import-modal')?.remove();
 
