@@ -1,0 +1,371 @@
+{
+  "language": {
+    "name": "Eldarindëva",
+    "nativeName": "Eldarindëva",
+    "shortName": "Elvish",
+    "meaning": "Speech of the Elven-kind",
+    "description": "The living tongue shared across all branches of the Eldarindë, from the Taralindë of the High Realm to the Sylvarindë of the deep forests. Warm, vowel-rich, and melodic, with a flowing cadence suited to song, poetry, and formal address. Distinguished from ancient forms by softer consonant clusters and a preference for open syllables. Regional dialects exist among the wood elves and drow, but the written standard remains unified.",
+    "note": "Names of the Elyndarûm (the divine pantheon) are sacred names that exist outside the normal linguistic rules and should not be derived from or decomposed into standard roots."
+  },
+
+  "phonology": {
+    "consonants": [
+      { "letter": "c", "ipa": "/k/", "description": "Always hard, as in 'cat'. Never soft." },
+      { "letter": "d", "ipa": "/d/", "description": "As in 'dawn'. Only appears word-initially or after n." },
+      { "letter": "f", "ipa": "/f/", "description": "As in 'fair'." },
+      { "letter": "g", "ipa": "/ɡ/", "description": "Always hard, as in 'gift'. Never soft." },
+      { "letter": "h", "ipa": "/h/", "description": "Soft aspiration, as in 'home'. Silent between identical vowels." },
+      { "letter": "l", "ipa": "/l/", "description": "Always clear and light, as in 'lily'. Never dark." },
+      { "letter": "m", "ipa": "/m/", "description": "As in 'moon'." },
+      { "letter": "n", "ipa": "/n/", "description": "As in 'night'." },
+      { "letter": "ny", "ipa": "/ɲ/", "description": "Palatalized n, as in Spanish 'año'." },
+      { "letter": "r", "ipa": "/ɾ/", "description": "Light single tap, as in Spanish 'pero'. Never harsh or trilled." },
+      { "letter": "s", "ipa": "/s/", "description": "Always voiceless, as in 'sun'. Never /z/." },
+      { "letter": "t", "ipa": "/t/", "description": "Light and dental, as in French 'tu'." },
+      { "letter": "th", "ipa": "/θ/", "description": "As in 'thin'. Never as in 'the'." },
+      { "letter": "v", "ipa": "/v/", "description": "As in 'vine'. Soft and voiced." },
+      { "letter": "y", "ipa": "/j/", "description": "As in 'yes'. Consonantal only before vowels." },
+      { "letter": "ly", "ipa": "/ʎ/", "description": "Palatalized l, as in Italian 'figlio'. Rare, poetic." }
+    ],
+    "vowels": [
+      { "letter": "a", "ipa": "/a/", "description": "Open, as in 'father'. The most common vowel." },
+      { "letter": "e", "ipa": "/ɛ/", "description": "Open-mid, as in 'bed'. Clear and warm." },
+      { "letter": "ë", "ipa": "/ɛ/", "description": "Always pronounced as a distinct syllable, never silent. Used word-finally." },
+      { "letter": "i", "ipa": "/i/", "description": "As in 'machine'. Bright and clear." },
+      { "letter": "o", "ipa": "/ɔ/", "description": "Open-mid, as in 'for'. Round and full." },
+      { "letter": "u", "ipa": "/u/", "description": "As in 'flute'. Deep and resonant." },
+      { "letter": "û", "ipa": "/uː/", "description": "Long u, held longer. Rare, used in sacred or ancient words." }
+    ],
+    "diphthongs": [
+      { "letter": "ae", "ipa": "/aɛ/", "description": "Falling, as in 'aisle'. Very common, the signature Arandori sound." },
+      { "letter": "ai", "ipa": "/ai/", "description": "As in 'high'. Bright and ascending." },
+      { "letter": "au", "ipa": "/au/", "description": "As in 'how'. Rich and full." },
+      { "letter": "ea", "ipa": "/ɛa/", "description": "Two syllables flowing together. As in 'idea' but smoother." },
+      { "letter": "ei", "ipa": "/ɛi/", "description": "As in 'vein'. Graceful." },
+      { "letter": "oi", "ipa": "/ɔi/", "description": "As in 'coin'. Rare." },
+      { "letter": "ui", "ipa": "/ui/", "description": "As in 'ruin'. Flowing." }
+    ],
+    "phonotacticRules": [
+      {
+        "rule": "syllableStructure",
+        "pattern": "(C)V(C)",
+        "description": "Every syllable contains exactly one vowel or diphthong. Initial consonant is optional. Final consonant is optional but limited to: n, r, l, s, th."
+      },
+      {
+        "rule": "stressPlacement",
+        "pattern": "penultimate",
+        "description": "Stress falls on the second-to-last syllable. Words ending in -ë shift stress to the third-to-last syllable. Monosyllabic words are stressed."
+      },
+      {
+        "rule": "allowedInitialClusters",
+        "values": ["th", "ny", "ly"],
+        "description": "Only these consonant clusters may begin a syllable. All other syllables begin with a single consonant or a vowel."
+      },
+      {
+        "rule": "allowedFinalConsonants",
+        "values": ["n", "r", "l", "s", "th"],
+        "description": "Syllables (and words) may only end in these consonants, or in a vowel. Most words end in vowels."
+      },
+      {
+        "rule": "forbiddenSequences",
+        "values": ["ng-initial", "double-consonant-final", "aa", "ee", "ii", "oo", "uu", "sz", "zh", "ck", "x", "j", "w"],
+        "description": "These sounds or sequences do not exist in Arandori. The sounds x, j (as in 'judge'), w, and z never appear."
+      },
+      {
+        "rule": "vowelHarmony",
+        "description": "Within a single root, front vowels (e, i) and back vowels (o, u) tend not to mix. The vowel 'a' is neutral and combines freely with any vowel. Compound words may cross harmony boundaries at the join."
+      },
+      {
+        "rule": "voicingAssimilation",
+        "description": "When a voiceless consonant (t, s, th) meets a voiced consonant (d, v) at a compound boundary, the voiceless softens: t+v becomes 'lv', s+d becomes 'nd'."
+      },
+      {
+        "rule": "wordEndings",
+        "description": "Most Arandori words end in a vowel. Masculine-coded words often end in -on, -or, -ar, -en. Feminine-coded words often end in -ë, -a, -iel, -iel. Neuter words end in -in, -il, -al."
+      }
+    ]
+  },
+
+  "grammar": {
+    "wordOrder": {
+      "standard": "VSO",
+      "formal": "SOV",
+      "poetic": "free (with case marking for clarity)",
+      "description": "Everyday speech uses Verb-Subject-Object. Formal address, law, and military commands use Subject-Object-Verb. Poetry allows free order since noun cases prevent ambiguity."
+    },
+    "articles": {
+      "definite": "i",
+      "indefinite": "na",
+      "description": "'I' (the) precedes the noun. 'Na' (a/an) precedes the noun. Omitted in poetry and proper nouns."
+    },
+    "nounCases": [
+      { "case": "nominative", "suffix": "(none)", "description": "Subject of the sentence. Unmarked base form.", "example": "aran = the king" },
+      { "case": "accusative", "suffix": "-a", "description": "Direct object of a verb.", "example": "arana = the king (as object)" },
+      { "case": "genitive", "suffix": "-or", "description": "Possession, origin, composition.", "example": "aranor = of the king / the king's" },
+      { "case": "dative", "suffix": "-en", "description": "Indirect object, recipient, beneficiary.", "example": "aranen = to/for the king" },
+      { "case": "locative", "suffix": "-essë", "description": "Location, at/in/on.", "example": "aranessë = at the king's (place)" },
+      { "case": "ablative", "suffix": "-ello", "description": "Motion away from, origin.", "example": "aranello = from the king" },
+      { "case": "instrumental", "suffix": "-inen", "description": "By means of, with (tool).", "example": "araninen = by the king's (hand)" }
+    ],
+    "plurals": {
+      "standardPlural": "-i",
+      "collectivePlural": "-ath",
+      "dualPlural": "-at",
+      "description": "Standard plural adds -i (aran > arani, kings). Collective -ath denotes 'all of a kind' (elenath, all the stars). Dual -at for exactly two (aranat, two kings).",
+      "rules": [
+        "Words ending in -a change to -ai (fanya > fanyai)",
+        "Words ending in -ë change to -i (dorë > dori)",
+        "Words ending in a consonant add -i (elen > eleni)"
+      ]
+    },
+    "adjectives": {
+      "placement": "after noun",
+      "agreement": "Adjectives agree with noun number but not case.",
+      "formation": "Many adjectives formed with suffix -ea (morëa = shadowy, from mor = shadow) or -in (valin = eternal, from val = enduring).",
+      "comparative": "prefix ari- (arivaelin = more beautiful)",
+      "superlative": "prefix amba- (ambavaelin = most beautiful)"
+    },
+    "verbs": {
+      "structure": "root + tense/aspect suffix + person suffix",
+      "tenses": [
+        { "tense": "present", "suffix": "-a", "example": "tirna = watches/guards (tir + n + a)" },
+        { "tense": "past", "suffix": "-ië", "description": "Completed action", "example": "tirnië = watched/guarded" },
+        { "tense": "future", "suffix": "-uva", "description": "Will/shall", "example": "tirnuva = will watch/guard" },
+        { "tense": "imperative", "suffix": "-o", "description": "Command form", "example": "tirno = watch! / guard!" },
+        { "tense": "continuative", "suffix": "-ala", "description": "Ongoing action", "example": "tirnala = is watching (right now)" }
+      ],
+      "personSuffixes": [
+        { "person": "1st singular", "suffix": "-n", "example": "tirnan = I watch" },
+        { "person": "2nd singular", "suffix": "-l", "example": "tirnal = you watch" },
+        { "person": "3rd singular", "suffix": "(none)", "example": "tirna = he/she watches" },
+        { "person": "1st plural", "suffix": "-lmë", "example": "tirnalmë = we watch" },
+        { "person": "2nd plural", "suffix": "-ldë", "example": "tirnaldë = you (all) watch" },
+        { "person": "3rd plural", "suffix": "-ntë", "example": "tirnantë = they watch" }
+      ],
+      "negation": "Prefix ú- before the verb: útirna = does not watch."
+    },
+    "compoundFormation": {
+      "order": "modifier + head",
+      "description": "The modifying element comes first. 'Star-shield' = ael (star) + thalon (shield) = aelthalon. At compound boundaries, consonant clusters may simplify per phonotactic rules.",
+      "joiningRules": [
+        "If the first root ends in a consonant and the second begins with one, insert linking vowel -a- or -i-: thal + nor = thalanor",
+        "If both elements end/begin with vowels, the first vowel may elide: aeli + elen = aelelen or aelelen",
+        "The suffix -ion/-arion denotes 'son of / bearer of': calarion = light-bearer",
+        "The suffix -iel/-ithiel denotes 'daughter of / maiden of': eleniel = star-maiden",
+        "The suffix -ndor/-dor denotes 'land of / realm of': arandor = high-realm",
+        "The suffix -rindë denotes 'kindred / people / folk': eldarindë = elf-kindred, sylvarindë = forest-kindred",
+        "The suffix -va/-ëva denotes 'speech of / pertaining to / of the nature of': Eldarindëva = speech of the elven-kind",
+        "The suffix -ath denotes collective totality: elenath = all the stars, eldarionath = all noble elves"
+      ]
+    },
+    "pronouns": [
+      { "person": "I/me", "elvish": "ni", "note": "Often dropped; verb suffix implies subject" },
+      { "person": "you (singular)", "elvish": "le" },
+      { "person": "he/she/it", "elvish": "se" },
+      { "person": "we", "elvish": "elmë" },
+      { "person": "you (plural)", "elvish": "eldë" },
+      { "person": "they", "elvish": "entë" },
+      { "person": "this", "elvish": "sina" },
+      { "person": "that", "elvish": "tana" },
+      { "person": "who", "elvish": "man" },
+      { "person": "what", "elvish": "mana" }
+    ],
+    "prepositions": [
+      { "elvish": "mi", "meaning": "in, within" },
+      { "elvish": "or", "meaning": "upon, on, above" },
+      { "elvish": "nu", "meaning": "under, beneath" },
+      { "elvish": "an", "meaning": "to, toward" },
+      { "elvish": "ho", "meaning": "from, away from" },
+      { "elvish": "ara", "meaning": "beside, near" },
+      { "elvish": "ava", "meaning": "beyond, past" },
+      { "elvish": "vin", "meaning": "through, across" },
+      { "elvish": "sai", "meaning": "with (accompaniment)" },
+      { "elvish": "ú", "meaning": "without, lacking" }
+    ],
+    "conjunctions": [
+      { "elvish": "ar", "meaning": "and" },
+      { "elvish": "hya", "meaning": "or" },
+      { "elvish": "mal", "meaning": "but, however" },
+      { "elvish": "fai", "meaning": "if, should" },
+      { "elvish": "an", "meaning": "for, because" },
+      { "elvish": "san", "meaning": "then, therefore" }
+    ],
+    "numbers": [
+      { "elvish": "er", "meaning": "one" },
+      { "elvish": "ata", "meaning": "two" },
+      { "elvish": "nel", "meaning": "three" },
+      { "elvish": "can", "meaning": "four" },
+      { "elvish": "lem", "meaning": "five" },
+      { "elvish": "enë", "meaning": "six" },
+      { "elvish": "oto", "meaning": "seven" },
+      { "elvish": "tol", "meaning": "eight" },
+      { "elvish": "nev", "meaning": "nine" },
+      { "elvish": "cae", "meaning": "ten" },
+      { "elvish": "caer", "meaning": "hundred" },
+      { "elvish": "menë", "meaning": "thousand" }
+    ]
+  },
+
+  "dictionary": {
+    "version": "1.0",
+    "totalEntries": 0,
+    "entries": [
+      {"id":"R001","word":"ael","ipa":"/aɛl/","pos":"noun/root","definitions":["star","celestial light"],"etymology":"Primordial root. One of the oldest words in the language.","tags":["root","celestial","core"]},
+      {"id":"R002","word":"cal","ipa":"/kal/","pos":"noun/root","definitions":["light","radiance","brilliance"],"etymology":"Primordial root associated with visible light and divine illumination.","tags":["root","light","core"]},
+      {"id":"R003","word":"thal","ipa":"/θal/","pos":"noun/root","definitions":["shield","protection","ward"],"etymology":"Primordial root. Connotes active defense rather than passive shelter.","tags":["root","defense","military","core"]},
+      {"id":"R004","word":"mor","ipa":"/mɔɾ/","pos":"noun/root","definitions":["shadow","darkness","absence of light"],"etymology":"Primordial root. Neutral connotation; shadow is not inherently evil in Arandori thought, merely the complement of light.","tags":["root","darkness","core"]},
+      {"id":"R005","word":"sil","ipa":"/sil/","pos":"noun/root","definitions":["silver","gleam","pale light"],"etymology":"Primordial root associated with moonlight and reflected starlight.","tags":["root","light","metal","core"]},
+      {"id":"R006","word":"var","ipa":"/vaɾ/","pos":"adj/root","definitions":["eternal","sacred","enduring"],"etymology":"Primordial root. Carries connotations of both temporal permanence and spiritual sanctity.","tags":["root","sacred","time","core"]},
+      {"id":"R007","word":"lin","ipa":"/lin/","pos":"noun/root","definitions":["song","flowing water","melody"],"etymology":"Primordial root. The Arandori do not distinguish between the sound of flowing water and music.","tags":["root","music","water","core"]},
+      {"id":"R008","word":"elen","ipa":"/ˈɛ.lɛn/","pos":"noun","definitions":["star (poetic/singular)","a particular star","celestial body"],"etymology":"Extended form of ael with individualizing suffix -en.","tags":["celestial","poetic"]},
+      {"id":"R009","word":"dorë","ipa":"/ˈdɔ.ɾɛ/","pos":"noun","definitions":["realm","land","domain","territory"],"etymology":"From ancient root dor- (settled place) + nominalizing -ë.","tags":["geography","political","core"]},
+      {"id":"R010","word":"aran","ipa":"/ˈa.ɾan/","pos":"noun","definitions":["king","high captain","sovereign"],"etymology":"From ara- (noble, high) + -n (agent). One who is noble.","tags":["rank","political","core"]},
+      {"id":"R011","word":"tir","ipa":"/tiɾ/","pos":"verb/root","definitions":["to watch","to guard","to keep vigil"],"etymology":"Primordial root. Implies watchful protection rather than aggressive defense.","tags":["root","military","protection","core"]},
+      {"id":"R012","word":"vanye","ipa":"/ˈva.ɲɛ/","pos":"noun","definitions":["beauty","grace","elegance"],"etymology":"From van- (fair, blessed) + -ye (abstract quality).","tags":["beauty","abstract","core"]},
+      {"id":"R013","word":"fanya","ipa":"/ˈfa.ɲa/","pos":"noun","definitions":["veil","cloud","mist","thin covering"],"etymology":"Onomatopoeic origin, evoking the soft sound of cloth or mist moving.","tags":["weather","poetic","core"]},
+      {"id":"R014","word":"eryn","ipa":"/ˈɛ.ɾin/","pos":"adj","definitions":["swift","keen","sharp-eyed"],"etymology":"From er- (lone, singular) + -yn (quality). Originally 'singular in ability.'","tags":["quality","military","core"]},
+      {"id":"R015","word":"ara","ipa":"/ˈa.ɾa/","pos":"adj/prefix","definitions":["high","noble","exalted"],"etymology":"Primordial root. Used as both standalone adjective and productive prefix.","tags":["root","rank","core"]},
+      {"id":"R016","word":"nor","ipa":"/nɔɾ/","pos":"noun/root","definitions":["land","ground","earth","soil"],"etymology":"Primordial root. Distinct from dorë (realm); nor is the physical earth itself.","tags":["root","geography","core"]},
+      {"id":"R017","word":"val","ipa":"/val/","pos":"adj/root","definitions":["mighty","powerful","great in strength"],"etymology":"Primordial root associated with both physical and spiritual might.","tags":["root","power","core"]},
+      {"id":"R018","word":"uin","ipa":"/uin/","pos":"noun/root","definitions":["sea","ocean","vast water"],"etymology":"Primordial root. Carries connotation of immensity and depth.","tags":["root","water","geography","core"]},
+      {"id":"R019","word":"naur","ipa":"/nauɾ/","pos":"noun","definitions":["fire","flame","burning"],"etymology":"From nau- (heat, warmth) + -r (intensifier).","tags":["element","core"]},
+      {"id":"R020","word":"ath","ipa":"/aθ/","pos":"suffix/root","definitions":["all","totality","collective"],"etymology":"Used as collective suffix: elenath = all the stars.","tags":["root","grammar","core"]},
+      {"id":"R021","word":"rima","ipa":"/ˈɾi.ma/","pos":"noun","definitions":["edge","border","boundary","frontier"],"etymology":"From rim- (outer) + -a (nominalizer).","tags":["geography","military"]},
+      {"id":"R022","word":"osto","ipa":"/ˈɔs.tɔ/","pos":"noun","definitions":["fortress","stronghold","citadel"],"etymology":"Ancient compound os- (wall) + to- (stand). A thing that stands walled.","tags":["military","architecture"]},
+      {"id":"R023","word":"mina","ipa":"/ˈmi.na/","pos":"noun","definitions":["tower","high structure","watchtower"],"etymology":"From mi- (in, within) + na- (upward). That which rises from within.","tags":["architecture"]},
+      {"id":"R024","word":"thalon","ipa":"/ˈθa.lɔn/","pos":"noun","definitions":["shield (physical object)","barrier","ward"],"etymology":"From thal (protection) + -on (concrete object suffix).","tags":["military","equipment"]},
+      {"id":"R025","word":"cala","ipa":"/ˈka.la/","pos":"noun","definitions":["light (as substance)","daylight","illumination"],"etymology":"From cal (light) + -a (noun form). The tangible presence of light.","tags":["light","nature"]},
+      {"id":"R026","word":"morë","ipa":"/ˈmɔ.ɾɛ/","pos":"noun","definitions":["shadow (as substance)","darkness","gloom"],"etymology":"From mor (shadow) + -ë (noun form).","tags":["darkness","nature"]},
+      {"id":"R027","word":"silmë","ipa":"/ˈsil.mɛ/","pos":"noun","definitions":["starlight","silver light","moonshine"],"etymology":"From sil (silver) + -më (emanation, quality that radiates).","tags":["light","celestial"]},
+      {"id":"R028","word":"aelin","ipa":"/ˈaɛ.lin/","pos":"noun","definitions":["lake","still pool","sacred basin"],"etymology":"From ael (star) + lin (water). Star-water: where stars are reflected.","tags":["water","geography","poetic"]},
+      {"id":"R029","word":"lindalë","ipa":"/lin.ˈda.lɛ/","pos":"noun","definitions":["music","singing","the art of song"],"etymology":"From lin (song) + dalë (craft, making).","tags":["music","art"]},
+      {"id":"R030","word":"dalë","ipa":"/ˈda.lɛ/","pos":"noun","definitions":["craft","skill","art of making"],"etymology":"Root dal- (to shape, to make) + -ë.","tags":["craft","core"]},
+
+      {"id":"C001","word":"arandorë","ipa":"/a.ɾan.ˈdɔ.ɾɛ/","pos":"noun","definitions":["high realm","sovereign domain","the elvish nation"],"etymology":"aran (king/high) + dorë (realm). The name of the elvish civilization itself.","tags":["political","proper","established"]},
+      {"id":"C002","word":"eldainë","ipa":"/ɛl.ˈdai.nɛ/","pos":"noun","definitions":["elven people","the kindred","star-folk"],"etymology":"elda (elf, star-person) + -inë (collective people).","tags":["people","proper","established"]},
+      {"id":"C003","word":"aelindor","ipa":"/aɛ.ˈlin.dɔɾ/","pos":"noun","definitions":["star-shield","celestial ward","name of a frigate class"],"etymology":"ael (star) + lin (song/linking) + dor (protector). A shield that sings with starlight.","tags":["military","ship","established"]},
+      {"id":"C004","word":"calarion","ipa":"/ka.ˈla.ɾi.ɔn/","pos":"noun","definitions":["light-bearer","radiant one","name of a cruiser class"],"etymology":"cal (light) + -arion (bearer/carrier).","tags":["military","ship","established"]},
+      {"id":"C005","word":"vaelisar","ipa":"/vaɛ.ˈli.saɾ/","pos":"noun","definitions":["wind-blade","swift-cutter","name of a destroyer class"],"etymology":"vael (wind) + lis (keen) + -ar (instrument).","tags":["military","ship","established"]},
+      {"id":"C006","word":"eryndor","ipa":"/ˈɛ.ɾin.dɔɾ/","pos":"noun","definitions":["swift-hunter","keen pursuer","name of a corvette class"],"etymology":"eryn (swift) + dor (one who acts).","tags":["military","ship","established"]},
+      {"id":"C007","word":"tirion","ipa":"/ˈti.ɾi.ɔn/","pos":"noun","definitions":["great watchtower","vigilant stronghold","name of a battleship class"],"etymology":"tir (to watch) + -ion (great/mighty thing).","tags":["military","ship","established"]},
+      {"id":"C008","word":"silvaron","ipa":"/sil.ˈva.ɾɔn/","pos":"noun","definitions":["silver-winged","moonlit vessel","name of a carrier class"],"etymology":"sil (silver) + var (eternal) + -on (entity).","tags":["military","ship","established"]},
+      {"id":"C009","word":"aerandor","ipa":"/aɛ.ˈɾan.dɔɾ/","pos":"noun","definitions":["sky-sovereign","lord of the heavens","name of a supercarrier class"],"etymology":"aer (sky/upper air) + an (toward) + dor (lord/ruler).","tags":["military","ship","established"]},
+      {"id":"C010","word":"thalanis","ipa":"/θa.ˈla.nis/","pos":"noun","definitions":["silent shield","phantom ward","name of a stealth frigate class"],"etymology":"thal (shield) + anis (silence, stillness).","tags":["military","ship","established"]},
+      {"id":"C011","word":"thalasrën","ipa":"/θa.ˈlas.ɾɛn/","pos":"noun","definitions":["sea-shield","wave-ward","name of a light frigate class"],"etymology":"thalas (sea-shield, from thal + uin) + rën (light/lesser).","tags":["military","ship","established"]},
+      {"id":"C012","word":"talasir","ipa":"/ta.ˈla.siɾ/","pos":"noun","definitions":["burden-bearer","faithful carrier","name of a transport class"],"etymology":"tal (to carry, to bear) + asir (faithfully, steadily).","tags":["military","ship","established"]},
+      {"id":"C013","word":"vardalum","ipa":"/vaɾ.ˈda.lum/","pos":"noun","definitions":["sacred silver","divine crystallized light","the holy material"],"etymology":"var (sacred/eternal) + dal (craft) + -um (substance). Literally: eternally-crafted substance.","tags":["material","sacred","established"]},
+
+      {"id":"E001","word":"elda","ipa":"/ˈɛl.da/","pos":"noun","definitions":["elf","star-person","one of the firstborn"],"etymology":"From elen (star) + -da (being). A being of starlight. The base word for all elvenkind.","tags":["people","root","core","established"]},
+      {"id":"E002","word":"rindë","ipa":"/ˈɾin.dɛ/","pos":"noun/suffix","definitions":["kindred","folk","people (collective)","clan"],"etymology":"From rin- (to join, to gather) + -dë (collective noun). Used as a suffix to form the names of elvish peoples and houses.","tags":["people","root","core","grammar"]},
+      {"id":"E003","word":"eldarindë","ipa":"/ɛl.da.ˈɾin.dɛ/","pos":"noun","definitions":["elves (all elvenkind collectively)","the elven peoples","the star-kindred"],"etymology":"elda (elf) + rindë (kindred). All those who share elven blood. Also the root of the language name: Eldarindëva (speech of the elven-kind).","tags":["people","proper","established"]},
+      {"id":"E004","word":"tara","ipa":"/ˈta.ɾa/","pos":"adj/prefix","definitions":["crowned","sovereign","exalted above others"],"etymology":"From tar- (high, lofty, crowned) + -a. Distinct from ara (noble); tara implies formal sovereignty and the right to rule.","tags":["root","rank","political","core"]},
+      {"id":"E005","word":"taralindë","ipa":"/ta.ɾa.ˈlin.dɛ/","pos":"noun","definitions":["Crown Folk","High Elves","the sovereign kindred"],"etymology":"tara (crowned/sovereign) + lindë (from lin, song + rindë, kindred, contracted). The elves who bear the crown. The formal name of the High Elven race.","tags":["people","race","proper","established"]},
+      {"id":"E006","word":"calvarindë","ipa":"/kal.va.ˈɾin.dɛ/","pos":"noun","definitions":["Radiant Elves","shining kindred","High Elves (poetic name)"],"etymology":"cal (light) + var (eternal) + rindë (kindred). The eternally radiant kindred. A poetic alternative name for the High Elves.","tags":["people","race","proper","established"]},
+      {"id":"E007","word":"eldarionath","ipa":"/ɛl.da.ɾi.ˈɔ.naθ/","pos":"noun","definitions":["Noble Elves","the noble-born","High Elves (formal name)"],"etymology":"elda (elf) + arion (noble bearer) + -ath (collective). All the noble-born elves. A formal, archaic name for the High Elves.","tags":["people","race","proper","established"]},
+      {"id":"E008","word":"sylva","ipa":"/ˈsil.va/","pos":"noun/root","definitions":["forest","deep woodland","the green domain"],"etymology":"From sil- (gleam) shifting to syl- (green-gleam) + -va (domain). The shimmering green depths of ancient forest.","tags":["root","nature","geography"]},
+      {"id":"E009","word":"sylvarindë","ipa":"/sil.va.ˈɾin.dɛ/","pos":"noun","definitions":["Forest Kindred","Wood Elves","the woodland people"],"etymology":"sylva (forest) + rindë (kindred). The kindred of the deep forest. The formal name of the Wood Elven race.","tags":["people","race","proper","established"]},
+      {"id":"E010","word":"umbra","ipa":"/ˈum.bɾa/","pos":"noun/root","definitions":["deep shadow","the underworld darkness","the realm below light"],"etymology":"From um- (beneath) + -bra (darkness, intensified mor). A deeper, more absolute darkness than morë.","tags":["root","darkness"]},
+      {"id":"E011","word":"umbrarindë","ipa":"/um.bɾa.ˈɾin.dɛ/","pos":"noun","definitions":["Night-Elves","Drow","the shadow kindred","Deep-Elves"],"etymology":"umbra (deep shadow) + rindë (kindred). The kindred who dwell in deep shadow. The formal name of the Drow.","tags":["people","race","proper","established"]},
+      {"id":"E012","word":"aurëva","ipa":"/au.ˈɾɛ.va/","pos":"adj","definitions":["of the dawn","dawn-touched","pertaining to first light"],"etymology":"aurë (day/dawn) + -va (pertaining to). Used in the compound Aurë-elves: elves of the dawn, keepers of ancient knowledge.","tags":["quality","celestial","established"]},
+
+      {"id":"W001","word":"aer","ipa":"/aɛɾ/","pos":"noun","definitions":["sky","upper air","the heavens (physical)"],"etymology":"From ael (star) with consonant shift l>r denoting the medium rather than the point of light.","tags":["nature","celestial"]},
+      {"id":"W002","word":"vael","ipa":"/vaɛl/","pos":"noun","definitions":["wind","breeze","moving air"],"etymology":"From va- (movement) + ael (sky). The sky in motion.","tags":["nature","weather"]},
+      {"id":"W003","word":"taur","ipa":"/tauɾ/","pos":"noun","definitions":["forest","great wood","ancient woodland"],"etymology":"From tau- (tall, growing) + -r (place).","tags":["nature","geography"]},
+      {"id":"W004","word":"eärë","ipa":"/ˈɛ.a.ɾɛ/","pos":"noun","definitions":["ocean","great sea","the deep waters"],"etymology":"Extended form of uin with poetic vowel expansion.","tags":["nature","geography","poetic"]},
+      {"id":"W005","word":"loth","ipa":"/lɔθ/","pos":"noun","definitions":["flower","blossom","bloom"],"etymology":"Onomatopoeic: the soft opening of a petal.","tags":["nature","beauty"]},
+      {"id":"W006","word":"galadh","ipa":"/ˈɡa.laθ/","pos":"noun","definitions":["tree","growing thing","tall plant"],"etymology":"From gal- (to grow) + -adh (living entity).","tags":["nature"]},
+      {"id":"W007","word":"ithil","ipa":"/ˈi.θil/","pos":"noun","definitions":["moon","the pale wanderer","reflected light"],"etymology":"From ith- (pale) + sil (silver). The silver pale one.","tags":["celestial"]},
+      {"id":"W008","word":"anor","ipa":"/ˈa.nɔɾ/","pos":"noun","definitions":["sun","the golden fire","day-star"],"etymology":"From an- (golden/warm) + -or (great one).","tags":["celestial"]},
+      {"id":"W009","word":"nén","ipa":"/nɛːn/","pos":"noun","definitions":["water (general)","fresh water","stream"],"etymology":"Primordial root for water in its flowing, drinkable form.","tags":["nature","water"]},
+      {"id":"W010","word":"ondo","ipa":"/ˈɔn.dɔ/","pos":"noun","definitions":["stone","rock","mineral"],"etymology":"Onomatopoeic: the sound of stone struck.","tags":["nature","material"]},
+
+      {"id":"W011","word":"fëa","ipa":"/ˈfɛ.a/","pos":"noun","definitions":["soul","spirit","inner self"],"etymology":"Primordial root. The animating essence of a living being.","tags":["spiritual","abstract","core"]},
+      {"id":"W012","word":"hroa","ipa":"/ˈɾɔ.a/","pos":"noun","definitions":["body","physical form","vessel of the soul"],"etymology":"Primordial root. The material housing of the fëa.","tags":["spiritual","abstract","core"]},
+      {"id":"W013","word":"oialë","ipa":"/ɔi.ˈa.lɛ/","pos":"adv","definitions":["forever","eternally","without end"],"etymology":"From oi- (ever) + -alë (state of being).","tags":["time","abstract"]},
+      {"id":"W014","word":"yén","ipa":"/jɛːn/","pos":"noun","definitions":["long year","elvish year","great cycle"],"etymology":"An elvish measure of time, far longer than a mortal year.","tags":["time","established"]},
+      {"id":"W015","word":"aurë","ipa":"/ˈau.ɾɛ/","pos":"noun","definitions":["day","daylight hours","a single day"],"etymology":"From au- (sun, warmth) + -rë (period).","tags":["time"]},
+      {"id":"W016","word":"lómë","ipa":"/ˈlɔ.mɛ/","pos":"noun","definitions":["night","nighttime","dusk-to-dawn"],"etymology":"From lóm- (twilight) + -ë.","tags":["time","darkness"]},
+      {"id":"W017","word":"anarë","ipa":"/ˈa.na.ɾɛ/","pos":"noun","definitions":["sunrise","dawn","the coming of light"],"etymology":"From anor (sun) + -rë (moment/event). The sun's event.","tags":["time","light"]},
+      {"id":"W018","word":"andúnë","ipa":"/an.ˈdu.nɛ/","pos":"noun","definitions":["sunset","dusk","the fading of light"],"etymology":"From an (toward) + dún (west/setting) + -ë.","tags":["time","darkness"]},
+
+      {"id":"M001","word":"heru","ipa":"/ˈhɛ.ɾu/","pos":"noun","definitions":["lord","master","commander"],"etymology":"From her- (to rule) + -u (agent).","tags":["rank","political"]},
+      {"id":"M002","word":"heri","ipa":"/ˈhɛ.ɾi/","pos":"noun","definitions":["lady","mistress","one who commands"],"etymology":"Feminine form of heru.","tags":["rank","political"]},
+      {"id":"M003","word":"ambaron","ipa":"/am.ˈba.ɾɔn/","pos":"noun","definitions":["high lord","supreme commander","first among lords"],"etymology":"amba- (highest) + aran (king). Established AEN rank.","tags":["rank","military","established"]},
+      {"id":"M004","word":"eldamar","ipa":"/ɛl.ˈda.maɾ/","pos":"noun","definitions":["star-commander","fleet admiral","grand admiral"],"etymology":"elda (star-person) + mar (home/command). Established AEN rank.","tags":["rank","military","established"]},
+      {"id":"M005","word":"rimbalen","ipa":"/ɾim.ˈba.lɛn/","pos":"noun","definitions":["fleet lord","admiral","fleet commander"],"etymology":"rimba (fleet, many ships) + -len (master). Established AEN rank.","tags":["rank","military","established"]},
+      {"id":"M006","word":"rimbaer","ipa":"/ɾim.ˈbaɛɾ/","pos":"noun","definitions":["task force commander","rear admiral","lesser fleet lord"],"etymology":"rimba (fleet) + -aer (lesser/subordinate). Established AEN rank.","tags":["rank","military","established"]},
+      {"id":"M007","word":"tanar","ipa":"/ˈta.naɾ/","pos":"noun","definitions":["battlegroup commander","commodore","war-captain"],"etymology":"tan (forge/make) + -ar (one who). One who forges battle.","tags":["rank","military","established"]},
+      {"id":"M008","word":"thalion","ipa":"/ˈθa.li.ɔn/","pos":"noun","definitions":["steadfast one","captain","resolute commander"],"etymology":"thal (shield) + -ion (great one). One who is a great shield.","tags":["rank","military","established"]},
+
+      {"id":"W020","word":"ohtar","ipa":"/ˈɔh.taɾ/","pos":"noun","definitions":["warrior","soldier","one who fights"],"etymology":"From oht- (war) + -ar (agent).","tags":["military"]},
+      {"id":"W021","word":"cirya","ipa":"/ˈki.ɾja/","pos":"noun","definitions":["ship","vessel","sailing craft"],"etymology":"Ancient root cir- (to cut through) + -ya (thing). That which cuts the void.","tags":["military","naval"]},
+      {"id":"W022","word":"rimba","ipa":"/ˈɾim.ba/","pos":"noun","definitions":["fleet","host of ships","naval formation"],"etymology":"From rim- (many, numerous) + -ba (collective of vessels).","tags":["military","naval"]},
+      {"id":"W023","word":"macil","ipa":"/ˈma.kil/","pos":"noun","definitions":["sword","blade","weapon"],"etymology":"From mac- (to cut) + -il (instrument).","tags":["military","weapon"]},
+      {"id":"W024","word":"ehtar","ipa":"/ˈɛh.taɾ/","pos":"noun","definitions":["spear","lance weapon","piercing arm"],"etymology":"From eht- (to pierce) + -ar (instrument).","tags":["military","weapon"]},
+      {"id":"W025","word":"cú","ipa":"/kuː/","pos":"noun","definitions":["bow","arc weapon","ranged arm"],"etymology":"Onomatopoeic: the sound of a bowstring.","tags":["military","weapon"]},
+
+      {"id":"W030","word":"mel","ipa":"/mɛl/","pos":"verb/root","definitions":["to love","to cherish","to hold dear"],"etymology":"Primordial root for love in its deepest sense.","tags":["root","emotion","core"]},
+      {"id":"W031","word":"melda","ipa":"/ˈmɛl.da/","pos":"adj","definitions":["beloved","dear","cherished"],"etymology":"mel (love) + -da (state of being).","tags":["emotion"]},
+      {"id":"W032","word":"alcar","ipa":"/ˈal.kaɾ/","pos":"noun","definitions":["glory","splendor","radiant triumph"],"etymology":"From al- (great) + cal (light) + -ar. Great radiance.","tags":["abstract","military"]},
+      {"id":"W033","word":"estel","ipa":"/ˈɛs.tɛl/","pos":"noun","definitions":["hope","trust","faith in what is unseen"],"etymology":"From es- (to begin) + tel (end/purpose). Trust that the beginning leads to a worthy end.","tags":["abstract","spiritual","core"]},
+      {"id":"W034","word":"fairë","ipa":"/ˈfai.ɾɛ/","pos":"noun","definitions":["phantom","spirit (disembodied)","apparition"],"etymology":"From fai- (fade) + -rë (entity).","tags":["spiritual"]},
+      {"id":"W035","word":"sérë","ipa":"/ˈsɛ.ɾɛ/","pos":"noun","definitions":["peace","rest","tranquility"],"etymology":"From sér- (to rest, to be still) + -ë.","tags":["abstract","core"]},
+      {"id":"W036","word":"nolmë","ipa":"/ˈnɔl.mɛ/","pos":"noun","definitions":["knowledge","lore","accumulated wisdom"],"etymology":"From nol- (to know) + -më (abstract quality).","tags":["abstract","scholar"]},
+      {"id":"W037","word":"saila","ipa":"/ˈsai.la/","pos":"adj","definitions":["wise","learned","possessing deep knowledge"],"etymology":"From sai- (to understand deeply) + -la (having the quality of).","tags":["quality","scholar"]},
+      {"id":"W038","word":"vanya","ipa":"/ˈva.ɲa/","pos":"adj","definitions":["fair","beautiful","blessed"],"etymology":"From van- (fair) + -ya (adjectival). The purest form of beauty.","tags":["quality","beauty","core"]},
+      {"id":"W039","word":"morëa","ipa":"/mɔ.ˈɾɛ.a/","pos":"adj","definitions":["shadowy","dark","cloaked in shadow"],"etymology":"mor (shadow) + -ëa (adjectival, 'having the quality of').","tags":["quality","darkness"]},
+      {"id":"W040","word":"calima","ipa":"/ka.ˈli.ma/","pos":"adj","definitions":["bright","shining","luminous"],"etymology":"cal (light) + -ima (capable of, full of).","tags":["quality","light"]},
+      {"id":"W041","word":"tulca","ipa":"/ˈtul.ka/","pos":"adj","definitions":["strong","steadfast","firm"],"etymology":"From tul- (to stand firm) + -ca (quality).","tags":["quality","strength"]},
+
+      {"id":"W050","word":"hosta","ipa":"/ˈhɔs.ta/","pos":"verb","definitions":["to gather","to assemble","to muster"],"etymology":"From hos- (to collect) + -ta (verbal).","tags":["action","military"]},
+      {"id":"W051","word":"mahta","ipa":"/ˈmah.ta/","pos":"verb","definitions":["to fight","to wield a weapon","to do battle"],"etymology":"From mah- (hand/force) + -ta (verbal).","tags":["action","military"]},
+      {"id":"W052","word":"ranya","ipa":"/ˈɾa.ɲa/","pos":"verb","definitions":["to wander","to travel","to journey"],"etymology":"From ran- (to flow, to move freely) + -ya (verbal).","tags":["action","travel"]},
+      {"id":"W053","word":"centa","ipa":"/ˈkɛn.ta/","pos":"verb","definitions":["to speak","to declare","to address"],"etymology":"From cen- (to perceive) + -ta (verbal). To make perceived.","tags":["action","communication"]},
+      {"id":"W054","word":"ista","ipa":"/ˈis.ta/","pos":"verb","definitions":["to know","to understand","to have knowledge of"],"etymology":"From is- (inner truth) + -ta (verbal).","tags":["action","knowledge"]},
+      {"id":"W055","word":"linda","ipa":"/ˈlin.da/","pos":"verb","definitions":["to sing","to make music","to chant"],"etymology":"From lin (song) + -da (verbal action).","tags":["action","music"]},
+      {"id":"W056","word":"orta","ipa":"/ˈɔɾ.ta/","pos":"verb","definitions":["to rise","to ascend","to lift up"],"etymology":"From or (upon/above) + -ta (verbal).","tags":["action","movement"]},
+      {"id":"W057","word":"lanta","ipa":"/ˈlan.ta/","pos":"verb","definitions":["to fall","to descend","to set (of stars/sun)"],"etymology":"From lan- (down) + -ta (verbal).","tags":["action","movement"]},
+      {"id":"W058","word":"tulya","ipa":"/ˈtul.ja/","pos":"verb","definitions":["to lead","to guide","to bring forth"],"etymology":"From tul- (to come) + -ya (causative). To cause to come.","tags":["action","leadership"]},
+      {"id":"W059","word":"hasta","ipa":"/ˈhas.ta/","pos":"verb","definitions":["to sail","to voyage through the void","to traverse space"],"etymology":"From has- (to cleave through) + -ta (verbal). Originally 'to cut through water,' now applied to void-travel.","tags":["action","naval","travel"]},
+
+      {"id":"T001","word":"luina","ipa":"/ˈlui.na/","pos":"adj","definitions":["blue","deep blue","sapphire-hued"],"etymology":"From lui- (deep) + -na (colored). Established in month name Luinavas.","tags":["color","established"]},
+      {"id":"T002","word":"silquen","ipa":"/ˈsil.kwɛn/","pos":"adj","definitions":["silver-gleaming","frost-bright","glittering"],"etymology":"From sil (silver) + quen (bright). Established in month name Silquendil.","tags":["quality","established"]},
+      {"id":"T003","word":"lissë","ipa":"/ˈlis.sɛ/","pos":"adj","definitions":["sweet","fragrant","honeyed"],"etymology":"From lis- (sweet) + -ë (quality). Established in month name Lissuinion.","tags":["quality","established"]},
+      {"id":"T004","word":"urithë","ipa":"/u.ˈɾi.θɛ/","pos":"noun","definitions":["burning radiance","zenith heat","flame of the sky"],"etymology":"From ur- (fire/heat) + ith (sky) + -ë. Established in month name Urithiel.","tags":["celestial","established"]},
+      {"id":"T005","word":"narvion","ipa":"/naɾ.ˈvi.ɔn/","pos":"noun","definitions":["ember","fading fire","quiet warmth"],"etymology":"From naur (fire) + -vion (diminishing). Established in month name Narviondë.","tags":["nature","established"]},
+      {"id":"T006","word":"myndar","ipa":"/ˈmin.daɾ/","pos":"noun","definitions":["echo","reverberation","memory-sound"],"etymology":"From myn- (memory) + dar (to linger). Established in month name Myndarial.","tags":["abstract","established"]},
+      {"id":"T007","word":"rilya","ipa":"/ˈɾil.ja/","pos":"adj","definitions":["crimson","deep red","autumn-colored"],"etymology":"From ril- (glitter, red-gleam) + -ya (quality). Established in month name Rilyarion.","tags":["color","established"]},
+      {"id":"T008","word":"morilthë","ipa":"/mɔ.ˈɾil.θɛ/","pos":"noun","definitions":["fading light","dimming glow","pre-winter twilight"],"etymology":"From mor (shadow) + il (light) + thë (state). Established in month name Morilthië.","tags":["time","established"]},
+
+      {"id":"P001","word":"alda","ipa":"/ˈal.da/","pos":"noun","definitions":["tree (in general)","growing wood"],"etymology":"From al- (to grow tall) + -da (living thing).","tags":["nature"]},
+      {"id":"P002","word":"lairë","ipa":"/ˈlai.ɾɛ/","pos":"noun","definitions":["summer","the warm season","time of growth"],"etymology":"From lai- (green/growing) + -rë (season).","tags":["time","nature"]},
+      {"id":"P003","word":"hrívë","ipa":"/ˈɾi.vɛ/","pos":"noun","definitions":["winter","the cold season","time of rest"],"etymology":"From hrív- (chill) + -ë.","tags":["time","nature"]},
+      {"id":"P004","word":"yavië","ipa":"/ja.ˈvi.ɛ/","pos":"noun","definitions":["autumn","harvest season","time of gathering"],"etymology":"From yav- (fruit, harvest) + -ië (season).","tags":["time","nature"]},
+      {"id":"P005","word":"tuili","ipa":"/ˈtui.li/","pos":"noun","definitions":["spring","budding season","time of awakening"],"etymology":"From tui- (to sprout) + -li (beginning).","tags":["time","nature"]},
+
+      {"id":"S001","word":"hir","ipa":"/hiɾ/","pos":"verb/root","definitions":["to find","to discover","to come upon"],"etymology":"Primordial root.","tags":["root","action"]},
+      {"id":"S002","word":"mir","ipa":"/miɾ/","pos":"noun/root","definitions":["jewel","precious thing","treasure"],"etymology":"Primordial root. Applied to any object of great value.","tags":["root","material"]},
+      {"id":"S003","word":"cuivë","ipa":"/ˈkui.vɛ/","pos":"noun","definitions":["awakening","coming to consciousness","first awareness"],"etymology":"From cui- (to awaken) + -vë (event/moment).","tags":["abstract","spiritual"]},
+      {"id":"S004","word":"hên","ipa":"/hɛːn/","pos":"noun","definitions":["child","young one","offspring"],"etymology":"Primordial root.","tags":["people","family"]},
+      {"id":"S005","word":"othar","ipa":"/ˈɔ.θaɾ/","pos":"noun","definitions":["stranger","outsider","one from beyond"],"etymology":"From oth- (outer) + -ar (person).","tags":["people"]},
+      {"id":"S006","word":"nilmë","ipa":"/ˈnil.mɛ/","pos":"noun","definitions":["friendship","bond of affection","alliance of hearts"],"etymology":"From nil- (friend) + -më (abstract quality).","tags":["emotion","social"]},
+      {"id":"S007","word":"nildë","ipa":"/ˈnil.dɛ/","pos":"noun","definitions":["friend","companion","trusted one"],"etymology":"From nil- (friend) + -dë (person).","tags":["people","social"]},
+      {"id":"S008","word":"vesta","ipa":"/ˈvɛs.ta/","pos":"noun","definitions":["oath","vow","solemn promise"],"etymology":"From ves- (to bind) + -ta (act). A binding act.","tags":["social","formal"]},
+      {"id":"S009","word":"hérë","ipa":"/ˈhɛ.ɾɛ/","pos":"noun","definitions":["lordship","governance","authority"],"etymology":"From her- (to rule) + -ë (abstract).","tags":["political"]},
+      {"id":"S010","word":"cáno","ipa":"/ˈka.nɔ/","pos":"noun","definitions":["commander","one who commands","chieftain"],"etymology":"From cán- (to order/command) + -o (agent).","tags":["rank","military"]}
+    ],
+
+    "commonPhrases": [
+      { "elvish": "Elen síla lúmenna", "literal": "Star shines upon-hour-your", "meaning": "A star shines upon the hour of our meeting (formal greeting)" },
+      { "elvish": "Namárië", "literal": "Be-well", "meaning": "Farewell (warm)" },
+      { "elvish": "Na vardalum le tirnuva", "literal": "May sacred-light you guard-will", "meaning": "May the sacred light guard you (blessing/dismissal)" },
+      { "elvish": "Tirno i rimba", "literal": "Guard-command the fleet", "meaning": "Guard the fleet! (military order)" },
+      { "elvish": "Mana cental?", "literal": "What speak-you?", "meaning": "What do you say? / What is your report?" },
+      { "elvish": "Hasta an i aeleni", "literal": "Sail toward the stars", "meaning": "Set course for the stars (naval command to depart)" },
+      { "elvish": "Ú-mahta, sérë na le", "literal": "Not-fight, peace to you", "meaning": "We come in peace (diplomatic greeting)" },
+      { "elvish": "Alcar i Arandorë", "literal": "Glory the High-Realm", "meaning": "Glory to the High Realm (patriotic/military salute)" },
+      { "elvish": "Estel ná", "literal": "Hope is", "meaning": "There is hope / Hope endures (proverb)" },
+      { "elvish": "Na aelin i fëa", "literal": "At still-water the soul", "meaning": "The soul finds its still water (proverb about inner peace)" }
+    ]
+  }
+}

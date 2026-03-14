@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SGN — Language Forge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@200;300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void:       #050810;
+      --deep:       #080d18;
+      --surface:    #0c1220;
+      --surface2:   #111b2e;
+      --border:     #1a2d46;
+      --border2:    #243d5e;
+      --cyan:       #38e8ff;
+      --cyan-dim:   #1a7090;
+      --gold:       #f5c542;
+      --gold-dim:   #7a6020;
+      --red-alert:  #ff3b3b;
+      --text:       #c8deff;
+      --text-dim:   #5a7a99;
+      --text-muted: #2e4a66;
+      --glow-cyan:  rgba(56,232,255,.18);
+      --glow-gold:  rgba(245,197,66,.18);
+      --green:      #5cdb7a;
+      --green-dim:  #1e4a28;
+      --purple:     #b388ff;
+      --purple-dim: #4a2e80;
+      --amber:      #ff9e44;
+      --amber-dim:  #6e3f10;
+      --slate:      #8faabe;
+      --slate-dim:  #3a5060;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:var(--void);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;}
+
+    /* ── Cursors ── */
+    * {
+      cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.6' stroke-opacity='0.3' stroke-dasharray='2 2'/><circle cx='4' cy='2' r='1.5' fill='%2338e8ff' fill-opacity='0.8'/><circle cx='4' cy='2' r='0.8' fill='%23fff'/></g></svg>") 4 2, auto !important;
+    }
+    a, button, [onclick], select, [role="button"],
+    .tab, .pbtn, .sb-filter, .hud-nav, .dict-item, .root-tag, .idiom-row,
+    input[type="submit"] {
+      cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.8' stroke-opacity='0.5' stroke-dasharray='2 2'/><polygon points='4,2 2,24 14,20' fill='%2338e8ff' fill-opacity='0.06'/><circle cx='4' cy='2' r='2.5' fill='%2338e8ff' fill-opacity='0.5'/><circle cx='4' cy='2' r='1.2' fill='%23fff'/></g></svg>") 4 2, pointer !important;
+    }
+
+    body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:100;}
+
+    /* ── HUD ── */
+    #hud{position:fixed;top:0;left:0;right:0;height:52px;z-index:50;display:flex;align-items:center;gap:0;background:linear-gradient(180deg,rgba(5,8,16,.97) 0%,rgba(5,8,16,.7) 100%);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);padding:0 20px;}
+    #hud::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,var(--cyan-dim) 15%,var(--cyan) 50%,var(--cyan-dim) 85%,transparent 100%);opacity:.4;}
+    .hud-logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;letter-spacing:6px;color:var(--cyan);text-shadow:0 0 16px rgba(56,232,255,.7);pointer-events:all;}
+    .hud-sep{width:1px;height:18px;background:var(--border2);margin:0 14px;opacity:.6;}
+    .hud-item{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;pointer-events:all;text-decoration:none;}
+    .hud-nav{transition:color .12s;}
+    .hud-nav:hover{color:var(--cyan) !important;}
+    .hud-nav.active{color:var(--cyan) !important;text-shadow:0 0 8px rgba(56,232,255,.5);}
+    .hud-spacer{flex:1;}
+    .hud-count{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:1.5px;}
+
+    /* ── APP LAYOUT ── */
+    #app{display:flex;height:100vh;padding-top:52px;}
+
+    /* ── SIDEBAR ── */
+    #sidebar{width:320px;min-width:300px;background:rgba(5,8,16,.95);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10;position:relative;}
+    #sidebar::after{content:'';position:absolute;top:0;right:0;width:1px;height:100%;background:linear-gradient(180deg,var(--cyan) 0%,rgba(56,232,255,.15) 40%,transparent 100%);opacity:.4;pointer-events:none;}
+
+    .sb-header{padding:14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .sb-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;letter-spacing:3px;color:var(--text);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:10px;}
+    .sb-title-lang{font-size:12px;font-weight:400;color:var(--gold);font-family:'Share Tech Mono',monospace;letter-spacing:1px;}
+    .sb-search{width:100%;background:rgba(5,8,16,.9);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:7px 10px 7px 28px;font-family:'Exo 2',sans-serif;font-size:13px;outline:none;transition:border-color .12s;}
+    .sb-search:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.08);}
+    .sb-search-wrap{position:relative;}
+    .sb-search-wrap::before{content:'⌕';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-muted);pointer-events:none;}
+
+    .sb-toggles{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;}
+    .sb-toggle{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border);border-radius:2px;background:transparent;color:var(--text-muted);cursor:pointer;transition:all .12s;}
+    .sb-toggle:hover{border-color:var(--border2);color:var(--text-dim);}
+    .sb-toggle.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.06);}
+
+    .sb-stats{display:flex;gap:12px;margin-top:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
+    .sb-stat-val{color:var(--cyan);}
+
+    .sb-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;}
+    .sb-footer .pbtn{flex:1;}
+    .pbtn{background:transparent;border:1px solid var(--border2);color:var(--text-dim);border-radius:2px;padding:6px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:all .12s;}
+    .pbtn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(56,232,255,.05);}
+    .pbtn.gold{border-color:var(--gold-dim);color:var(--gold);}
+    .pbtn.gold:hover{border-color:var(--gold);background:rgba(245,197,66,.08);box-shadow:0 0 8px rgba(245,197,66,.2);}
+
+    /* ── Word list ── */
+    #word-list{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+    #word-list::-webkit-scrollbar{width:3px;}
+    #word-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    .dict-item{padding:10px 14px;border-bottom:1px solid rgba(26,45,70,.3);transition:background .1s;display:flex;flex-direction:column;gap:2px;}
+    .dict-item:hover{background:rgba(56,232,255,.03);}
+    .dict-item.active{background:rgba(56,232,255,.06);border-left:2px solid var(--cyan);}
+    .dict-item-word{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:600;color:var(--text);letter-spacing:.5px;}
+    .dict-item-ipa{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);}
+    .dict-item-def{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .dict-item-pos{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan-dim);letter-spacing:1px;text-transform:uppercase;}
+
+    /* ── MAIN AREA ── */
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+    /* ── Tab bar ── */
+    .main-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(5,8,16,.6);padding:0 16px;}
+    .tab{font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;padding:12px 16px;color:var(--text-muted);transition:all .12s;border-bottom:2px solid transparent;white-space:nowrap;}
+    .tab:hover{color:var(--text-dim);}
+    .tab.active{color:var(--cyan);border-bottom-color:var(--cyan);text-shadow:0 0 8px rgba(56,232,255,.3);}
+
+    /* ── Tab panes ── */
+    .tab-pane{display:none;flex:1;overflow-y:auto;padding:20px 24px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+    .tab-pane::-webkit-scrollbar{width:4px;}
+    .tab-pane::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+    .tab-pane.active{display:block;}
+
+    /* ── Empty state ── */
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;opacity:.5;}
+    .empty-state-icon{font-size:36px;color:var(--text-muted);}
+    .empty-state-text{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text-muted);text-align:center;letter-spacing:1px;line-height:1.8;}
+
+    /* ── Section labels ── */
+    .section-label{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+    .section-label:first-child{margin-top:0;}
+
+    /* ── Dictionary entry view ── */
+    .entry-header{margin-bottom:20px;}
+    .entry-word{font-family:'Rajdhani',sans-serif;font-size:32px;font-weight:700;color:var(--cyan);letter-spacing:1px;line-height:1.2;}
+    .entry-ipa{font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--text-dim);margin-top:2px;}
+    .entry-pos{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+    .entry-defs{margin-top:12px;}
+    .entry-def{font-size:15px;color:var(--text);padding:3px 0;padding-left:12px;border-left:2px solid var(--border2);}
+    .entry-etym{font-size:13px;color:var(--text-dim);margin-top:12px;font-style:italic;line-height:1.6;}
+    .entry-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+    .entry-tag{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border:1px solid var(--border);border-radius:2px;color:var(--text-muted);}
+
+    /* ── Inflection tables ── */
+    .inflection-table{width:100%;border-collapse:collapse;margin:10px 0 20px;font-size:13px;}
+    .inflection-table th{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);}
+    .inflection-table td{padding:6px 10px;border-bottom:1px solid rgba(26,45,70,.3);color:var(--text);}
+    .inflection-table td:first-child{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan-dim);letter-spacing:1px;text-transform:uppercase;width:120px;}
+    .inflection-table td:nth-child(2){font-family:'Rajdhani',sans-serif;font-weight:600;font-size:15px;color:var(--text);letter-spacing:.5px;}
+    .inflection-table td:nth-child(3){font-size:12px;color:var(--text-dim);}
+    .inflection-table tr:hover td{background:rgba(56,232,255,.02);}
+
+    /* ── Phonology reference ── */
+    .phon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:10px 0 20px;}
+    .phon-card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:10px 12px;display:flex;gap:10px;align-items:center;}
+    .phon-letter{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--cyan);min-width:30px;text-align:center;}
+    .phon-info{flex:1;}
+    .phon-ipa{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--gold);margin-bottom:2px;}
+    .phon-desc{font-size:11px;color:var(--text-dim);line-height:1.3;}
+
+    .phon-rule{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:12px 14px;margin:6px 0;}
+    .phon-rule-name{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+    .phon-rule-desc{font-size:12px;color:var(--text-dim);line-height:1.5;}
+
+    /* ── Grammar reference ── */
+    .gram-block{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:14px;margin:8px 0;}
+    .gram-block-title{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;}
+    .gram-example{font-family:'Rajdhani',sans-serif;font-size:15px;color:var(--gold);margin:4px 0;}
+    .gram-note{font-size:12px;color:var(--text-dim);line-height:1.5;}
+
+    /* ── Word Forge ── */
+    .forge-input-group{display:flex;gap:10px;margin-bottom:20px;align-items:flex-end;}
+    .forge-input{flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:10px 14px;font-family:'Exo 2',sans-serif;font-size:14px;outline:none;transition:border-color .12s;}
+    .forge-input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,232,255,.08);}
+    .forge-input::placeholder{color:var(--text-muted);}
+    .forge-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;display:block;}
+
+    .forge-btn{background:transparent;border:1px solid var(--cyan-dim);color:var(--cyan);border-radius:2px;padding:10px 20px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;transition:all .12s;white-space:nowrap;}
+    .forge-btn:hover{border-color:var(--cyan);background:rgba(56,232,255,.08);box-shadow:0 0 8px rgba(56,232,255,.2);}
+    .forge-btn.gold{border-color:var(--gold-dim);color:var(--gold);}
+    .forge-btn.gold:hover{border-color:var(--gold);background:rgba(245,197,66,.08);box-shadow:0 0 8px rgba(245,197,66,.2);}
+    .forge-btn.green{border-color:var(--green-dim);color:var(--green);}
+    .forge-btn.green:hover{border-color:var(--green);background:rgba(92,219,122,.08);}
+    .forge-btn.red{border-color:rgba(255,59,59,.3);color:var(--red-alert);}
+    .forge-btn.red:hover{border-color:var(--red-alert);background:rgba(255,59,59,.08);}
+    .forge-btn:disabled{opacity:.4;pointer-events:none;}
+
+    .forge-select{background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:2px;padding:10px 14px;font-family:'Exo 2',sans-serif;font-size:13px;outline:none;transition:border-color .12s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a7a99'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px;}
+    .forge-select:focus{border-color:var(--cyan);}
+
+    /* ── Candidate cards ── */
+    .candidate-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:14px;}
+    .candidate-card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:14px;transition:all .15s;position:relative;}
+    .candidate-card:hover{border-color:var(--border2);background:var(--surface2);}
+    .candidate-card.approved{border-color:var(--green-dim);background:rgba(92,219,122,.04);}
+    .candidate-word{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--cyan);letter-spacing:1px;}
+    .candidate-ipa{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:1px;}
+    .candidate-etym{font-size:12px;color:var(--text-dim);margin-top:6px;font-style:italic;}
+    .candidate-literal{font-size:12px;color:var(--gold);margin-top:2px;}
+    .candidate-register{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;position:absolute;top:10px;right:10px;padding:2px 6px;border:1px solid var(--border);border-radius:2px;}
+    .candidate-score{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:6px;}
+    .candidate-actions{display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);}
+    .candidate-actions .forge-btn{padding:4px 10px;font-size:10px;}
+
+    /* ── Name Forge ── */
+    .name-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+    .name-result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;}
+    .name-card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:12px;transition:all .15s;}
+    .name-card:hover{border-color:var(--border2);background:var(--surface2);}
+    .name-card-name{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:var(--gold);letter-spacing:1px;}
+    .name-card-ipa{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:1px;}
+    .name-card-etym{font-size:11px;color:var(--text-dim);margin-top:4px;font-style:italic;}
+    .name-card-meta{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px;letter-spacing:1px;}
+
+    /* ── Translator ── */
+    .translator-output{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:16px;margin-top:14px;}
+    .translator-elvish{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:600;color:var(--cyan);letter-spacing:1px;margin-bottom:10px;}
+    .translator-register-tag{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border:1px solid var(--border);border-radius:2px;display:inline-block;margin-bottom:10px;}
+    .gloss-table{width:100%;border-collapse:collapse;margin:10px 0;}
+    .gloss-table th{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);}
+    .gloss-table td{padding:4px 8px;border-bottom:1px solid rgba(26,45,70,.3);font-size:13px;}
+    .gloss-table td.elvish-cell{font-family:'Rajdhani',sans-serif;font-weight:600;color:var(--cyan);}
+    .gloss-table td.gloss-cell{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);}
+    .translator-notes{margin-top:10px;}
+    .translator-note{font-size:12px;color:var(--text-dim);padding:3px 0;padding-left:10px;border-left:2px solid var(--border2);}
+
+    /* ── Phrases / Idioms ── */
+    .idiom-filters{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;}
+    .idiom-row{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:12px 14px;margin:6px 0;transition:all .12s;}
+    .idiom-row:hover{border-color:var(--border2);background:var(--surface2);}
+    .idiom-elvish{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;color:var(--cyan);letter-spacing:.5px;}
+    .idiom-literal{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:2px;}
+    .idiom-meaning{font-size:13px;color:var(--text);margin-top:4px;}
+    .idiom-meta{display:flex;gap:8px;margin-top:6px;align-items:center;}
+    .idiom-register{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:2px;}
+    .idiom-register.casual{color:var(--green);border:1px solid var(--green-dim);}
+    .idiom-register.formal{color:var(--cyan);border:1px solid var(--cyan-dim);}
+    .idiom-register.military{color:var(--red-alert);border:1px solid rgba(255,59,59,.3);}
+    .idiom-register.poetic{color:var(--purple);border:1px solid var(--purple-dim);}
+    .idiom-register.sacred{color:var(--gold);border:1px solid var(--gold-dim);}
+    .idiom-theme{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
+    .idiom-notes{font-size:11px;color:var(--text-dim);margin-top:4px;font-style:italic;}
+
+    /* ── Euphony meter ── */
+    .euphony-meter{display:flex;align-items:center;gap:10px;margin:8px 0;}
+    .euphony-bar{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;position:relative;}
+    .euphony-fill{height:100%;border-radius:4px;transition:width .4s ease;}
+    .euphony-fill.excellent{background:linear-gradient(90deg,var(--green),var(--cyan));}
+    .euphony-fill.good{background:linear-gradient(90deg,var(--cyan),var(--cyan));}
+    .euphony-fill.fair{background:linear-gradient(90deg,var(--gold),var(--amber));}
+    .euphony-fill.poor{background:linear-gradient(90deg,var(--red-alert),var(--amber));}
+    .euphony-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;min-width:80px;text-align:right;}
+    .euphony-label.excellent{color:var(--green);}
+    .euphony-label.good{color:var(--cyan);}
+    .euphony-label.fair{color:var(--gold);}
+    .euphony-label.poor{color:var(--red-alert);}
+    .euphony-score{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text);min-width:40px;}
+
+    .euphony-breakdown{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px;margin:6px 0;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:.5px;}
+
+    /* ── Decomposition cards ── */
+    .decomp-card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:12px 14px;margin:8px 0;transition:border-color .12s;}
+    .decomp-card:hover{border-color:var(--border2);}
+    .decomp-type{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;}
+    .decomp-parts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0;}
+    .decomp-root{background:rgba(56,232,255,.06);border:1px solid var(--cyan-dim);border-radius:2px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:15px;color:var(--cyan);}
+    .decomp-root-meaning{font-size:11px;color:var(--text-dim);font-style:italic;}
+    .decomp-plus{color:var(--text-muted);font-size:14px;}
+    .decomp-suffix{background:rgba(245,197,66,.06);border:1px solid var(--gold-dim);border-radius:2px;padding:4px 10px;font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--gold);}
+    .decomp-literal{font-size:14px;color:var(--text);margin-top:6px;}
+    .decomp-confidence{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
+    .decomp-confidence-bar{display:inline-block;width:60px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;vertical-align:middle;margin-left:6px;}
+    .decomp-confidence-fill{height:100%;border-radius:2px;background:var(--cyan);}
+
+    /* ── Validation status ── */
+    .validation-pass{color:var(--green);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1px;}
+    .validation-fail{color:var(--red-alert);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1px;}
+    .validation-error{font-size:11px;color:var(--red-alert);padding:3px 0 3px 10px;border-left:2px solid rgba(255,59,59,.3);}
+
+    /* ── Parsed sentence display ── */
+    .parse-info{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;}
+    .parse-tag{padding:3px 8px;border:1px solid var(--border);border-radius:2px;color:var(--text-dim);}
+    .parse-tag.active-tag{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.06);}
+
+    /* ── Concept explorer (semantic tab) ── */
+    .concept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin:10px 0;}
+    .concept-chip{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:6px 10px;font-size:12px;color:var(--text-dim);transition:all .12s;text-align:center;}
+    .concept-chip:hover{border-color:var(--border2);color:var(--text);background:var(--surface2);}
+    .concept-chip.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.06);}
+
+    .metaphor-card{background:var(--surface);border:1px solid var(--gold-dim);border-radius:3px;padding:14px;margin:10px 0;}
+    .metaphor-concept{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--gold);text-transform:capitalize;}
+    .metaphor-literal{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--cyan);margin-top:2px;}
+    .metaphor-roots{font-size:12px;color:var(--text-dim);margin-top:4px;}
+    .metaphor-desc{font-size:13px;color:var(--text);margin-top:6px;line-height:1.5;}
+
+    /* ── Toast ── */
+    #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(8,13,24,.95);border:1px solid var(--cyan-dim);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1px;padding:8px 20px;border-radius:3px;opacity:0;transition:all .25s;pointer-events:none;z-index:200;white-space:nowrap;}
+    #toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    /* ── Responsive ── */
+    @media (max-width:900px) {
+      #sidebar{width:260px;min-width:200px;}
+      .candidate-grid{grid-template-columns:1fr;}
+      .name-result-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hud-logo">SGN</div>
+  <div class="hud-sep"></div>
+  <a href="./index.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;">STAR CHART</a>
+  <div class="hud-sep"></div>
+  <a href="./wiki.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;">CODEX</a>
+  <div class="hud-sep"></div>
+  <a href="./personnel.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;">PERSONNEL</a>
+  <div class="hud-sep"></div>
+  <a href="./orbat.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;">ORBAT</a>
+  <div class="hud-sep"></div>
+  <a href="./language.html" class="hud-item hud-nav active" style="pointer-events:all;text-decoration:none;">LANGUAGE</a>
+  <div class="hud-spacer"></div>
+  <span class="hud-count" id="hud-count">0 ENTRIES</span>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="sb-header">
+      <div class="sb-title">
+        DICTIONARY
+        <span class="sb-title-lang">Eldarindëva</span>
+      </div>
+      <div class="sb-search-wrap">
+        <input type="text" class="sb-search" id="sb-search" placeholder="Search Elvish or English...">
+      </div>
+      <div class="sb-toggles" id="sb-toggles">
+        <button class="sb-toggle active" data-mode="alpha">A-Z</button>
+        <button class="sb-toggle" data-mode="english">BY MEANING</button>
+        <button class="sb-toggle" data-mode="roots">ROOTS</button>
+        <button class="sb-toggle" data-mode="pos">BY POS</button>
+      </div>
+      <div class="sb-stats">
+        <span>ENTRIES <span class="sb-stat-val" id="stat-total">0</span></span>
+        <span>ROOTS <span class="sb-stat-val" id="stat-roots">0</span></span>
+      </div>
+    </div>
+    <div id="word-list"></div>
+    <div class="sb-footer">
+      <button class="pbtn gold" id="sb-save-repo">↓ SAVE TO REPO</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div class="main-tabs" id="main-tabs">
+      <div class="tab active" data-tab="dictionary">DICTIONARY</div>
+      <div class="tab" data-tab="phonology">PHONOLOGY</div>
+      <div class="tab" data-tab="grammar">GRAMMAR</div>
+      <div class="tab" data-tab="wordforge">WORD FORGE</div>
+      <div class="tab" data-tab="nameforge">NAME FORGE</div>
+      <div class="tab" data-tab="translator">TRANSLATOR</div>
+      <div class="tab" data-tab="analyzer">ANALYZER</div>
+      <div class="tab" data-tab="phrases">PHRASES</div>
+    </div>
+
+    <!-- DICTIONARY TAB -->
+    <div class="tab-pane active" id="pane-dictionary">
+      <div class="empty-state" id="dict-empty">
+        <div class="empty-state-icon">◎</div>
+        <div class="empty-state-text">// SELECT A WORD FROM THE SIDEBAR<br>// OR USE THE WORD FORGE TO CREATE NEW ENTRIES</div>
+      </div>
+      <div id="dict-entry" style="display:none;"></div>
+    </div>
+
+    <!-- PHONOLOGY TAB -->
+    <div class="tab-pane" id="pane-phonology"></div>
+
+    <!-- GRAMMAR TAB -->
+    <div class="tab-pane" id="pane-grammar"></div>
+
+    <!-- WORD FORGE TAB -->
+    <div class="tab-pane" id="pane-wordforge">
+      <div class="section-label">WORD FORGE</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;">Enter an English concept and the forge will generate Elvish word candidates using the semantic network, cultural metaphors, and phonological rules. Approve candidates to add them to the dictionary.</p>
+      <div class="forge-input-group">
+        <div style="flex:1;">
+          <label class="forge-label">English Concept</label>
+          <input type="text" class="forge-input" id="wf-input" placeholder="e.g. hope, betrayal, ocean voyage...">
+        </div>
+        <button class="forge-btn" id="wf-generate">FORGE</button>
+      </div>
+      <div id="wf-results"></div>
+    </div>
+
+    <!-- NAME FORGE TAB -->
+    <div class="tab-pane" id="pane-nameforge">
+      <div class="section-label">NAME FORGE</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;">Generate culturally authentic Elvish names for characters, ships, systems, places, or formations. Specify constraints to guide the generator.</p>
+      <div class="name-controls">
+        <div>
+          <label class="forge-label">Category</label>
+          <select class="forge-select" id="nf-category">
+            <option value="character">Character</option>
+            <option value="ship">Ship</option>
+            <option value="system">Star System</option>
+            <option value="place">Place</option>
+            <option value="formation">Formation</option>
+          </select>
+        </div>
+        <div>
+          <label class="forge-label">Gender (characters)</label>
+          <select class="forge-select" id="nf-gender">
+            <option value="">Any</option>
+            <option value="masculine">Masculine</option>
+            <option value="feminine">Feminine</option>
+            <option value="neuter">Neuter</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label class="forge-label">Meaning Bias (optional)</label>
+          <input type="text" class="forge-input" id="nf-bias" placeholder="e.g. star, courage, fire...">
+        </div>
+        <button class="forge-btn gold" id="nf-generate" style="align-self:flex-end;">FORGE NAMES</button>
+      </div>
+      <div id="nf-results"></div>
+    </div>
+
+    <!-- TRANSLATOR TAB -->
+    <div class="tab-pane" id="pane-translator">
+      <div class="section-label">PHRASE TRANSLATOR</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;">Enter a simple English phrase and the translator will construct it in Eldarindëva with interlinear glossing. Works best with subject-verb-object sentences using vocabulary already in the dictionary.</p>
+      <div class="forge-input-group">
+        <div style="flex:1;">
+          <label class="forge-label">English Phrase</label>
+          <input type="text" class="forge-input" id="tr-input" placeholder="e.g. the king guards the realm">
+        </div>
+        <div>
+          <label class="forge-label">Register</label>
+          <select class="forge-select" id="tr-register">
+            <option value="formal">Formal (SOV)</option>
+            <option value="casual">Casual (VSO)</option>
+            <option value="military">Military</option>
+            <option value="poetic">Poetic (free)</option>
+          </select>
+        </div>
+        <button class="forge-btn" id="tr-translate" style="align-self:flex-end;">TRANSLATE</button>
+      </div>
+      <div id="tr-results"></div>
+    </div>
+
+    <!-- ANALYZER TAB -->
+    <div class="tab-pane" id="pane-analyzer">
+      <div class="section-label">WORD ANALYZER</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;">Enter any Elvish word (real or invented) and the analyzer will attempt to decompose it into known roots and suffixes, assess its phonological validity, and rate its euphony. Use this to check if a made-up word "works" in Eldarindëva.</p>
+      <div class="forge-input-group">
+        <div style="flex:1;">
+          <label class="forge-label">Elvish Word</label>
+          <input type="text" class="forge-input" id="az-input" placeholder="e.g. calindorë, aelthalon, morësérë...">
+        </div>
+        <button class="forge-btn" id="az-analyze">ANALYZE</button>
+      </div>
+      <div id="az-results"></div>
+    </div>
+
+    <!-- PHRASES TAB -->
+    <div class="tab-pane" id="pane-phrases">
+      <div class="section-label">IDIOMS, PROVERBS & COMMANDS</div>
+      <div class="idiom-filters" id="idiom-filters"></div>
+      <div id="idiom-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="./phonological-core.js"></script>
+<script src="./morphological-engine.js"></script>
+<script src="./semantic-network.js"></script>
+<script src="./composition-engine.js"></script>
+<script src="./cultural-layer.js"></script>
+<script src="./language-forge.js"></script>
+<script src="./stardate.js"></script>
+</body>
+</html>
