@@ -314,32 +314,44 @@ const CompositionEngine = (() => {
 
   /* ══════════════════════════════════
      MODE 3: PHRASE CONSTRUCTION
-     Real sentence parser with grammar
+     Real sentence parser with grammar,
+     possessives, plurals, copula
      ══════════════════════════════════ */
 
   /* ── English POS tagger (simple heuristic) ── */
-  const EN_DETERMINERS = new Set(['the','a','an','this','that','these','those','my','your','his','her','its','our','their']);
-  const EN_PREPOSITIONS = new Set(['in','on','at','to','from','with','by','for','through','under','above','beyond','near','without','upon']);
+  const EN_DETERMINERS = new Set(['the','a','an','this','that','these','those']);
+  const EN_POSSESSIVES = { 'my':'1s', 'your':'2s', 'his':'3s', 'her':'3s', 'its':'3s', 'our':'1p', 'their':'3p' };
+  const EN_PREPOSITIONS = new Set(['in','on','at','to','from','with','by','for','through','under','above','beyond','near','without','upon','into','across','beside','between','among','against','toward','towards','before','after','behind','beneath','below','over']);
   const EN_CONJUNCTIONS = new Set(['and','or','but','if','then','because','so']);
   const EN_NEGATION = new Set(['not','no','never','don\'t','doesn\'t','didn\'t','cannot','can\'t','won\'t']);
   const EN_PRONOUNS = { 'i':'ni','me':'ni','you':'le','he':'se','she':'se','it':'se','we':'elmë','they':'entë','us':'elmë','them':'entë' };
   const EN_QUESTION = new Set(['who','what','where','when','why','how']);
+  const EN_COPULA = new Set(['is','are','am','was','were','be','been','being']);
+  const EN_HELPERS = new Set(['do','does','did','will','shall','can','could','would','should','may','might','must','have','has','had']);
 
   /* Simple English morphology: strip -s, -ed, -ing to find root */
   function stemEnglish(word) {
     const w = word.toLowerCase();
     if (w.endsWith('ing') && w.length > 5) return w.slice(0, -3);
+    if (w.endsWith('ying') && w.length > 5) return w.slice(0, -4) + 'y';
     if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
     if (w.endsWith('es') && w.length > 4) return w.slice(0, -2);
     if (w.endsWith('ed') && w.length > 4) return w.slice(0, -2);
-    if (w.endsWith('s') && w.length > 3 && !w.endsWith('ss')) return w.slice(0, -1);
+    if (w.endsWith('s') && w.length > 3 && !w.endsWith('ss') && !w.endsWith('us')) return w.slice(0, -1);
     return w;
+  }
+
+  /* Detect if an English word is plural */
+  function isEnglishPlural(word) {
+    const w = word.toLowerCase();
+    const stem = stemEnglish(w);
+    return stem !== w && (w.endsWith('s') || w.endsWith('es') || w.endsWith('ies'));
   }
 
   /* Detect tense from English verb */
   function detectTense(word, context) {
     const w = word.toLowerCase();
-    if (w.endsWith('ed') || context.includes('did')) return 'past';
+    if (w.endsWith('ed') || context.includes('did') || context.includes('was') || context.includes('were')) return 'past';
     if (w.endsWith('ing')) return 'continuative';
     if (context.includes('will') || context.includes('shall')) return 'future';
     return 'present';
@@ -347,11 +359,14 @@ const CompositionEngine = (() => {
 
   /* Detect person from subject */
   function detectPerson(subject) {
-    const s = subject.toLowerCase();
+    const s = subject?.toLowerCase();
+    if (!s) return '3s';
     if (s === 'i' || s === 'ni') return '1s';
     if (s === 'you' || s === 'le') return '2s';
     if (s === 'we' || s === 'elmë') return '1p';
     if (s === 'they' || s === 'entë') return '3p';
+    // Plural nouns get 3p
+    if (isEnglishPlural(s)) return '3p';
     return '3s';
   }
 
@@ -371,13 +386,13 @@ const CompositionEngine = (() => {
       return { elvish: best.word, pos: best.pos || 'noun', english: w, gloss: best.pos || 'n', found: true, entry: best };
     }
 
-    // Try stemmed form
+    // Try stemmed form (handles plurals and verb forms)
     const stemmed = stemEnglish(w);
     if (stemmed !== w) {
       matches = lookupEnglish(stemmed);
       if (matches.length) {
         const best = matches[0];
-        return { elvish: best.word, pos: best.pos || 'noun', english: w, gloss: best.pos || 'n', found: true, entry: best, stemmedFrom: w };
+        return { elvish: best.word, pos: best.pos || 'noun', english: w, gloss: best.pos || 'n', found: true, entry: best, stemmedFrom: w, wasPlural: isEnglishPlural(w) };
       }
     }
 
@@ -391,16 +406,60 @@ const CompositionEngine = (() => {
       }
     }
 
+    // Try semantic with stemmed form
+    if (stemmed !== w) {
+      const concepts2 = SN().findConcept(stemmed);
+      if (concepts2.length && concepts2[0].roots.length) {
+        const root = concepts2[0].roots[0];
+        const rootEntry = _dict.find(e => e.word === root);
+        if (rootEntry) {
+          return { elvish: rootEntry.word, pos: rootEntry.pos || 'root', english: w, gloss: 'sem', found: true, entry: rootEntry, wasPlural: isEnglishPlural(w) };
+        }
+      }
+    }
+
     return { elvish: `[${w}]`, pos: 'unknown', english: w, gloss: 'UNK', found: false };
   }
 
-  /* ── Sentence pattern matching ── */
+  /* ── Detect possessive 's ── */
+  function parsePossessive(words) {
+    // "the king's sword" -> possessor: "king", owned: "sword"
+    // Also "king's sword" without article
+    const result = { hasPossessive: false, possessor: null, possessorDet: null, owned: null, ownedDet: null, ownedAdjs: [], restWords: [] };
 
-  /* Tokenize English sentence into grammatical slots */
+    for (let i = 0; i < words.length; i++) {
+      if (words[i].endsWith("'s") || words[i].endsWith("'s")) {
+        result.hasPossessive = true;
+        // Look back for determiner
+        const possWord = words[i].replace(/'s$/i, '');
+        if (i > 0 && EN_DETERMINERS.has(words[i - 1])) {
+          result.possessorDet = words[i - 1];
+          result.possessor = possWord;
+        } else {
+          result.possessor = possWord;
+        }
+        // Everything after is the owned NP
+        const after = words.slice(i + 1);
+        let j = 0;
+        if (j < after.length && EN_DETERMINERS.has(after[j])) { result.ownedDet = after[j]; j++; }
+        // Adjectives
+        while (j < after.length) {
+          const r = resolveWord(after[j]);
+          if (r.found && r.pos?.includes('adj')) { result.ownedAdjs.push(after[j]); j++; }
+          else break;
+        }
+        if (j < after.length) { result.owned = after[j]; j++; }
+        result.restWords = after.slice(j);
+        return result;
+      }
+    }
+    return result;
+  }
+
+  /* ── Sentence pattern matching ── */
   function parseEnglish(phrase) {
     const raw = phrase.trim().replace(/[.!]+$/, '');
     const isQuestion = raw.endsWith('?') || EN_QUESTION.has(raw.split(/\s+/)[0]?.toLowerCase());
-    const isImperative = /^[A-Z]/.test(raw) === false || raw.split(/\s+/).length <= 4;
     const words = raw.replace('?', '').split(/\s+/).map(w => w.toLowerCase());
 
     const parsed = {
@@ -408,18 +467,24 @@ const CompositionEngine = (() => {
       negated: false,
       tense: 'present',
       subject: null,
+      subjectPlural: false,
       verb: null,
+      isCopula: false,         // "X is Y" pattern
+      copulaComplement: null,  // the Y in "X is Y"
       object: null,
-      adjectives: [],   // { word, modifies: 'subject'|'object' }
-      determinerS: null, // article for subject
-      determinerO: null, // article for object
+      objectPlural: false,
+      adjectives: [],
+      determinerS: null,
+      determinerO: null,
+      possessor: null,         // possessive constructions
+      possessorDet: null,
+      possessivePerson: null,  // 'my', 'your', etc.
       preposition: null,
       prepObject: null,
       raw: words,
       person: '3s'
     };
 
-    // Detect question
     if (isQuestion) parsed.type = 'question';
 
     // Detect negation
@@ -427,104 +492,151 @@ const CompositionEngine = (() => {
       if (EN_NEGATION.has(w)) { parsed.negated = true; break; }
     }
 
-    // Filter out helper verbs and negation particles
-    const SKIP = new Set(['do','does','did','will','shall','not','don\'t','doesn\'t','didn\'t','can\'t','cannot','won\'t','is','are','am','was','were','be','been','being']);
-    // But track them for tense
+    // Detect tense from helpers
     if (words.includes('will') || words.includes('shall')) parsed.tense = 'future';
     if (words.includes('did') || words.includes('was') || words.includes('were')) parsed.tense = 'past';
 
-    // Build content word sequence, preserving order
+    // ── Check for possessive 's constructions ──
+    const poss = parsePossessive(words);
+
+    // ── Check for possessive determiner (my, your, his, etc.) ──
+    const possDetIdx = words.findIndex(w => EN_POSSESSIVES[w] !== undefined);
+
+    // ── Check for copula pattern: "X is/are Y" ──
+    const copulaIdx = words.findIndex(w => EN_COPULA.has(w));
+    const hasCopula = copulaIdx !== -1;
+
+    // Build content word sequence, filtering out helpers/negation/copula
+    const SKIP = new Set([...EN_HELPERS, ...EN_COPULA, ...EN_NEGATION]);
     const content = [];
     for (const w of words) {
-      if (SKIP.has(w) || EN_NEGATION.has(w)) continue;
+      if (SKIP.has(w)) continue;
       if (EN_QUESTION.has(w)) { parsed.type = 'question'; continue; }
       if (EN_CONJUNCTIONS.has(w)) continue;
       content.push(w);
     }
 
-    // Pattern match: [DET] [ADJ*] NOUN VERB [DET] [ADJ*] NOUN [PREP DET NOUN]
-    let i = 0;
-    const len = content.length;
+    let ci = 0;
+    const clen = content.length;
 
-    // Helper: consume a noun phrase (det? adj* noun)
+    // Helper: consume a noun phrase
     function consumeNP() {
-      let det = null, adjs = [], noun = null;
-      if (i < len && EN_DETERMINERS.has(content[i])) { det = content[i]; i++; }
+      let det = null, possAdj = null, adjs = [], noun = null, isPlural = false;
+      // Determiner or possessive adjective
+      if (ci < clen && EN_DETERMINERS.has(content[ci])) { det = content[ci]; ci++; }
+      else if (ci < clen && EN_POSSESSIVES[content[ci]] !== undefined) { possAdj = content[ci]; ci++; }
 
-      // Consume adjectives (words not in dict as nouns/verbs, or known adj POS)
-      while (i < len) {
-        const resolved = resolveWord(content[i]);
-        if (resolved.found && resolved.pos?.includes('adj')) {
-          adjs.push(content[i]);
-          i++;
-        } else {
-          break;
+      // Check for possessive 's inside this NP
+      if (ci < clen && content[ci].endsWith("'s")) {
+        const possWord = content[ci].replace(/'s$/i, '');
+        ci++;
+        // The rest of this NP is the owned thing
+        while (ci < clen) {
+          const r = resolveWord(content[ci]);
+          if (r.found && r.pos?.includes('adj')) { adjs.push(content[ci]); ci++; }
+          else break;
         }
+        if (ci < clen) { noun = content[ci]; ci++; }
+        isPlural = noun ? isEnglishPlural(noun) : false;
+        return { det, possAdj, adjs, noun, isPlural, possessorOf: possWord };
       }
 
+      // Adjectives
+      while (ci < clen) {
+        const r = resolveWord(content[ci]);
+        if (r.found && r.pos?.includes('adj')) { adjs.push(content[ci]); ci++; }
+        else break;
+      }
       // Noun
-      if (i < len) {
-        noun = content[i];
-        i++;
+      if (ci < clen && !EN_PREPOSITIONS.has(content[ci])) {
+        noun = content[ci];
+        isPlural = isEnglishPlural(noun);
+        ci++;
       }
-
-      return { det, adjs, noun };
+      return { det, possAdj, adjs, noun, isPlural, possessorOf: null };
     }
 
     // Detect imperative: starts with a verb
     const firstResolved = content.length > 0 ? resolveWord(content[0]) : null;
-    if (firstResolved && firstResolved.found && firstResolved.pos?.includes('verb') && !EN_PRONOUNS[content[0]]) {
+    if (firstResolved && firstResolved.found && firstResolved.pos?.includes('verb') && !EN_PRONOUNS[content[0]] && !hasCopula) {
       parsed.type = 'imperative';
       parsed.verb = content[0];
       parsed.tense = 'imperative';
-      i = 1;
-      // Rest is object
-      if (i < len) {
+      ci = 1;
+      if (ci < clen) {
         const np = consumeNP();
         parsed.determinerO = np.det;
+        parsed.possessivePerson = np.possAdj ? EN_POSSESSIVES[np.possAdj] : null;
         parsed.adjectives.push(...np.adjs.map(a => ({ word: a, modifies: 'object' })));
         parsed.object = np.noun;
+        parsed.objectPlural = np.isPlural;
+        if (np.possessorOf) { parsed.possessor = np.possessorOf; }
       }
     } else {
-      // Standard: Subject NP, then verb, then object NP
-      i = 0;
+      // Standard sentence: Subject NP, then verb/copula, then object/complement
+      ci = 0;
       const subjNP = consumeNP();
       parsed.determinerS = subjNP.det;
+      parsed.possessivePerson = subjNP.possAdj ? EN_POSSESSIVES[subjNP.possAdj] : null;
       parsed.adjectives.push(...subjNP.adjs.map(a => ({ word: a, modifies: 'subject' })));
       parsed.subject = subjNP.noun;
+      parsed.subjectPlural = subjNP.isPlural;
       parsed.person = detectPerson(parsed.subject || '');
+      if (subjNP.possessorOf) { parsed.possessor = subjNP.possessorOf; }
 
-      // Verb
-      if (i < len) {
-        // Detect tense from the verb form
-        const verbTense = detectTense(content[i], words);
-        if (parsed.tense === 'present') parsed.tense = verbTense;
-        parsed.verb = stemEnglish(content[i]);
-        i++;
-      }
-
-      // Object NP
-      if (i < len) {
-        // Check for preposition first
-        if (EN_PREPOSITIONS.has(content[i])) {
-          parsed.preposition = content[i];
-          i++;
-          const ppNP = consumeNP();
-          parsed.prepObject = ppNP.noun;
+      // Verb or copula
+      if (ci < clen) {
+        if (hasCopula && !firstResolved?.pos?.includes('verb')) {
+          // Copula: "X is Y"
+          parsed.isCopula = true;
+          parsed.verb = null;
+          // The rest is the complement
+          if (ci < clen) {
+            const compNP = consumeNP();
+            // Complement might be an adjective or a noun
+            if (compNP.noun) {
+              const compResolved = resolveWord(compNP.noun);
+              if (compResolved.found && compResolved.pos?.includes('adj')) {
+                parsed.adjectives.push({ word: compNP.noun, modifies: 'complement' });
+                parsed.copulaComplement = compNP.noun;
+              } else {
+                parsed.copulaComplement = compNP.noun;
+                parsed.determinerO = compNP.det;
+              }
+            }
+            parsed.adjectives.push(...compNP.adjs.map(a => ({ word: a, modifies: 'complement' })));
+          }
         } else {
-          const objNP = consumeNP();
-          parsed.determinerO = objNP.det;
-          parsed.adjectives.push(...objNP.adjs.map(a => ({ word: a, modifies: 'object' })));
-          parsed.object = objNP.noun;
+          // Regular verb
+          const verbTense = detectTense(content[ci] || '', words);
+          if (parsed.tense === 'present') parsed.tense = verbTense;
+          parsed.verb = stemEnglish(content[ci]);
+          ci++;
+
+          // Object NP
+          if (ci < clen) {
+            if (EN_PREPOSITIONS.has(content[ci])) {
+              parsed.preposition = content[ci]; ci++;
+              const ppNP = consumeNP();
+              parsed.prepObject = ppNP.noun;
+            } else {
+              const objNP = consumeNP();
+              parsed.determinerO = objNP.det;
+              parsed.adjectives.push(...objNP.adjs.map(a => ({ word: a, modifies: 'object' })));
+              parsed.object = objNP.noun;
+              parsed.objectPlural = objNP.isPlural;
+              if (objNP.possessorOf) { parsed.possessor = objNP.possessorOf; }
+              if (objNP.possAdj) { parsed.possessivePerson = EN_POSSESSIVES[objNP.possAdj]; }
+            }
+          }
         }
       }
 
       // Trailing prepositional phrase
-      if (i < len && EN_PREPOSITIONS.has(content[i])) {
-        parsed.preposition = content[i];
-        i++;
-        if (i < len && EN_DETERMINERS.has(content[i])) i++; // skip det
-        if (i < len) { parsed.prepObject = content[i]; i++; }
+      if (ci < clen && EN_PREPOSITIONS.has(content[ci])) {
+        parsed.preposition = content[ci]; ci++;
+        const ppNP = consumeNP();
+        parsed.prepObject = ppNP.noun;
       }
     }
 
@@ -533,21 +645,22 @@ const CompositionEngine = (() => {
 
   /* ── Elvish sentence assembly ── */
 
-  /* Map English prepositions to Elvish */
   const PREP_MAP = {
-    'in': 'mi', 'within': 'mi', 'on': 'or', 'upon': 'or', 'above': 'or',
+    'in': 'mi', 'within': 'mi', 'into': 'mi', 'on': 'or', 'upon': 'or', 'above': 'or', 'over': 'or',
     'to': 'an', 'toward': 'an', 'towards': 'an',
-    'from': 'ho', 'under': 'nu', 'beneath': 'nu', 'below': 'nu',
-    'near': 'ara', 'beside': 'ara', 'beyond': 'ava', 'past': 'ava',
+    'from': 'ho', 'after': 'ho', 'under': 'nu', 'beneath': 'nu', 'below': 'nu',
+    'near': 'ara', 'beside': 'ara', 'between': 'ara', 'among': 'ara',
+    'beyond': 'ava', 'past': 'ava', 'before': 'ava',
     'through': 'vin', 'across': 'vin', 'with': 'sai', 'without': 'ú',
-    'by': 'sai', 'for': 'an', 'at': 'mi'
+    'by': 'sai', 'for': 'an', 'at': 'mi', 'against': 'an', 'behind': 'nu'
   };
+
+  /* Map possessive person to Elvish suffix */
+  const POSS_SUFFIX = { '1s': 'nya', '2s': 'lya', '3s': 'rya', '1p': 'lva', '3p': 'ntya' };
 
   function constructPhrase(englishPhrase, register = 'formal') {
     const parsed = parseEnglish(englishPhrase);
-    const glossEntries = [];
     const notes = [];
-    const elvishParts = [];
 
     // Resolve all content words to Elvish
     const resolved = {
@@ -555,27 +668,74 @@ const CompositionEngine = (() => {
       verb: parsed.verb ? resolveWord(parsed.verb) : null,
       object: parsed.object ? resolveWord(parsed.object) : null,
       prepObj: parsed.prepObject ? resolveWord(parsed.prepObject) : null,
+      possessor: parsed.possessor ? resolveWord(parsed.possessor) : null,
+      complement: parsed.copulaComplement ? resolveWord(parsed.copulaComplement) : null,
       adjectives: parsed.adjectives.map(a => ({ ...a, resolved: resolveWord(a.word) }))
     };
 
     // Track unresolved words
-    [resolved.subject, resolved.verb, resolved.object, resolved.prepObj].forEach(r => {
+    [resolved.subject, resolved.verb, resolved.object, resolved.prepObj, resolved.possessor, resolved.complement].forEach(r => {
       if (r && !r.found) notes.push(`"${r.english}" has no dictionary entry yet`);
     });
+    resolved.adjectives.forEach(a => {
+      if (!a.resolved.found) notes.push(`"${a.resolved.english}" has no dictionary entry yet`);
+    });
+
+    // ── Apply Elvish plural to a noun ──
+    function applyPlural(elvishWord, isPlural) {
+      if (!isPlural) return elvishWord;
+      const pluralized = ME().pluralize(elvishWord, 'standard');
+      notes.push(`"${elvishWord}" pluralized to "${pluralized}"`);
+      return pluralized;
+    }
+
+    // ── Apply possessive suffix ──
+    function applyPossessive(elvishNoun, person) {
+      if (!person) return elvishNoun;
+      const suffix = POSS_SUFFIX[person];
+      if (!suffix) return elvishNoun;
+      const form = ME().possessive(elvishNoun, person);
+      notes.push(`"${elvishNoun}" with possessive suffix -${suffix} (${person})`);
+      return form;
+    }
 
     // ── Build subject noun phrase ──
     function buildSubjectNP() {
       const parts = [];
+
+      // Possessive construction: "the king's X" = "X aranya" (genitive or possessive)
+      if (parsed.possessor && resolved.possessor && !parsed.object) {
+        // This is "possessor's subject" pattern
+        // In Elvish: subject + possessor-genitive
+        // Handle below in assembly
+      }
+
       // Determiner
-      if (parsed.determinerS === 'the') {
+      if (parsed.possessivePerson && !parsed.possessor) {
+        // "my/your/his X" -> no article, possessive suffix on noun
+      } else if (parsed.determinerS === 'the') {
         parts.push({ elvish: 'i', english: 'the', gloss: 'DEF' });
       } else if (parsed.determinerS === 'a' || parsed.determinerS === 'an') {
         parts.push({ elvish: 'na', english: parsed.determinerS, gloss: 'INDEF' });
       }
-      // Subject noun (nominative, unmarked)
+
+      // Subject noun (nominative, unmarked, but handle plural and possessive)
       if (resolved.subject) {
-        parts.push({ elvish: resolved.subject.elvish, english: parsed.subject, gloss: 'NOM' });
+        let nounForm = resolved.subject.elvish;
+        nounForm = applyPlural(nounForm, parsed.subjectPlural);
+        if (parsed.possessivePerson && !parsed.possessor) {
+          nounForm = applyPossessive(nounForm, parsed.possessivePerson);
+        }
+        parts.push({ elvish: nounForm, english: parsed.subject, gloss: parsed.subjectPlural ? 'NOM.PL' : 'NOM' });
       }
+
+      // Possessor in genitive
+      if (parsed.possessor && resolved.possessor && !parsed.object) {
+        const genForm = ME().declineNoun(resolved.possessor.elvish, 'genitive');
+        parts.push({ elvish: genForm, english: parsed.possessor + "'s", gloss: 'GEN' });
+        notes.push(`"${resolved.possessor.elvish}" in genitive form "${genForm}" (possession)`);
+      }
+
       // Subject adjectives (after noun in Elvish)
       for (const adj of resolved.adjectives.filter(a => a.modifies === 'subject')) {
         parts.push({ elvish: adj.resolved.elvish, english: adj.word, gloss: 'ADJ' });
@@ -586,20 +746,36 @@ const CompositionEngine = (() => {
     // ── Build object noun phrase (accusative case) ──
     function buildObjectNP() {
       const parts = [];
+      if (!resolved.object) return parts;
+
       if (parsed.determinerO === 'the') {
         parts.push({ elvish: 'i', english: 'the', gloss: 'DEF' });
       } else if (parsed.determinerO === 'a' || parsed.determinerO === 'an') {
         parts.push({ elvish: 'na', english: parsed.determinerO, gloss: 'INDEF' });
       }
-      // Object noun with accusative -a
-      if (resolved.object) {
-        const objElvish = resolved.object.elvish;
-        const accusative = ME().declineNoun(objElvish, 'accusative');
-        parts.push({ elvish: accusative, english: parsed.object, gloss: 'ACC' });
-        if (accusative !== objElvish) {
-          notes.push(`"${objElvish}" takes accusative form "${accusative}" as direct object`);
-        }
+
+      let nounForm = resolved.object.elvish;
+      nounForm = applyPlural(nounForm, parsed.objectPlural);
+
+      // Apply possessive if "verb my/his X"
+      if (parsed.possessivePerson && parsed.object) {
+        nounForm = applyPossessive(nounForm, parsed.possessivePerson);
       }
+
+      // Accusative case
+      const accusative = ME().declineNoun(nounForm, 'accusative');
+      parts.push({ elvish: accusative, english: parsed.object, gloss: parsed.objectPlural ? 'ACC.PL' : 'ACC' });
+      if (accusative !== nounForm) {
+        notes.push(`"${nounForm}" takes accusative form "${accusative}" as direct object`);
+      }
+
+      // Possessor in genitive (if "verb the king's sword")
+      if (parsed.possessor && resolved.possessor && parsed.object) {
+        const genForm = ME().declineNoun(resolved.possessor.elvish, 'genitive');
+        parts.push({ elvish: genForm, english: parsed.possessor + "'s", gloss: 'GEN' });
+        notes.push(`"${resolved.possessor.elvish}" in genitive form "${genForm}" (possession)`);
+      }
+
       // Object adjectives
       for (const adj of resolved.adjectives.filter(a => a.modifies === 'object')) {
         parts.push({ elvish: adj.resolved.elvish, english: adj.word, gloss: 'ADJ' });
@@ -612,7 +788,6 @@ const CompositionEngine = (() => {
       if (!resolved.verb) return [];
       const verbElvish = resolved.verb.elvish;
 
-      // Get verb stem (strip trailing vowel if present for conjugation)
       let stem = verbElvish;
       if (resolved.verb.entry?.pos?.includes('verb')) {
         stem = verbElvish.replace(/[aeiouë]$/, '') || verbElvish;
@@ -633,6 +808,27 @@ const CompositionEngine = (() => {
       return parts;
     }
 
+    // ── Build copula construction ──
+    function buildCopula() {
+      const parts = [];
+      // In Elvish: "X ná Y" or "X Y ná" (SOV)
+      const copulaForm = parsed.negated ? 'úná' : 'ná';
+      const copulaGloss = parsed.negated ? 'COP.NEG' : 'COP';
+
+      // Complement (predicate noun or adjective)
+      if (resolved.complement) {
+        parts.push({ elvish: resolved.complement.elvish, english: parsed.copulaComplement, gloss: 'PRED' });
+      }
+      for (const adj of resolved.adjectives.filter(a => a.modifies === 'complement')) {
+        parts.push({ elvish: adj.resolved.elvish, english: adj.word, gloss: 'PRED.ADJ' });
+      }
+
+      parts.push({ elvish: copulaForm, english: parsed.negated ? 'is not' : 'is', gloss: copulaGloss });
+      notes.push(`Copula "ná" (to be/exist)${parsed.negated ? ' negated to "úná"' : ''} used for "X is Y" construction`);
+
+      return parts;
+    }
+
     // ── Build prepositional phrase ──
     function buildPP() {
       if (!parsed.preposition) return [];
@@ -640,39 +836,49 @@ const CompositionEngine = (() => {
       const elvPrep = PREP_MAP[parsed.preposition] || parsed.preposition;
       parts.push({ elvish: elvPrep, english: parsed.preposition, gloss: 'PREP' });
       if (resolved.prepObj) {
-        parts.push({ elvish: resolved.prepObj.elvish, english: parsed.prepObject, gloss: 'N' });
+        let ppNoun = resolved.prepObj.elvish;
+        parts.push({ elvish: ppNoun, english: parsed.prepObject, gloss: 'N' });
       }
       return parts;
     }
 
     // ── Assemble in correct word order ──
     const subj = buildSubjectNP();
-    const verb = buildVerb();
     const obj = buildObjectNP();
     const pp = buildPP();
+    let verb, ordered;
 
-    let ordered = [];
-    if (parsed.type === 'imperative') {
-      // Imperative: VERB [OBJECT] [PP]
-      ordered = [...verb, ...obj, ...pp];
-      notes.push('Imperative: verb-first command form');
-    } else if (register === 'casual') {
-      // VSO
-      ordered = [...verb, ...subj, ...obj, ...pp];
-      notes.push('Casual register: VSO word order');
-    } else if (register === 'formal' || register === 'military' || register === 'sacred') {
-      // SOV
-      ordered = [...subj, ...obj, ...verb, ...pp];
-      notes.push(`${register.charAt(0).toUpperCase() + register.slice(1)} register: SOV word order`);
-    } else if (register === 'poetic') {
-      // Free order, but default to SVO for readability
-      ordered = [...subj, ...verb, ...obj, ...pp];
-      notes.push('Poetic register: free word order (shown as SVO)');
+    if (parsed.isCopula) {
+      // Copula sentence: "X is Y"
+      const cop = buildCopula();
+      if (register === 'casual') {
+        // VSO-ish: ná X Y
+        ordered = [...cop, ...subj, ...pp];
+      } else {
+        // SOV: X Y ná
+        ordered = [...subj, ...cop, ...pp];
+      }
+      notes.push(`${register.charAt(0).toUpperCase() + register.slice(1)} register: copula construction`);
     } else {
-      ordered = [...verb, ...subj, ...obj, ...pp];
+      verb = buildVerb();
+
+      if (parsed.type === 'imperative') {
+        ordered = [...verb, ...obj, ...pp];
+        notes.push('Imperative: verb-first command form');
+      } else if (register === 'casual') {
+        ordered = [...verb, ...subj, ...obj, ...pp];
+        notes.push('Casual register: VSO word order');
+      } else if (register === 'formal' || register === 'military' || register === 'sacred') {
+        ordered = [...subj, ...obj, ...verb, ...pp];
+        notes.push(`${register.charAt(0).toUpperCase() + register.slice(1)} register: SOV word order`);
+      } else if (register === 'poetic') {
+        ordered = [...subj, ...verb, ...obj, ...pp];
+        notes.push('Poetic register: free word order (shown as SVO)');
+      } else {
+        ordered = [...verb, ...subj, ...obj, ...pp];
+      }
     }
 
-    // Build final output
     const elvishSentence = ordered.map(p => p.elvish).join(' ');
 
     return {
@@ -680,7 +886,7 @@ const CompositionEngine = (() => {
       elvish: elvishSentence,
       register,
       parsedType: parsed.type,
-      tense: parsed.tense,
+      tense: parsed.isCopula ? 'copula' : parsed.tense,
       person: parsed.person,
       negated: parsed.negated,
       gloss: ordered,
