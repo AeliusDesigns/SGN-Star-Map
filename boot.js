@@ -327,17 +327,17 @@
 
     const lines = [
       { prefix: '[SYS]',  text: `Establishing link to AEN Command Network`,      cursor: true },
-      { prefix: '[NET]',  text: `Connection secured \u00b7 Encryption: <span class="boot-cyan">VARDALUM-7</span>`, ok: true },
+      { prefix: '[NET]',  text: `Connection secured \u00b7 Encryption: <span class="boot-cyan">VALARINDË AUTHORITY</span>`, ok: true },
       { prefix: '[AUTH]', text: `Authenticating terminal credentials`,            cursor: true },
       { prefix: '[AUTH]', text: `Clearance verified \u00b7 Tier: <span class="boot-gold">COMMAND</span>`, ok: true },
       { prefix: '[SYNC]', text: `Synchronizing datacore \u00b7 ${syncStr}`,      cursor: true },
       { prefix: '[SYNC]', text: `Datacore online`,                                ok: true },
       { prefix: '[TIME]', text: `Anorvalas Standard: <span class="boot-gold">${sd.dateStr} \u00b7 ${sd.monthName.toUpperCase()}</span>` },
-      { prefix: '',       text: `<span class="boot-ready">SGN TERMINAL READY</span> <span class="boot-ok">\u00b7 ALL SYSTEMS NOMINAL \u00b7</span> <span class="boot-dim">Alcar i Arandor\u00eb</span>` },
+      { prefix: '',       text: `<span class="boot-ready">AEN TERMINAL READY</span> <span class="boot-ok">\u00b7 ALL SYSTEMS NOMINAL \u00b7</span> <span class="boot-dim">Alcar i Arandor\u00eb</span>` },
     ];
 
     overlay.innerHTML = `
-      <div class="boot-watermark">SGN</div>
+      <div class="boot-watermark">AEN</div>
       <div class="boot-console" id="boot-console">
         ${lines.map((l, i) => `
           <div class="boot-line" data-idx="${i}">
