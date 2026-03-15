@@ -204,11 +204,30 @@ document.getElementById('search').addEventListener('input', () => renderList());
 document.getElementById('btn-new').addEventListener('click', () => { if (!requireEditor()) return; editRecord(null); });
 
 /* ── Save to repo ── */
-document.getElementById('btn-save-repo').addEventListener('click', () => {
+document.getElementById('btn-save-repo').addEventListener('click', async () => {
   if (!requireEditor()) return;
-  const blob = new Blob([JSON.stringify(personnel, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'personnel.json'; a.click(); URL.revokeObjectURL(a.href);
-  toast('personnel.json downloaded');
+
+  await SGNGitHub.loadConfig();
+  if (!SGNGitHub.isAvailable()) {
+    toast('GitHub credentials not found in editor.json');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-repo');
+  const origText = btn.textContent;
+  btn.textContent = 'SAVING...';
+  btn.disabled = true;
+
+  try {
+    await SGNGitHub.commitFile('personnel.json', JSON.stringify(personnel, null, 2), 'Personnel: update personnel.json');
+    toast('personnel.json committed to GitHub');
+  } catch (err) {
+    console.error('GitHub save failed:', err);
+    toast('Save failed: ' + err.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 });
 
 /* ══════════════════════════════════════════

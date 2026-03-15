@@ -434,11 +434,30 @@ document.getElementById('btn-new').addEventListener('click', () => {
   showNewEntryPicker();
 });
 
-document.getElementById('btn-save-repo').addEventListener('click', () => {
+document.getElementById('btn-save-repo').addEventListener('click', async () => {
   if (!requireEditor()) return;
-  const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'codex.json'; a.click(); URL.revokeObjectURL(a.href);
-  toast('codex.json downloaded — drop it in your repo');
+
+  await SGNGitHub.loadConfig();
+  if (!SGNGitHub.isAvailable()) {
+    toast('GitHub credentials not found in editor.json');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-repo');
+  const origText = btn.textContent;
+  btn.textContent = 'SAVING...';
+  btn.disabled = true;
+
+  try {
+    await SGNGitHub.commitFile('codex.json', JSON.stringify(entries, null, 2), 'Codex: update codex.json');
+    toast('codex.json committed to GitHub');
+  } catch (err) {
+    console.error('GitHub save failed:', err);
+    toast('Save failed: ' + err.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 });
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -973,6 +992,7 @@ function statRow(key, val, idx) {
   updateCount();
 })();
 </script>
+<script src="./github-save.js"></script>
 <script src="./boot.js"></script>
 <script src="./search.js"></script>
 <script src="./stardate.js"></script>

@@ -838,21 +838,36 @@ function initEvents() {
   });
 
   // Save to repo
-  document.getElementById('sb-save-repo').addEventListener('click', () => {
+  document.getElementById('sb-save-repo').addEventListener('click', async () => {
     if (!requireEditor()) return;
-    // Build full language JSON for export
-    const exportData = JSON.parse(JSON.stringify(langData || {}));
-    exportData.dictionary = exportData.dictionary || {};
-    exportData.dictionary.entries = entries;
-    exportData.dictionary.totalEntries = entries.length;
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'arandori-language.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    toast('arandori-language.json downloaded');
+    await SGNGitHub.loadConfig();
+    if (!SGNGitHub.isAvailable()) {
+      toast('GitHub credentials not found in editor.json');
+      return;
+    }
+
+    const btn = document.getElementById('sb-save-repo');
+    const origText = btn.textContent;
+    btn.textContent = 'SAVING...';
+    btn.disabled = true;
+
+    try {
+      // Build full language JSON for export
+      const exportData = JSON.parse(JSON.stringify(langData || {}));
+      exportData.dictionary = exportData.dictionary || {};
+      exportData.dictionary.entries = entries;
+      exportData.dictionary.totalEntries = entries.length;
+
+      await SGNGitHub.commitFile('arandori-language.json', JSON.stringify(exportData, null, 2), 'Language: update arandori-language.json');
+      toast('arandori-language.json committed to GitHub');
+    } catch (err) {
+      console.error('GitHub save failed:', err);
+      toast('Save failed: ' + err.message);
+    } finally {
+      btn.textContent = origText;
+      btn.disabled = false;
+    }
   });
 
   // Keyboard shortcut: / handled by global search.js

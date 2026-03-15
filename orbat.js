@@ -94,9 +94,30 @@ document.getElementById('btn-new').addEventListener('click',()=>{
   const orbat={id:genId(),name:name.trim(),root:{id:fmId(),type:'fleet',name:name.trim(),commander:'',rankTitle:'',ships:[],children:[]},updated:Date.now()};
   orbats.push(orbat);save();activeId=orbat.id;renderList();renderTree();toast('ORBAT created');
 });
-document.getElementById('btn-save-repo').addEventListener('click',()=>{
-  if(!requireEditor())return;const blob=new Blob([JSON.stringify(orbats,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='orbat.json';a.click();URL.revokeObjectURL(a.href);toast('orbat.json downloaded');
+document.getElementById('btn-save-repo').addEventListener('click', async () => {
+  if(!requireEditor())return;
+
+  await SGNGitHub.loadConfig();
+  if (!SGNGitHub.isAvailable()) {
+    toast('GitHub credentials not found in editor.json');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-repo');
+  const origText = btn.textContent;
+  btn.textContent = 'SAVING...';
+  btn.disabled = true;
+
+  try {
+    await SGNGitHub.commitFile('orbat.json', JSON.stringify(orbats, null, 2), 'ORBAT: update orbat.json');
+    toast('orbat.json committed to GitHub');
+  } catch (err) {
+    console.error('GitHub save failed:', err);
+    toast('Save failed: ' + err.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 });
 
 /* ══════════════════════════════════════════

@@ -741,36 +741,51 @@ document.getElementById('sp-gen').onclick    = async () => {
 document.getElementById('sp-exp').onclick    = () => { if (selectedId && requireEditor()) exportSystemDetails(selectedId); };
 document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
 
-document.getElementById('sb-save-repo').onclick = () => {
+document.getElementById('sb-save-repo').onclick = async () => {
   if (!requireEditor()) return;
 
-  /* systems.json — map nodes + lanes */
-  const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
-  const sysBlob = new Blob([JSON.stringify({ image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut }, null, 2)], { type:'application/json' });
-  const a1 = document.createElement('a');
-  a1.href = URL.createObjectURL(sysBlob);
-  a1.download = 'systems.json';
-  a1.click();
-  URL.revokeObjectURL(a1.href);
-
-  /* solar_systems.json — all star/planet/body compositions */
-  const solarData = {};
-  for (const sys of systems) {
-    const det = getCachedSystem(sys.id);
-    if (det) solarData[sys.id] = det;
+  /* Check if GitHub save is available */
+  await SGNGitHub.loadConfig();
+  if (!SGNGitHub.isAvailable()) {
+    toast('GitHub credentials not found in editor.json');
+    return;
   }
-  const solBlob = new Blob([JSON.stringify(solarData, null, 2)], { type:'application/json' });
-  const a2 = document.createElement('a');
-  a2.href = URL.createObjectURL(solBlob);
-  a2.download = 'solar_systems.json';
-  setTimeout(() => { a2.click(); URL.revokeObjectURL(a2.href); }, 300);
 
-  /* fleets.json */
-  const fBlob = new Blob([JSON.stringify(fleets, null, 2)], { type:'application/json' });
-  const a3 = document.createElement('a');
-  a3.href = URL.createObjectURL(fBlob);
-  a3.download = 'fleets.json';
-  setTimeout(() => { a3.click(); URL.revokeObjectURL(a3.href); }, 600);
+  const btn = document.getElementById('sb-save-repo');
+  const origText = btn.textContent;
+  btn.textContent = 'SAVING...';
+  btn.disabled = true;
+
+  try {
+    /* systems.json */
+    const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
+    const sysContent = JSON.stringify({ image_size:{width:imgW,height:imgH}, systems, lanes:lanesOut }, null, 2);
+
+    /* solar_systems.json */
+    const solarData = {};
+    for (const sys of systems) {
+      const det = getCachedSystem(sys.id);
+      if (det) solarData[sys.id] = det;
+    }
+    const solContent = JSON.stringify(solarData, null, 2);
+
+    /* fleets.json */
+    const flContent = JSON.stringify(fleets, null, 2);
+
+    await SGNGitHub.commitFiles([
+      { path: 'systems.json',       content: sysContent },
+      { path: 'solar_systems.json', content: solContent },
+      { path: 'fleets.json',        content: flContent }
+    ], 'Star Chart');
+
+    toast('Committed to GitHub: systems, solar_systems, fleets');
+  } catch (err) {
+    console.error('GitHub save failed:', err);
+    toast('Save failed: ' + err.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 };
 
 canvas.addEventListener('dblclick', async e => {
