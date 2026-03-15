@@ -877,4 +877,17 @@ function switchTab(tabId) {
   renderWordList();
   updateCounts();
   initEvents();
+
+  // Register deep-link handler for global search navigation
+  if (window.SGNSearch && SGNSearch.onDeepLink) {
+    SGNSearch.onDeepLink(function(params) {
+      if (params.word) {
+        const target = entries.find(e => e.word.toLowerCase() === params.word.toLowerCase());
+        if (target) { switchTab('dictionary'); viewEntry(target.id); }
+      } else if (params.phrase) {
+        switchTab('phrases');
+        renderPhrases();
+      }
+    });
+  }
 })();
