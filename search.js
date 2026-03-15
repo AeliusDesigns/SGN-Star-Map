@@ -1,13 +1,12 @@
 /* ══════════════════════════════════════════════════════════════
    SGN — GLOBAL SEARCH OVERLAY
    Press "/" from any page to open. Searches across all data stores.
-   Reads localStorage first, falls back to repo JSON files.
+   Deep-links into the target page via URL hash + onDeepLink API.
    ══════════════════════════════════════════════════════════════ */
 
 (function () {
   'use strict';
 
-  /* ── Data source keys (localStorage) + file fallbacks ── */
   const SOURCES = {
     map:       { lsKey: 'sgn_map_state_v1', file: './systems.json' },
     fleets:    { lsKey: 'sgn_fleets_v1',    file: './fleets.json' },
@@ -17,7 +16,6 @@
     language:  { lsKey: 'sgn_language_v1',   file: './arandori-language.json' }
   };
 
-  /* ── Category meta ── */
   const CATEGORIES = {
     systems:   { label: 'SYSTEMS',   icon: '✦', cls: 'system',    page: 'Star Chart',  href: './index.html' },
     orbat:     { label: 'ORBAT',     icon: '⟐', cls: 'orbat',     page: 'ORBAT',       href: './orbat.html' },
@@ -29,23 +27,6 @@
 
   const FILTER_ORDER = ['all', 'systems', 'codex', 'personnel', 'orbat', 'fleets', 'language'];
 
-  /* ── Fetch helper: localStorage first, then JSON file ── */
-  async function loadSource(key) {
-    const src = SOURCES[key];
-    /* try localStorage */
-    try {
-      const raw = localStorage.getItem(src.lsKey);
-      if (raw) { const d = JSON.parse(raw); if (d && (Array.isArray(d) ? d.length : Object.keys(d).length)) return d; }
-    } catch {}
-    /* fallback: fetch JSON file */
-    try {
-      const r = await fetch(src.file, { cache: 'no-store' });
-      if (r.ok) return await r.json();
-    } catch {}
-    return null;
-  }
-
-  /* ── Build overlay DOM ── */
   function buildOverlay() {
     const overlay = document.createElement('div');
     overlay.id = 'sgn-search-overlay';
@@ -67,7 +48,6 @@
     return overlay;
   }
 
-  /* ── Inject styles ── */
   function injectStyles() {
     if (document.getElementById('sgn-search-styles')) return;
     const style = document.createElement('style');
@@ -122,7 +102,6 @@
     document.head.appendChild(style);
   }
 
-  /* ── Highlight query in text ── */
   function highlight(text, query) {
     if (!query || !text) return escHtml(text || '');
     const esc = escHtml(text);
@@ -132,209 +111,38 @@
   function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
   function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-  /* ══════════════════════════════════════════
-     ASYNC DATA GATHERING
-     localStorage first → JSON file fallback
-     ══════════════════════════════════════════ */
-
-  /* Cache fetched file data so we don't re-fetch on every keystroke */
-  const _fileCache = {};
-
-  async function loadSourceData(key) {
-    const src = SOURCES[key];
-    /* try localStorage first */
-    try {
-      const raw = localStorage.getItem(src.lsKey);
-      if (raw) {
-        const d = JSON.parse(raw);
-        const hasData = Array.isArray(d) ? d.length > 0 : (d && Object.keys(d).length > 0);
-        if (hasData) return d;
-      }
-    } catch {}
-    /* fallback: check cache, then fetch file */
-    if (_fileCache[key] !== undefined) return _fileCache[key];
-    try {
-      const r = await fetch(src.file, { cache: 'no-store' });
-      if (r.ok) { const d = await r.json(); _fileCache[key] = d; return d; }
-    } catch {}
-    _fileCache[key] = null;
-    return null;
-  }
-
-  async function gatherData() {
-    const results = { systems: [], fleets: [], orbat: [], personnel: [], codex: [], language: [] };
-
-    /* Systems */
-    const mapData = await loadSourceData('map');
-    if (mapData) {
-      (mapData.systems || []).forEach(s => {
-        results.systems.push({
-          name: s.name || s.id,
-          meta: `${s.id}${s.owner ? ' · Owner: ' + s.owner : ''}${s.tags?.length ? ' · ' + s.tags.join(', ') : ''}`,
-          href: './index.html',
-          searchText: [s.name, s.id, s.owner, ...(s.tags || []), s.notes].filter(Boolean).join(' ')
-        });
-      });
-    }
-
-    /* Fleets */
-    const fleetData = await loadSourceData('fleets');
-    if (fleetData) {
-      (Array.isArray(fleetData) ? fleetData : []).forEach(f => {
-        const shipCount = (f.ships || []).reduce((s, sh) => s + (sh.qty || 0), 0);
-        results.fleets.push({
-          name: f.name || 'Unnamed Fleet',
-          meta: `${f.status || 'Stationed'} · ${shipCount} ships${f.captain ? ' · ' + f.captain : ''}`,
-          href: './index.html',
-          searchText: [f.name, f.captain, f.designation, f.status, f.notes, ...(f.ships || []).map(s => s.className)].filter(Boolean).join(' ')
-        });
-      });
-    }
-
-    /* ORBAT */
-    const orbatData = await loadSourceData('orbat');
-    if (orbatData) {
-      (Array.isArray(orbatData) ? orbatData : []).forEach(ob => {
-        function walkNodes(node, path) {
-          if (!node) return;
-          results.orbat.push({
-            name: node.name || 'Formation',
-            meta: `${node.type || 'formation'}${node.commander ? ' · ' + node.commander : ''}${path ? ' · ' + path : ''}`,
-            icon: node.type === 'battlegroup' ? '▣' : '⟐',
-            href: './orbat.html',
-            searchText: [node.name, node.type, node.commander, node.rankTitle, ...(node.ships || []).map(s => s.name)].filter(Boolean).join(' ')
-          });
-          (node.children || []).forEach(c => walkNodes(c, node.name));
-        }
-        walkNodes(ob.root, '');
-      });
-    }
-
-    /* Personnel */
-    const persData = await loadSourceData('personnel');
-    if (persData) {
-      (Array.isArray(persData) ? persData : []).forEach(p => {
-        results.personnel.push({
-          name: p.name || 'Unknown',
-          meta: `${p.rankTitle || p.rank || ''} · ${p.branch || 'Navy'} · ${p.status || 'Active'}${p.posting ? ' · ' + p.posting : ''}`,
-          href: './personnel.html',
-          searchText: [p.name, p.rank, p.rankTitle, p.branch, p.posting, p.system, p.command, p.faction, p.bio, ...(p.tags || [])].filter(Boolean).join(' ')
-        });
-      });
-    }
-
-    /* Codex */
-    const codexData = await loadSourceData('codex');
-    if (codexData) {
-      (Array.isArray(codexData) ? codexData : []).forEach(e => {
-        results.codex.push({
-          name: e.title || 'Untitled',
-          meta: `${e.category || 'Entry'}${e.designation ? ' · ' + e.designation : ''}`,
-          href: './wiki.html',
-          searchText: [e.title, e.category, e.designation, e.classification, e.role, e.body?.replace(/<[^>]+>/g, '')].filter(Boolean).join(' ')
-        });
-      });
-    }
-
-    /* Language (Eldarindëva dictionary) */
-    const langData = await loadSourceData('language');
-    if (langData) {
-      /* The language file has a nested structure: langData.dictionary.entries[]
-         or localStorage may store { entries: [] } */
-      let langEntries = [];
-      if (langData.dictionary && langData.dictionary.entries) {
-        langEntries = langData.dictionary.entries;
-      } else if (langData.entries) {
-        langEntries = langData.entries;
-      } else if (Array.isArray(langData)) {
-        langEntries = langData;
-      }
-      langEntries.forEach(e => {
-        const defs = (e.definitions || []).join(', ');
-        const tags = (e.tags || []).join(', ');
-        results.language.push({
-          name: e.word || 'Unknown',
-          meta: `${e.ipa || ''} · ${e.pos || ''} · ${defs}`,
-          href: './language.html',
-          searchText: [e.word, defs, e.pos, e.etymology, tags, e.ipa].filter(Boolean).join(' ')
-        });
-      });
-      /* Also index common phrases */
-      const phrases = langData.dictionary?.commonPhrases || [];
-      phrases.forEach(p => {
-        results.language.push({
-          name: p.elvish || '',
-          meta: `Phrase · ${p.meaning || ''}`,
-          href: './language.html',
-          searchText: [p.elvish, p.literal, p.meaning].filter(Boolean).join(' ')
-        });
-      });
-    }
-
-    return results;
-  }
-
-  /* ── Render results (async) ── */
-  let _renderSeq = 0; // prevent stale renders from slow fetches
+  let _renderSeq = 0;
 
   async function renderResults(container, query, activeFilter) {
     const seq = ++_renderSeq;
-
-    if (!query || query.length < 1) {
-      container.innerHTML = '<div class="gs-empty">// TYPE TO SEARCH ACROSS ALL SGN DATA</div>';
-      return;
-    }
-
+    if (!query || query.length < 1) { container.innerHTML = '<div class="gs-empty">// TYPE TO SEARCH ACROSS ALL SGN DATA</div>'; return; }
     container.innerHTML = '<div class="gs-loading">// SCANNING DATA STORES…</div>';
-
     const data = await gatherData();
-    if (seq !== _renderSeq) return; // superseded by newer input
-
+    if (seq !== _renderSeq) return;
     const q = query.toLowerCase();
     let totalResults = 0;
     let html = '';
-
-    const categoriesToSearch = activeFilter === 'all'
-      ? Object.keys(CATEGORIES)
-      : [activeFilter];
-
+    const categoriesToSearch = activeFilter === 'all' ? Object.keys(CATEGORIES) : [activeFilter];
     for (const catKey of categoriesToSearch) {
       const cat = CATEGORIES[catKey];
       const items = data[catKey] || [];
       const matches = items.filter(item => item.searchText.toLowerCase().includes(q));
       if (!matches.length) continue;
       totalResults += matches.length;
-
-      html += `<div class="gs-group">`;
-      html += `<div class="gs-group-header">${cat.label} <span class="gs-group-count">${matches.length} result${matches.length !== 1 ? 's' : ''}</span></div>`;
-
+      html += `<div class="gs-group"><div class="gs-group-header">${cat.label} <span class="gs-group-count">${matches.length} result${matches.length !== 1 ? 's' : ''}</span></div>`;
       matches.slice(0, 10).forEach(item => {
-        const icon = item.icon || cat.icon;
-        html += `
-          <a class="gs-item ${cat.cls}" href="${item.href}" data-search-nav>
-            <div class="gs-item-icon ${cat.cls}">${icon}</div>
-            <div class="gs-item-info">
-              <div class="gs-item-name">${highlight(item.name, query)}</div>
-              <div class="gs-item-meta">${escHtml(item.meta)}</div>
-            </div>
-            <span class="gs-item-page">${cat.page}</span>
-          </a>`;
+        html += `<a class="gs-item ${cat.cls}" href="${item.href}" data-search-nav>
+            <div class="gs-item-icon ${cat.cls}">${item.icon || cat.icon}</div>
+            <div class="gs-item-info"><div class="gs-item-name">${highlight(item.name, query)}</div><div class="gs-item-meta">${escHtml(item.meta)}</div></div>
+            <span class="gs-item-page">${cat.page}</span></a>`;
       });
-
-      if (matches.length > 10) {
-        html += `<div class="gs-empty" style="padding:8px;">… and ${matches.length - 10} more</div>`;
-      }
+      if (matches.length > 10) html += `<div class="gs-empty" style="padding:8px;">… and ${matches.length - 10} more</div>`;
       html += `</div>`;
     }
-
-    if (!totalResults) {
-      html = `<div class="gs-empty">// NO RESULTS FOR "${escHtml(query.toUpperCase())}"</div>`;
-    }
-
+    if (!totalResults) html = `<div class="gs-empty">// NO RESULTS FOR "${escHtml(query.toUpperCase())}"</div>`;
     container.innerHTML = html;
   }
 
-  /* ── Init ── */
   let overlay = null;
   let activeFilter = 'all';
 
@@ -346,11 +154,10 @@
     bar.focus();
     renderResults(overlay.querySelector('#gs-results'), '', activeFilter);
   }
-
   function close() { if (overlay) overlay.classList.remove('open'); }
   function isOpen() { return overlay && overlay.classList.contains('open'); }
 
-  /* ── Event delegation ── */
+  /* ── Keyboard ── */
   document.addEventListener('keydown', e => {
     const tag = document.activeElement?.tagName;
     const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable;
@@ -369,21 +176,63 @@
     renderResults(overlay.querySelector('#gs-results'), query, activeFilter);
   });
 
-  /* Debounced search input */
   let _debounce = null;
   document.addEventListener('input', e => {
     if (!isOpen() || !e.target.classList.contains('gs-bar')) return;
     clearTimeout(_debounce);
     _debounce = setTimeout(() => {
-      const query = e.target.value.trim();
-      renderResults(overlay.querySelector('#gs-results'), query, activeFilter);
+      renderResults(overlay.querySelector('#gs-results'), e.target.value.trim(), activeFilter);
     }, 120);
   });
 
+  /* ── Navigation: same-page deep link or cross-page ── */
   document.addEventListener('click', e => {
     const item = e.target.closest('[data-search-nav]');
-    if (item && isOpen()) close();
+    if (!item || !isOpen()) return;
+    close();
+    const href = item.getAttribute('href');
+    if (!href) return;
+    const hashIdx = href.indexOf('#');
+    if (hashIdx < 0) return; /* no hash, normal nav */
+    const pagePart = href.slice(0, hashIdx);
+    const hashPart = href.slice(hashIdx + 1);
+    const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+    const targetPage = pagePart.replace('./', '') || 'index.html';
+    if (targetPage === currentPage) {
+      e.preventDefault();
+      window.location.hash = '#' + hashPart;
+      handleDeepLink();
+    }
   });
 
-  window.SGNSearch = { open, close, isOpen };
+  /* ══════════════════════════════════════════
+     DEEP LINK API
+     ══════════════════════════════════════════ */
+
+  let _deepLinkHandler = null;
+
+  function parseHash() {
+    const hash = window.location.hash;
+    if (!hash || hash.length < 2) return null;
+    const params = {};
+    hash.slice(1).split('&').forEach(p => {
+      const eq = p.indexOf('=');
+      if (eq > 0) params[p.slice(0, eq)] = decodeURIComponent(p.slice(eq + 1));
+    });
+    return Object.keys(params).length ? params : null;
+  }
+
+  function handleDeepLink() {
+    const params = parseHash();
+    if (!params || !_deepLinkHandler) return;
+    _deepLinkHandler(params);
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+
+  function onDeepLink(fn) {
+    _deepLinkHandler = fn;
+    if (window.location.hash) setTimeout(handleDeepLink, 150);
+  }
+
+  window.SGNSearch = { open, close, isOpen, onDeepLink, handleDeepLink };
 })();

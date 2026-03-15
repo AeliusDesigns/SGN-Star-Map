@@ -600,4 +600,14 @@ function editRecord(id) {
   await load();
   renderList();
   updateCount();
+
+  /* Deep-link from global search: #id=PER_xxx */
+  if (window.SGNSearch && SGNSearch.onDeepLink) {
+    SGNSearch.onDeepLink(function(params) {
+      if (params.id) {
+        const target = personnel.find(p => p.id === params.id);
+        if (target) { activeId = target.id; renderList(); viewRecord(target.id); }
+      }
+    });
+  }
 })();

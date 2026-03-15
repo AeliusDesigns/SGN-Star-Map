@@ -542,6 +542,29 @@ function saveMapState() {
     await initFromData(DEFAULT_DATA);
   }
   await loadSolarSystems();
+
+  /* Deep-link from global search: #system=SYS_ID or #fleet=FLT_ID&system=SYS_ID */
+  if (window.SGNSearch && SGNSearch.onDeepLink) {
+    SGNSearch.onDeepLink(async function(params) {
+      if (params.fleet && params.system) {
+        /* Fleet deep link: select system, open fleet detail */
+        const sysId = params.system;
+        const fltId = params.fleet;
+        selectedId = sysId;
+        activeFleetId = fltId;
+        fleetViewMode = 'detail';
+        const det = await ensureSystemDetails(sysId);
+        renderPanel(sysId, det);
+        document.querySelector('#sp-tabs .tab[data-tab="fleets"]')?.click();
+      } else if (params.system) {
+        /* System deep link: select and open panel */
+        const sysId = params.system;
+        selectedId = sysId;
+        const det = await ensureSystemDetails(sysId);
+        renderPanel(sysId, det);
+      }
+    });
+  }
 })();
 
 async function loadSolarSystems() {

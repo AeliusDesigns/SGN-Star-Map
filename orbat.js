@@ -258,4 +258,15 @@ function updateSummary(root){
 }
 
 /* ── Boot ── */
-(async function boot(){await load();renderList();updateCount();renderTree();})();
+(async function boot(){await load();renderList();updateCount();renderTree();
+
+  /* Deep-link from global search: #id=OB_xxx */
+  if (window.SGNSearch && SGNSearch.onDeepLink) {
+    SGNSearch.onDeepLink(function(params) {
+      if (params.id) {
+        const target = orbats.find(o => o.id === params.id);
+        if (target) { activeId = target.id; renderList(); renderTree(); }
+      }
+    });
+  }
+})();
