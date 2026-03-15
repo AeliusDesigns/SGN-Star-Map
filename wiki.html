@@ -303,12 +303,10 @@
    DATA & STORAGE
    ══════════════════════════════════════════ */
 const STORE_KEY  = 'sgn_codex_v1';
-const PW_SESSION = 'starmap_editor_ok';
 let entries = [];
 let activeId = null;
 let filterCat = 'all';
-let _editorPW = null;
-let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
+let editorOK = false;
 
 async function load() {
   let fileEntries = null;
@@ -359,17 +357,12 @@ function save() {
 }
 function genId() { return 'CX_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,5).toUpperCase(); }
 
-(async function loadPW() {
-  try { const r = await fetch('./editor.json',{cache:'no-store'}); if(r.ok){ const d=await r.json(); if(typeof d.pw==='string'&&d.pw.length) _editorPW=d.pw; } } catch{}
-})();
-
-function requireEditor() {
-  if (editorOK) return true;
-  if (_editorPW === null) { alert('Editor not available.'); return false; }
-  const pw = prompt('Enter editor password:');
-  if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION,'1'); return true; }
-  alert('Incorrect password.');
-  return false;
+/* ── Auth (delegated to shared auth.js) ── */
+SGN_Auth.editorReady().then(ok => { editorOK = ok; });
+async function requireEditor() {
+  const ok = await SGN_Auth.requireEditor();
+  if (ok) editorOK = true;
+  return ok;
 }
 
 function toast(msg) {
@@ -429,13 +422,13 @@ document.getElementById('filters').addEventListener('click', e => {
   renderList();
 });
 
-document.getElementById('btn-new').addEventListener('click', () => {
-  if (!requireEditor()) return;
+document.getElementById('btn-new').addEventListener('click', async () => {
+  if (!(await requireEditor())) return;
   showNewEntryPicker();
 });
 
-document.getElementById('btn-save-repo').addEventListener('click', () => {
-  if (!requireEditor()) return;
+document.getElementById('btn-save-repo').addEventListener('click', async () => {
+  if (!(await requireEditor())) return;
   const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'codex.json'; a.click(); URL.revokeObjectURL(a.href);
   toast('codex.json downloaded — drop it in your repo');
@@ -538,15 +531,15 @@ function viewEntry(id) {
     </div>
   `;
 
-  document.getElementById('d-edit').onclick = () => { if(requireEditor()) editEntry(id); };
-  document.getElementById('d-dup').onclick = () => {
-    if(!requireEditor()) return;
+  document.getElementById('d-edit').onclick = async () => { if((await requireEditor())) editEntry(id); };
+  document.getElementById('d-dup').onclick = async () => {
+    if(!(await requireEditor())) return;
     const clone = JSON.parse(JSON.stringify(e));
     clone.id = genId(); clone.title += ' (Copy)'; clone.updated = Date.now();
     entries.push(clone); save(); activeId = clone.id; renderList(); viewEntry(clone.id); toast('Entry duplicated');
   };
-  document.getElementById('d-del').onclick = () => {
-    if(!requireEditor()) return;
+  document.getElementById('d-del').onclick = async () => {
+    if(!(await requireEditor())) return;
     if(!confirm('Delete "'+e.title+'"?')) return;
     entries = entries.filter(x => x.id !== id); save(); activeId = null; renderList();
     main.innerHTML = document.getElementById('empty-view')?.outerHTML || '';
@@ -973,6 +966,7 @@ function statRow(key, val, idx) {
   updateCount();
 })();
 </script>
+<script src="./auth.js"></script>
 <script src="./boot.js"></script>
 <script src="./search.js"></script>
 <script src="./stardate.js"></script>

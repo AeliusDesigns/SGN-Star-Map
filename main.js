@@ -438,34 +438,15 @@ let selectedId = null;
 let haloVBO = null;
 const t0 = performance.now();
 
-let editorOK = sessionStorage.getItem('starmap_editor_ok') === '1';
-let _editorPW = null;
+let editorOK = false;
 
-(async function loadEditorPW() {
-  try {
-    const r = await fetch('./editor.json', { cache: 'no-store' });
-    if (r.ok) {
-      const d = await r.json();
-      if (typeof d.pw === 'string' && d.pw.length) _editorPW = d.pw;
-    }
-  } catch {}
-})();
+// Auth delegated to shared SGN_Auth module (auth.js)
+SGN_Auth.editorReady().then(ok => { editorOK = ok; updateHUD(); });
 
-function requireEditor() {
-  if (editorOK) return true;
-  if (_editorPW === null) {
-    alert('Editor not available.');
-    return false;
-  }
-  const pw = prompt('Enter editor password:');
-  if (pw === _editorPW) {
-    editorOK = true;
-    sessionStorage.setItem('starmap_editor_ok', '1');
-    updateHUD();
-    return true;
-  }
-  alert('Incorrect password.');
-  return false;
+async function requireEditor() {
+  const ok = await SGN_Auth.requireEditor();
+  if (ok && !editorOK) { editorOK = true; updateHUD(); }
+  return ok;
 }
 
 let editMode = false;
@@ -627,7 +608,7 @@ canvas.addEventListener('mouseup', async e => {
 
   if (!_clickDownId) {
     if (addMode) {
-      if (!requireEditor()) return;
+      if (!(await requireEditor())) return;
       const mvp = buildMVP();
       const world = screenToWorldOnZ0(e.clientX, e.clientY, mvp);
       if (!world) return;
@@ -653,7 +634,7 @@ canvas.addEventListener('mouseup', async e => {
   _clickDownId = null;
 
   if (editMode) {
-    if (!requireEditor()) return;
+    if (!(await requireEditor())) return;
     if (!window._lanePickA) {
       window._lanePickA = id;
       updateHUD();
@@ -708,9 +689,9 @@ function deleteNearestLane(mx, my, mvp) {
   }
 }
 
-canvas.addEventListener('auxclick', e => {
+canvas.addEventListener('auxclick', async e => {
   if (!editMode || e.button !== 1) return;
-  if (!requireEditor()) return;
+  if (!(await requireEditor())) return;
   const [mx, my] = mouseToCanvas(e);
   deleteNearestLane(mx, my, buildMVP());
   updateLaneCounts();
@@ -724,11 +705,11 @@ const spOwner    = document.getElementById('sp-owner');
 const spStarOrb  = document.getElementById('sp-star-orb');
 const spStarAbbr = document.getElementById('sp-star-abbr');
 
-document.getElementById('sp-tabs').addEventListener('click', e => {
+document.getElementById('sp-tabs').addEventListener('click', async e => {
   const tab = e.target.closest('.tab');
   if (!tab) return;
   const name = tab.dataset.tab;
-  if (name === 'edit' && !requireEditor()) return;
+  if (name === 'edit' && !(await requireEditor())) return;
   document.querySelectorAll('#sp-tabs .tab').forEach(t => t.classList.toggle('active', t === tab));
   document.querySelectorAll('#sp-body .tab-pane').forEach(p => p.classList.toggle('active', p.id === `pane-${name}`));
 });
@@ -738,11 +719,11 @@ document.getElementById('sp-gen').onclick    = async () => {
   if (!selectedId) return;
   renderPanel(selectedId, await ensureSystemDetails(selectedId, true));
 };
-document.getElementById('sp-exp').onclick    = () => { if (selectedId && requireEditor()) exportSystemDetails(selectedId); };
+document.getElementById('sp-exp').onclick    = async () => { if (selectedId && (await requireEditor())) exportSystemDetails(selectedId); };
 document.getElementById('sp-orrery').onclick = () => { if (selectedId) openOrrery(selectedId); };
 
-document.getElementById('sb-save-repo').onclick = () => {
-  if (!requireEditor()) return;
+document.getElementById('sb-save-repo').onclick = async () => {
+  if (!(await requireEditor())) return;
 
   /* systems.json — map nodes + lanes */
   const lanesOut = Array.from(lanesSet).map(s => s.split('::'));
@@ -780,7 +761,7 @@ canvas.addEventListener('dblclick', async e => {
     renderPanel(id, await ensureSystemDetails(id));
     return;
   }
-  if (!requireEditor()) return;
+  if (!(await requireEditor())) return;
   const sys = systems.find(s => s.id === id);
   const nn = prompt('Rename system:', sys?.name || id);
   if (nn && nn.trim()) {
@@ -797,7 +778,7 @@ window.addEventListener('keydown', async e => {
 
   const k = e.key.toLowerCase();
   if (k === 'e') {
-    if (!requireEditor()) return;
+    if (!(await requireEditor())) return;
     editMode = !editMode;
     if (editMode) addMode = false;
     if (!editMode) window._lanePickA = null;
@@ -805,7 +786,7 @@ window.addEventListener('keydown', async e => {
     return;
   }
   if (k === 'a') {
-    if (!requireEditor()) return;
+    if (!(await requireEditor())) return;
     addMode = !addMode;
     if (addMode) editMode = false;
     updateHUD();
@@ -816,7 +797,7 @@ window.addEventListener('keydown', async e => {
     return;
   }
   if (!editMode) return;
-  if (!requireEditor()) return;
+  if (!(await requireEditor())) return;
   if (k === 'c') {
     if (!confirm('Clear ALL lanes?')) return;
     lanesSet.clear();
@@ -2230,8 +2211,8 @@ function renderFleetEditor(pane, fleet, systemId) {
   pane.querySelector('#fleet-back-btn').addEventListener('click', goBack);
   pane.querySelector('#fe-cancel').addEventListener('click', goBack);
 
-  pane.querySelector('#fe-save').addEventListener('click', () => {
-    if (!requireEditor()) return;
+  pane.querySelector('#fe-save').addEventListener('click', async () => {
+    if (!(await requireEditor())) return;
     const newFleet = {
       id: f.id,
       name: pane.querySelector('#fe-name').value.trim() || 'Unnamed Fleet',
@@ -2485,10 +2466,8 @@ addEventListener('mousemove', e => {
   }
 });
 
-addEventListener('mouseup', e => {
+addEventListener('mouseup', async e => {
   if (!_fleetDrag) return;
-
-  const fd = _fleetDrag;
   _fleetDrag = null;
 
   /* Hide all drag visuals */
@@ -2507,7 +2486,7 @@ addEventListener('mouseup', e => {
   const targetId = findNearestSystemId(e.clientX, e.clientY, mvp, 40);
 
   if (targetId && targetId !== fd.originSysId) {
-    if (!requireEditor()) return;
+    if (!(await requireEditor())) return;
     const targetSys = systems.find(s => s.id === targetId);
     const originSys = systems.find(s => s.id === fd.originSysId);
 

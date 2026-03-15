@@ -4,12 +4,10 @@
    ══════════════════════════════════════════ */
 
 const STORE_KEY  = 'sgn_personnel_v1';
-const PW_SESSION = 'starmap_editor_ok';
 let personnel = [];
 let activeId  = null;
 let filterBranch = 'all';
-let _editorPW = null;
-let editorOK  = sessionStorage.getItem(PW_SESSION) === '1';
+let editorOK  = false;
 
 /* ── Utility ── */
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -89,16 +87,12 @@ const AVAILABLE_TAGS = [
   'Exile', 'Dissident', 'War Hero', 'Legendary', 'Elder',
 ];
 
-/* ── Password ── */
-(async function loadPW() {
-  try { const r = await fetch('./editor.json', { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (typeof d.pw === 'string' && d.pw.length) _editorPW = d.pw; } } catch {}
-})();
-function requireEditor() {
-  if (editorOK) return true;
-  if (_editorPW === null) { alert('Editor not available.'); return false; }
-  const pw = prompt('Enter editor password:');
-  if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION, '1'); return true; }
-  alert('Incorrect password.'); return false;
+/* ── Auth (delegated to shared auth.js) ── */
+SGN_Auth.editorReady().then(ok => { editorOK = ok; });
+async function requireEditor() {
+  const ok = await SGN_Auth.requireEditor();
+  if (ok) editorOK = true;
+  return ok;
 }
 
 /* ── Load / Save ── */
@@ -201,11 +195,11 @@ document.getElementById('filters').addEventListener('click', e => {
 document.getElementById('search').addEventListener('input', () => renderList());
 
 /* ── New record ── */
-document.getElementById('btn-new').addEventListener('click', () => { if (!requireEditor()) return; editRecord(null); });
+document.getElementById('btn-new').addEventListener('click', async () => { if (!(await requireEditor())) return; editRecord(null); });
 
 /* ── Save to repo ── */
-document.getElementById('btn-save-repo').addEventListener('click', () => {
-  if (!requireEditor()) return;
+document.getElementById('btn-save-repo').addEventListener('click', async () => {
+  if (!(await requireEditor())) return;
   const blob = new Blob([JSON.stringify(personnel, null, 2)], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'personnel.json'; a.click(); URL.revokeObjectURL(a.href);
   toast('personnel.json downloaded');
@@ -313,15 +307,15 @@ function viewRecord(id) {
   });
 
   /* wire actions */
-  document.getElementById('dos-edit').onclick = () => { if (requireEditor()) editRecord(id); };
-  document.getElementById('dos-dup').onclick = () => {
-    if (!requireEditor()) return;
+  document.getElementById('dos-edit').onclick = async () => { if ((await requireEditor())) editRecord(id); };
+  document.getElementById('dos-dup').onclick = async () => {
+    if (!(await requireEditor())) return;
     const dup = JSON.parse(JSON.stringify(p));
     dup.id = genId(); dup.name = (dup.name || '') + ' (Copy)'; dup.updated = Date.now();
     personnel.push(dup); save(); renderList(); activeId = dup.id; viewRecord(dup.id); toast('Record duplicated');
   };
-  document.getElementById('dos-del').onclick = () => {
-    if (!requireEditor()) return;
+  document.getElementById('dos-del').onclick = async () => {
+    if (!(await requireEditor())) return;
     if (!confirm(`Delete record for "${p.name}"?`)) return;
     personnel = personnel.filter(x => x.id !== id); save(); activeId = null; renderList();
     main.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⊹</div><div class="empty-state-text">Select a personnel record</div></div>';

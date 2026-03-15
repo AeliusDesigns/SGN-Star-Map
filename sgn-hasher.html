@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SGN Password Hasher</title>
+  <style>
+    body { background:#050810; color:#c8deff; font-family:'Courier New',monospace; padding:40px; max-width:600px; margin:0 auto; }
+    h1 { color:#38e8ff; font-size:18px; letter-spacing:3px; margin-bottom:8px; }
+    .sub { color:#5a7a99; font-size:12px; margin-bottom:30px; }
+    label { display:block; color:#5a7a99; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+    input { background:#080d18; border:1px solid #243d5e; color:#c8deff; padding:10px 14px; font-family:inherit; font-size:14px; width:100%; border-radius:3px; outline:none; margin-bottom:16px; box-sizing:border-box; }
+    input:focus { border-color:#38e8ff; }
+    button { background:transparent; border:1px solid #1a7090; color:#38e8ff; padding:10px 24px; font-family:inherit; font-size:12px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; border-radius:3px; }
+    button:hover { background:rgba(56,232,255,.08); }
+    .output { background:#080d18; border:1px solid #1a2d46; padding:14px; border-radius:3px; margin-top:20px; white-space:pre-wrap; word-break:break-all; font-size:12px; color:#5cdb75; display:none; }
+    .instructions { color:#5a7a99; font-size:12px; line-height:1.7; margin-top:16px; display:none; }
+    .instructions code { color:#38e8ff; background:rgba(56,232,255,.06); padding:2px 6px; border-radius:2px; }
+    .warn { color:#f5c542; font-size:11px; margin-top:12px; }
+  </style>
+</head>
+<body>
+  <h1>SGN PASSWORD HASHER</h1>
+  <p class="sub">Generate a hashed config file for the SGN editor lock. Run locally, never online.</p>
+
+  <label>Choose your editor password</label>
+  <input type="password" id="pw1" placeholder="Enter password" autocomplete="off">
+
+  <label>Confirm password</label>
+  <input type="password" id="pw2" placeholder="Re-enter password" autocomplete="off">
+
+  <button onclick="generate()">GENERATE CONFIG</button>
+
+  <div class="output" id="output"></div>
+  <div class="instructions" id="instructions">
+    <p><strong>Steps:</strong></p>
+    <p>1. Create a file called <code>.sgn_cfg</code> in your project root (same folder as index.html).</p>
+    <p>2. Paste the JSON above into that file.</p>
+    <p>3. Make sure <code>.sgn_cfg</code> is in your <code>.gitignore</code>.</p>
+    <p class="warn">Do NOT commit this file. Do NOT share it. The hash is one-way but the salt makes brute-forcing significantly harder.</p>
+  </div>
+
+  <script>
+    async function sha256(str) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function generate() {
+      const pw1 = document.getElementById('pw1').value;
+      const pw2 = document.getElementById('pw2').value;
+
+      if (!pw1) { alert('Enter a password.'); return; }
+      if (pw1 !== pw2) { alert('Passwords do not match.'); return; }
+      if (pw1.length < 6) { alert('Password should be at least 6 characters.'); return; }
+
+      // Generate a random salt
+      const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+      const salt = Array.from(saltBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // Hash = SHA-256(salt + password)
+      const hash = await sha256(salt + pw1);
+
+      const config = JSON.stringify({ h: hash, s: salt }, null, 2);
+
+      const out = document.getElementById('output');
+      out.style.display = 'block';
+      out.textContent = config;
+
+      document.getElementById('instructions').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
