@@ -1,5 +1,145 @@
 [
   {
+    "id": "PER_MMRAMPI2_RWG",
+    "name": "Halion Velár",
+    "branch": "navy",
+    "rank": "Captain (O-6)",
+    "rankTitle": "Tanar",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "AEN Ship Captain",
+    "system": "Vaelthir",
+    "command": "Cruiser Tirithal",
+    "yearsOfService": "150",
+    "bio": "A clone officer that after graduating from the officer academy was assigned to a Command posting aboard the Cruiser Tirithal.",
+    "tags": [
+      "Officer"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4030.03.09",
+        "text": "Graduates from the officer academy and takes command of the Cruiser Tirithal"
+      },
+      {
+        "date": "4172.03.01",
+        "text": "Makes first contact with the Dolls"
+      }
+    ],
+    "relationships": [],
+    "updated": 1773551325460
+  },
+  {
+    "id": "PER_MMRA59S1_NUV",
+    "name": "Vaerion Calenarth",
+    "branch": "navy",
+    "rank": "Captain (O-6)",
+    "rankTitle": "Tanar",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "AEN Ship Captain",
+    "system": "Vaelthir",
+    "command": "Cruiser Calathorion",
+    "yearsOfService": "150",
+    "bio": "A clone officer that after graduating from the officer academy was assigned to a Command posting aboard the Cruiser Calathorion.",
+    "tags": [
+      "Officer"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4030.03.09",
+        "text": "Graduates from the officer academy and takes command of the Cruiser Calathorion"
+      },
+      {
+        "date": "4169.5.15",
+        "text": "Makes first contact with the Fyraxian Swarm"
+      },
+      {
+        "date": "4172.10.3",
+        "text": "Makes first contact with the mysterious Guardians on an unknown world"
+      }
+    ],
+    "relationships": [],
+    "updated": 1773551186859
+  },
+  {
+    "id": "PER_MMR9QJ4G_UVU",
+    "name": "Myrion Orinthal",
+    "branch": "diplomacy",
+    "rank": "Foreign Service Officer",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Telynar",
+    "yearsOfService": "51",
+    "bio": "A commoner of House Telynar that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
+    "tags": [
+      "Diplomat",
+      "Advisor"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Subordinate",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9ZIUI_2MT",
+        "targetName": ""
+      }
+    ],
+    "updated": 1773550380021
+  },
+  {
+    "id": "PER_MMR9ZIUI_2MT",
+    "name": "Talanor Lirathen",
+    "branch": "diplomacy",
+    "rank": "Foreign Service Officer",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Sylvaris",
+    "yearsOfService": "51",
+    "bio": "A commoner of House Sylvaris that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
+    "tags": [
+      "Diplomat",
+      "Advisor"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Subordinate",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetName": ""
+      }
+    ],
+    "updated": 1773550345029
+  },
+  {
     "id": "PER_MMR6RA2B_2JW",
     "name": "Sylion Aurendal",
     "branch": "diplomacy",
