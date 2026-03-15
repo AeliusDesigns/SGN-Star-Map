@@ -1,5 +1,83 @@
 [
   {
+    "id": "PER_MMR9QJ4G_UVU",
+    "name": "Myrion Orinthal",
+    "branch": "diplomacy",
+    "rank": "Foreign Service Officer",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Telynar",
+    "yearsOfService": "51",
+    "bio": "A commoner of House Telynar that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
+    "tags": [
+      "Diplomat",
+      "Advisor"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Superior",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9ZIUI_2MT",
+        "targetName": ""
+      }
+    ],
+    "updated": 1773603213775
+  },
+  {
+    "id": "PER_MMR9ZIUI_2MT",
+    "name": "Talanor Lirathen",
+    "branch": "diplomacy",
+    "rank": "Foreign Service Officer",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Sylvaris",
+    "yearsOfService": "51",
+    "bio": "A commoner of House Sylvaris that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
+    "tags": [
+      "Diplomat",
+      "Advisor"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Superior",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetName": ""
+      }
+    ],
+    "updated": 1773603203241
+  },
+  {
     "id": "PER_MMRAMPI2_RWG",
     "name": "Halion Velár",
     "branch": "navy",
@@ -60,84 +138,6 @@
     ],
     "relationships": [],
     "updated": 1773551186859
-  },
-  {
-    "id": "PER_MMR9QJ4G_UVU",
-    "name": "Myrion Orinthal",
-    "branch": "diplomacy",
-    "rank": "Foreign Service Officer",
-    "rankTitle": "",
-    "status": "Active",
-    "faction": "Arandorë Eldainë",
-    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
-    "system": "Nolvarin Expanse",
-    "command": "House Telynar",
-    "yearsOfService": "51",
-    "bio": "A commoner of House Telynar that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
-    "tags": [
-      "Diplomat",
-      "Advisor"
-    ],
-    "serviceRecord": [
-      {
-        "date": "4129.02.29",
-        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
-      }
-    ],
-    "relationships": [
-      {
-        "type": "Subordinate",
-        "detail": "",
-        "targetId": "PER_MMR6RA2B_2JW",
-        "targetName": ""
-      },
-      {
-        "type": "Peer",
-        "detail": "",
-        "targetId": "PER_MMR9ZIUI_2MT",
-        "targetName": ""
-      }
-    ],
-    "updated": 1773550380021
-  },
-  {
-    "id": "PER_MMR9ZIUI_2MT",
-    "name": "Talanor Lirathen",
-    "branch": "diplomacy",
-    "rank": "Foreign Service Officer",
-    "rankTitle": "",
-    "status": "Active",
-    "faction": "Arandorë Eldainë",
-    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
-    "system": "Nolvarin Expanse",
-    "command": "House Sylvaris",
-    "yearsOfService": "51",
-    "bio": "A commoner of House Sylvaris that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
-    "tags": [
-      "Diplomat",
-      "Advisor"
-    ],
-    "serviceRecord": [
-      {
-        "date": "4129.02.29",
-        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
-      }
-    ],
-    "relationships": [
-      {
-        "type": "Subordinate",
-        "detail": "",
-        "targetId": "PER_MMR6RA2B_2JW",
-        "targetName": ""
-      },
-      {
-        "type": "Peer",
-        "detail": "",
-        "targetId": "PER_MMR9QJ4G_UVU",
-        "targetName": ""
-      }
-    ],
-    "updated": 1773550345029
   },
   {
     "id": "PER_MMR6RA2B_2JW",
