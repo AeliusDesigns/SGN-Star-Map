@@ -4,22 +4,28 @@
    ══════════════════════════════════════════ */
 
 const STORE_KEY = 'sgn_language_v1';
+const PW_SESSION = 'starmap_editor_ok';
 let langData = null;
 let entries = [];
 let activeWordId = null;
 let sidebarMode = 'alpha';
-let editorOK = false;
+let _editorPW = null;
+let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 
 /* ── Utility ── */
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('visible'); setTimeout(() => el.classList.remove('visible'), 2200); }
 
-/* ── Auth (delegated to shared auth.js) ── */
-SGN_Auth.editorReady().then(ok => { editorOK = ok; });
-async function requireEditor() {
-  const ok = await SGN_Auth.requireEditor();
-  if (ok) editorOK = true;
-  return ok;
+/* ── Password ── */
+(async function loadPW() {
+  try { const r = await fetch('./editor.json', { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (typeof d.pw === 'string' && d.pw.length) _editorPW = d.pw; } } catch {}
+})();
+function requireEditor() {
+  if (editorOK) return true;
+  if (_editorPW === null) { alert('Editor not available (no editor.json found).'); return false; }
+  const pw = prompt('Enter editor password:');
+  if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION, '1'); return true; }
+  alert('Incorrect password.'); return false;
 }
 
 /* ══════════════════════════════════════════
@@ -482,8 +488,8 @@ function runWordForge() {
   window._wfCandidates = result.candidates;
 }
 
-async function approveCandidate(idx, concept) {
-  if (!(await requireEditor())) return;
+function approveCandidate(idx, concept) {
+  if (!requireEditor()) return;
   const c = window._wfCandidates?.[idx];
   if (!c) return;
 
@@ -832,8 +838,8 @@ function initEvents() {
   });
 
   // Save to repo
-  document.getElementById('sb-save-repo').addEventListener('click', async () => {
-    if (!(await requireEditor())) return;
+  document.getElementById('sb-save-repo').addEventListener('click', () => {
+    if (!requireEditor()) return;
     // Build full language JSON for export
     const exportData = JSON.parse(JSON.stringify(langData || {}));
     exportData.dictionary = exportData.dictionary || {};

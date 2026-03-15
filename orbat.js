@@ -3,9 +3,11 @@
    ══════════════════════════════════════════ */
 
 const STORE_KEY  = 'sgn_orbat_v1';
+const PW_SESSION = 'starmap_editor_ok';
 let orbats     = [];
 let activeId   = null;
-let editorOK   = false;
+let _editorPW  = null;
+let editorOK   = sessionStorage.getItem(PW_SESSION) === '1';
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function genId() { return 'OB_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).slice(2,5).toUpperCase(); }
@@ -49,12 +51,16 @@ const FLEET_TO_ORBAT_MAP = {
   'TALASIR-CLASS TRANSPORT':'Talasir TPT',
 };
 
-/* ── Auth (delegated to shared auth.js) ── */
-SGN_Auth.editorReady().then(ok => { editorOK = ok; });
-async function requireEditor() {
-  const ok = await SGN_Auth.requireEditor();
-  if (ok) editorOK = true;
-  return ok;
+/* ── Password ── */
+(async function loadPW() {
+  try { const r = await fetch('./editor.json',{cache:'no-store'}); if(r.ok){const d=await r.json();if(typeof d.pw==='string'&&d.pw.length) _editorPW=d.pw;} } catch{}
+})();
+function requireEditor() {
+  if(editorOK) return true;
+  if(_editorPW===null){alert('Editor not available.');return false;}
+  const pw=prompt('Enter editor password:');
+  if(pw===_editorPW){editorOK=true;sessionStorage.setItem(PW_SESSION,'1');return true;}
+  alert('Incorrect password.'); return false;
 }
 
 /* ── Load / Save ── */
@@ -83,13 +89,13 @@ function countVessels(node){if(!node)return 0;let t=(node.ships||[]).reduce((s,s
 function countFormations(node){if(!node)return 0;let t=1;(node.children||[]).forEach(c=>{t+=countFormations(c);});return t;}
 
 /* ── New / Delete ORBAT ── */
-document.getElementById('btn-new').addEventListener('click',async()=>{
-  if(!(await requireEditor()))return;const name=prompt('Name for new Order of Battle:','New ORBAT');if(!name)return;
+document.getElementById('btn-new').addEventListener('click',()=>{
+  if(!requireEditor())return;const name=prompt('Name for new Order of Battle:','New ORBAT');if(!name)return;
   const orbat={id:genId(),name:name.trim(),root:{id:fmId(),type:'fleet',name:name.trim(),commander:'',rankTitle:'',ships:[],children:[]},updated:Date.now()};
   orbats.push(orbat);save();activeId=orbat.id;renderList();renderTree();toast('ORBAT created');
 });
-document.getElementById('btn-save-repo').addEventListener('click',async()=>{
-  if(!(await requireEditor()))return;const blob=new Blob([JSON.stringify(orbats,null,2)],{type:'application/json'});
+document.getElementById('btn-save-repo').addEventListener('click',()=>{
+  if(!requireEditor())return;const blob=new Blob([JSON.stringify(orbats,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='orbat.json';a.click();URL.revokeObjectURL(a.href);toast('orbat.json downloaded');
 });
 
@@ -125,16 +131,16 @@ function renderNode(node,orbat){
 function wireTreeActions(orbat){
   const scroll=document.getElementById('tree-scroll');
   scroll.querySelectorAll('.fm-toggle').forEach(btn=>{btn.addEventListener('click',e=>{e.stopPropagation();const node=btn.closest('.fm-node'),children=node.querySelector('.fm-children');if(!children)return;const c=children.style.display==='none';children.style.display=c?'':'none';btn.textContent=c?'▾':'▸';});});
-  scroll.querySelectorAll('.fm-act').forEach(btn=>{btn.addEventListener('click',async e=>{
-    e.stopPropagation();if(!(await requireEditor()))return;
+  scroll.querySelectorAll('.fm-act').forEach(btn=>{btn.addEventListener('click',e=>{
+    e.stopPropagation();if(!requireEditor())return;
     const action=btn.dataset.action,fmid=btn.dataset.fmid;
     if(action==='add-child'){const p=findNode(orbat.root,fmid);if(!p)return;if(!p.children)p.children=[];p.children.push({id:fmId(),type:'talon',name:'New Formation',commander:'',rankTitle:'',ships:[],children:[]});orbat.updated=Date.now();save();renderTree();toast('Sub-formation added');}
     if(action==='edit')editFormation(orbat,fmid);
     if(action==='delete'){if(!confirm('Delete this formation and all its children?'))return;removeNode(orbat.root,fmid);orbat.updated=Date.now();save();renderTree();toast('Formation deleted');}
     if(action==='import-fleet')openFleetImportModal(orbat,fmid);
   });});
-  document.getElementById('tree-edit-root')?.addEventListener('click',async()=>{if(!(await requireEditor()))return;editFormation(orbat,orbat.root.id,true);});
-  document.getElementById('tree-del-orbat')?.addEventListener('click',async()=>{if(!(await requireEditor()))return;if(!confirm(`Delete entire ORBAT "${orbat.name}"?`))return;orbats=orbats.filter(o=>o.id!==orbat.id);save();activeId=null;renderList();renderTree();toast('ORBAT deleted');});
+  document.getElementById('tree-edit-root')?.addEventListener('click',()=>{if(!requireEditor())return;editFormation(orbat,orbat.root.id,true);});
+  document.getElementById('tree-del-orbat')?.addEventListener('click',()=>{if(!requireEditor())return;if(!confirm(`Delete entire ORBAT "${orbat.name}"?`))return;orbats=orbats.filter(o=>o.id!==orbat.id);save();activeId=null;renderList();renderTree();toast('ORBAT deleted');});
 }
 
 function findNode(node,id){if(!node)return null;if(node.id===id)return node;for(const c of(node.children||[])){const f=findNode(c,id);if(f)return f;}return null;}
