@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
+  <link rel="icon" type="image/png" href="./favicon.png">
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>SGN — Order of Battle</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -75,9 +76,9 @@
 
     /* ── MAIN ── */
     #main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-    #tree-scroll{flex:1;overflow:auto;padding:24px 32px 60px;background:var(--void);position:relative;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+    #tree-scroll{flex:1;overflow:auto;padding:24px 32px 60px;background:var(--deep);position:relative;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
     #tree-scroll::after{content:'';position:absolute;inset:0;pointer-events:none;
-      background-image:radial-gradient(circle at 1px 1px, rgba(26,45,70,.06) 1px, transparent 0);background-size:32px 32px;}
+      background-image:radial-gradient(circle at 1px 1px, rgba(26,45,70,.12) 1px, transparent 0);background-size:32px 32px;}
 
     .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;}
     .empty-state-icon{font-size:42px;opacity:.2;}
@@ -220,8 +221,6 @@
   <a href="./personnel.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;">PERSONNEL</a>
   <div class="hud-sep"></div>
   <a href="./orbat.html" class="hud-item hud-nav active" style="pointer-events:all;text-decoration:none;">ORBAT</a>
-  <div class="hud-sep"></div>                                                          
-  <a href="./language.html" class="hud-item hud-nav" style="pointer-events:all;text-decoration:none;">LANGUAGE</a>
   <div class="hud-spacer"></div>
   <span class="hud-item" id="hud-count" style="color:var(--text-muted);"></span>
 </div>
