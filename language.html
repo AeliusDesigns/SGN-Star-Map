@@ -211,7 +211,44 @@
     .name-card-meta{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px;letter-spacing:1px;}
 
     /* ── Translator ── */
-    .translator-output{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:16px;margin-top:14px;}
+    /* ── Translator: side-by-side panels ── */
+    .tr-dual{display:flex;gap:0;height:280px;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--surface);}
+    .tr-panel{flex:1;display:flex;flex-direction:column;min-width:0;}
+    .tr-panel-en{border-right:none;}
+    .tr-panel-elv{background:rgba(56,232,255,.015);}
+    .tr-panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;flex-shrink:0;}
+    .tr-panel-lang{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);}
+    .tr-panel-hint{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
+    .tr-textarea{flex:1;background:transparent;border:none;color:var(--text);font-family:'Exo 2',sans-serif;font-size:18px;line-height:1.6;padding:0 14px 10px;resize:none;outline:none;}
+    .tr-textarea::placeholder{color:var(--text-muted);font-size:16px;}
+    .tr-output{flex:1;padding:0 14px 10px;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:600;color:var(--cyan);letter-spacing:0.5px;line-height:1.6;overflow-y:auto;word-break:break-word;}
+    .tr-output-placeholder{font-family:'Exo 2',sans-serif;font-size:16px;font-weight:300;color:var(--text-muted);letter-spacing:0;}
+    .tr-panel-footer{padding:8px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px;min-height:42px;}
+    .tr-register-select{background:rgba(5,8,16,.8);color:var(--text-dim);border:1px solid var(--border);border-radius:2px;padding:4px 28px 4px 8px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a7a99'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;transition:border-color .12s;}
+    .tr-register-select:focus{border-color:var(--cyan-dim);}
+    .tr-clear-btn{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:26px;height:26px;border-radius:2px;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .12s;margin-left:auto;}
+    .tr-clear-btn:hover{border-color:var(--red-alert);color:var(--red-alert);}
+    .tr-copy-btn{background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:2px;padding:3px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;transition:all .12s;}
+    .tr-copy-btn:hover{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.04);}
+    .tr-copy-btn.copied{border-color:var(--green-dim);color:var(--green);}
+    .tr-tags{display:flex;gap:4px;flex-wrap:wrap;overflow:hidden;}
+    .tr-tag{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border:1px solid var(--border);border-radius:2px;color:var(--text-muted);white-space:nowrap;}
+    .tr-tag.register{border-color:var(--cyan-dim);color:var(--cyan-dim);}
+    .tr-tag.negated{border-color:rgba(255,59,59,.3);color:var(--red-alert);}
+    .tr-divider{display:flex;flex-direction:column;align-items:center;justify-content:center;width:32px;flex-shrink:0;background:rgba(26,45,70,.2);}
+    .tr-divider-line{flex:1;width:1px;background:var(--border);}
+    .tr-divider-icon{font-family:'Rajdhani',sans-serif;font-size:16px;color:var(--cyan-dim);padding:8px 0;text-shadow:0 0 8px rgba(56,232,255,.3);}
+
+    /* ── Translator: breakdown section ── */
+    .tr-details{margin-top:14px;}
+    .tr-details-toggle{display:flex;align-items:center;gap:8px;padding:10px 0;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);cursor:pointer;transition:color .12s;user-select:none;}
+    .tr-details-toggle:hover{color:var(--text-dim);}
+    .tr-details-chevron{font-size:12px;transition:transform .15s;}
+    .tr-details.collapsed .tr-details-chevron{transform:rotate(-90deg);}
+    .tr-details.collapsed #tr-results{display:none;}
+
+    /* ── Keep old translator output styles for the breakdown ── */
+    .translator-output{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:16px;margin-top:8px;}
     .translator-elvish{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:600;color:var(--cyan);letter-spacing:1px;margin-bottom:10px;}
     .translator-register-tag{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border:1px solid var(--border);border-radius:2px;display:inline-block;margin-bottom:10px;}
     .gloss-table{width:100%;border-collapse:collapse;margin:10px 0;}
@@ -425,25 +462,50 @@
 
     <!-- TRANSLATOR TAB -->
     <div class="tab-pane" id="pane-translator">
-      <div class="section-label">PHRASE TRANSLATOR</div>
-      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;">Enter a simple English phrase and the translator will construct it in Eldarindëva with interlinear glossing. Works best with subject-verb-object sentences using vocabulary already in the dictionary.</p>
-      <div class="forge-input-group">
-        <div style="flex:1;">
-          <label class="forge-label">English Phrase</label>
-          <input type="text" class="forge-input" id="tr-input" placeholder="e.g. the king guards the realm">
+      <!-- ── Side-by-side translation panels ── -->
+      <div class="tr-dual">
+        <div class="tr-panel tr-panel-en">
+          <div class="tr-panel-header">
+            <span class="tr-panel-lang">ENGLISH</span>
+            <span class="tr-panel-hint" id="tr-char-count">0</span>
+          </div>
+          <textarea class="tr-textarea" id="tr-input" placeholder="Type English here..." spellcheck="false"></textarea>
+          <div class="tr-panel-footer">
+            <select class="tr-register-select" id="tr-register">
+              <option value="formal">FORMAL (SOV)</option>
+              <option value="casual">CASUAL (VSO)</option>
+              <option value="military">MILITARY</option>
+              <option value="poetic">POETIC (FREE)</option>
+              <option value="sacred">SACRED</option>
+            </select>
+            <button class="tr-clear-btn" id="tr-clear" title="Clear">✕</button>
+          </div>
         </div>
-        <div>
-          <label class="forge-label">Register</label>
-          <select class="forge-select" id="tr-register">
-            <option value="formal">Formal (SOV)</option>
-            <option value="casual">Casual (VSO)</option>
-            <option value="military">Military</option>
-            <option value="poetic">Poetic (free)</option>
-          </select>
+        <div class="tr-divider">
+          <div class="tr-divider-line"></div>
+          <div class="tr-divider-icon">⟩</div>
+          <div class="tr-divider-line"></div>
         </div>
-        <button class="forge-btn" id="tr-translate" style="align-self:flex-end;">TRANSLATE</button>
+        <div class="tr-panel tr-panel-elv">
+          <div class="tr-panel-header">
+            <span class="tr-panel-lang" style="color:var(--cyan);">ELDARINDËVA</span>
+            <button class="tr-copy-btn" id="tr-copy" title="Copy to clipboard">⧉ COPY</button>
+          </div>
+          <div class="tr-output" id="tr-output"><span class="tr-output-placeholder">Translation will appear here...</span></div>
+          <div class="tr-panel-footer">
+            <div class="tr-tags" id="tr-tags"></div>
+          </div>
+        </div>
       </div>
-      <div id="tr-results"></div>
+
+      <!-- ── Detailed breakdown (below, collapsible) ── -->
+      <div id="tr-details" class="tr-details" style="display:none;">
+        <div class="tr-details-toggle" id="tr-details-toggle">
+          <span class="tr-details-chevron">▾</span>
+          <span>TRANSLATION BREAKDOWN</span>
+        </div>
+        <div id="tr-results"></div>
+      </div>
     </div>
 
     <!-- ANALYZER TAB -->
