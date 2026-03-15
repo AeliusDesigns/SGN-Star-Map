@@ -1,1 +1,69 @@
-[]
+[
+  {
+    "id": "PER_MMR6RA2B_2JW",
+    "name": "Sylion Aurendal",
+    "branch": "diplomacy",
+    "rank": "Ambassador",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Ambassador to the Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Alarion",
+    "yearsOfService": "51",
+    "bio": "A noble of House Alarion that was nominated and chosen by the High King to be the Ambassador and Chief representative of the High Realm to the Galactic Assembly.",
+    "tags": [
+      "Noble",
+      "Ambassador"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Nominated Ambassador to the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Superior",
+        "detail": "",
+        "targetId": "PER_MMR6YFLB_FJS",
+        "targetName": ""
+      }
+    ],
+    "updated": 1773546449778
+  },
+  {
+    "id": "PER_MMR6YFLB_FJS",
+    "name": "Aelorion Alarion",
+    "branch": "nobility",
+    "rank": "High King",
+    "rankTitle": "Aratara",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "The Valarindë, First Councillor of the Valarindë",
+    "system": "Anorvalas",
+    "command": "House Alarion",
+    "yearsOfService": "685",
+    "bio": "Following a long line of High King's, Aelorion is the reigning Monarch of the High Realm and will continue to be for the foreseeable future.",
+    "tags": [
+      "Noble",
+      "Legendary",
+      "Elder"
+    ],
+    "serviceRecord": [
+      {
+        "date": "3495.05.06",
+        "text": "Coronation of High King Aelorion Alarion"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Subordinate",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      }
+    ],
+    "updated": 1773546441836
+  }
+]
