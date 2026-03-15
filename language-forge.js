@@ -66,6 +66,9 @@ async function load() {
 
   // Initialize composition engine with dictionary
   CompositionEngine.setDictionary(entries);
+
+  // Give semantic network access to dictionary for fallback searches
+  SemanticNetwork.setDictRef(entries);
 }
 
 function save() {
@@ -278,7 +281,7 @@ function renderPhonology() {
   html += '<div class="section-label">Phonotactic Rules</div>';
   for (const r of p.phonotacticRules) {
     html += `<div class="phon-rule">
-      <div class="phon-rule-name">${esc(r.rule)}${r.pattern ? ' · ' + esc(r.pattern) : ''}</div>
+      <div class="phon-rule-name">${esc(r.rule.replace(/([A-Z])/g, ' $1').trim())}${r.pattern ? ' · ' + esc(r.pattern) : ''}</div>
       <div class="phon-rule-desc">${esc(r.description)}</div>
     </div>`;
   }
@@ -509,6 +512,7 @@ function approveCandidate(idx, concept) {
 
   entries.push(newEntry);
   CompositionEngine.setDictionary(entries);
+  SemanticNetwork.setDictRef(entries);
   save();
   renderWordList();
   toast(`"${c.word}" added to dictionary`);
