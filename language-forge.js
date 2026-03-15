@@ -855,13 +855,7 @@ function initEvents() {
     toast('arandori-language.json downloaded');
   });
 
-  // Keyboard shortcut: / for search focus
-  document.addEventListener('keydown', e => {
-    if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
-      e.preventDefault();
-      document.getElementById('sb-search').focus();
-    }
-  });
+  // Keyboard shortcut: / handled by global search.js
 }
 
 function switchTab(tabId) {

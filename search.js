@@ -13,7 +13,8 @@
     fleets:    { lsKey: 'sgn_fleets_v1',    file: './fleets.json' },
     orbat:     { lsKey: 'sgn_orbat_v1',     file: './orbat.json' },
     personnel: { lsKey: 'sgn_personnel_v1', file: './personnel.json' },
-    codex:     { lsKey: 'sgn_codex_v1',     file: './codex.json' }
+    codex:     { lsKey: 'sgn_codex_v1',     file: './codex.json' },
+    language:  { lsKey: 'sgn_language_v1',   file: './arandori-language.json' }
   };
 
   /* ── Category meta ── */
@@ -22,10 +23,11 @@
     orbat:     { label: 'ORBAT',     icon: '⟐', cls: 'orbat',     page: 'ORBAT',       href: './orbat.html' },
     fleets:    { label: 'FLEETS',    icon: '◆', cls: 'fleet',     page: 'Star Chart',  href: './index.html' },
     personnel: { label: 'PERSONNEL', icon: '⊹', cls: 'personnel', page: 'Personnel',   href: './personnel.html' },
-    codex:     { label: 'CODEX',     icon: '◈', cls: 'codex',     page: 'Codex',       href: './wiki.html' }
+    codex:     { label: 'CODEX',     icon: '◈', cls: 'codex',     page: 'Codex',       href: './wiki.html' },
+    language:  { label: 'LANGUAGE',  icon: '◉', cls: 'language',  page: 'Language',    href: './language.html' }
   };
 
-  const FILTER_ORDER = ['all', 'systems', 'codex', 'personnel', 'orbat', 'fleets'];
+  const FILTER_ORDER = ['all', 'systems', 'codex', 'personnel', 'orbat', 'fleets', 'language'];
 
   /* ── Fetch helper: localStorage first, then JSON file ── */
   async function loadSource(key) {
@@ -100,12 +102,14 @@
       .gs-item.personnel::before { background: var(--green, #5cdb7a); }
       .gs-item.orbat::before   { background: var(--purple, #b388ff); }
       .gs-item.fleet::before   { background: var(--amber, #ff9e44); }
+      .gs-item.language::before { background: var(--cyan, #38e8ff); }
       .gs-item-icon { width: 32px; height: 32px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; border: 1px solid; }
       .gs-item-icon.system   { background: rgba(56,232,255,.08);  border-color: rgba(56,232,255,.2);  color: var(--cyan, #38e8ff); }
       .gs-item-icon.codex    { background: rgba(245,197,66,.08);  border-color: rgba(245,197,66,.2);  color: var(--gold, #f5c542); }
       .gs-item-icon.personnel{ background: rgba(92,219,122,.08);  border-color: rgba(92,219,122,.2);  color: var(--green, #5cdb7a); }
       .gs-item-icon.orbat    { background: rgba(179,136,255,.08); border-color: rgba(179,136,255,.2); color: var(--purple, #b388ff); }
       .gs-item-icon.fleet    { background: rgba(255,158,68,.08);  border-color: rgba(255,158,68,.2);  color: var(--amber, #ff9e44); }
+      .gs-item-icon.language { background: rgba(56,232,255,.08);  border-color: rgba(56,232,255,.2);  color: var(--cyan, #38e8ff); }
       .gs-item-info { flex: 1; min-width: 0; }
       .gs-item-name { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .gs-item-name mark { background: none; color: var(--cyan, #38e8ff); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
@@ -158,7 +162,7 @@
   }
 
   async function gatherData() {
-    const results = { systems: [], fleets: [], orbat: [], personnel: [], codex: [] };
+    const results = { systems: [], fleets: [], orbat: [], personnel: [], codex: [], language: [] };
 
     /* Systems */
     const mapData = await loadSourceData('map');
@@ -228,6 +232,41 @@
           meta: `${e.category || 'Entry'}${e.designation ? ' · ' + e.designation : ''}`,
           href: './wiki.html',
           searchText: [e.title, e.category, e.designation, e.classification, e.role, e.body?.replace(/<[^>]+>/g, '')].filter(Boolean).join(' ')
+        });
+      });
+    }
+
+    /* Language (Eldarindëva dictionary) */
+    const langData = await loadSourceData('language');
+    if (langData) {
+      /* The language file has a nested structure: langData.dictionary.entries[]
+         or localStorage may store { entries: [] } */
+      let langEntries = [];
+      if (langData.dictionary && langData.dictionary.entries) {
+        langEntries = langData.dictionary.entries;
+      } else if (langData.entries) {
+        langEntries = langData.entries;
+      } else if (Array.isArray(langData)) {
+        langEntries = langData;
+      }
+      langEntries.forEach(e => {
+        const defs = (e.definitions || []).join(', ');
+        const tags = (e.tags || []).join(', ');
+        results.language.push({
+          name: e.word || 'Unknown',
+          meta: `${e.ipa || ''} · ${e.pos || ''} · ${defs}`,
+          href: './language.html',
+          searchText: [e.word, defs, e.pos, e.etymology, tags, e.ipa].filter(Boolean).join(' ')
+        });
+      });
+      /* Also index common phrases */
+      const phrases = langData.dictionary?.commonPhrases || [];
+      phrases.forEach(p => {
+        results.language.push({
+          name: p.elvish || '',
+          meta: `Phrase · ${p.meaning || ''}`,
+          href: './language.html',
+          searchText: [p.elvish, p.literal, p.meaning].filter(Boolean).join(' ')
         });
       });
     }
