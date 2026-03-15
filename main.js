@@ -745,12 +745,6 @@ document.getElementById('sb-save-repo').onclick = async () => {
   if (!requireEditor()) return;
 
   /* Check if GitHub save is available */
-  await SGNGitHub.loadConfig();
-  if (!SGNGitHub.isAvailable()) {
-    toast('GitHub credentials not found in editor.json');
-    return;
-  }
-
   const btn = document.getElementById('sb-save-repo');
   const origText = btn.textContent;
   btn.textContent = 'SAVING...';

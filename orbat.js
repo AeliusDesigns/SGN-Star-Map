@@ -97,12 +97,6 @@ document.getElementById('btn-new').addEventListener('click',()=>{
 document.getElementById('btn-save-repo').addEventListener('click', async () => {
   if(!requireEditor())return;
 
-  await SGNGitHub.loadConfig();
-  if (!SGNGitHub.isAvailable()) {
-    toast('GitHub credentials not found in editor.json');
-    return;
-  }
-
   const btn = document.getElementById('btn-save-repo');
   const origText = btn.textContent;
   btn.textContent = 'SAVING...';

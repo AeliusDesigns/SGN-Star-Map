@@ -567,48 +567,17 @@ function runNameForge() {
    TAB: TRANSLATOR
    ══════════════════════════════════════════ */
 
-/* ── Live translator with debounce ── */
-let _trDebounce = null;
-let _lastTrResult = null;
-
 function runTranslator() {
   const input = document.getElementById('tr-input').value.trim();
   const register = document.getElementById('tr-register').value;
-  const output = document.getElementById('tr-output');
-  const tagsEl = document.getElementById('tr-tags');
-  const details = document.getElementById('tr-details');
-  const container = document.getElementById('tr-results');
-  const charCount = document.getElementById('tr-char-count');
-
-  // Update character count
-  if (charCount) charCount.textContent = input.length || '0';
-
-  if (!input) {
-    output.innerHTML = '<span class="tr-output-placeholder">Translation will appear here...</span>';
-    tagsEl.innerHTML = '';
-    details.style.display = 'none';
-    _lastTrResult = null;
-    return;
-  }
+  if (!input) { toast('Enter an English phrase first'); return; }
 
   const result = CompositionEngine.constructPhrase(input, register);
-  _lastTrResult = result;
+  const container = document.getElementById('tr-results');
 
-  // Update the live output panel
-  output.innerHTML = esc(result.elvish);
-
-  // Update tags
-  let tagsHTML = `<span class="tr-tag register">${esc(register)}</span>`;
-  tagsHTML += `<span class="tr-tag">${esc(result.parsedType || 'statement')}</span>`;
-  tagsHTML += `<span class="tr-tag">${esc(result.tense || 'present')}</span>`;
-  tagsHTML += `<span class="tr-tag">${esc(result.person || '3s')}</span>`;
-  if (result.negated) tagsHTML += '<span class="tr-tag negated">NEGATED</span>';
-  tagsEl.innerHTML = tagsHTML;
-
-  // Show and populate the breakdown section
-  details.style.display = '';
   container.innerHTML = `
     <div class="translator-output">
+      <div class="translator-elvish">${esc(result.elvish)}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;">
         <span class="translator-register-tag">${esc(register)}</span>
         <span class="translator-register-tag" style="border-color:var(--border2);">${esc(result.parsedType || 'statement')}</span>
@@ -852,35 +821,9 @@ function initEvents() {
   // Name Forge
   document.getElementById('nf-generate').addEventListener('click', runNameForge);
 
-  // Translator: live typing with debounce
-  document.getElementById('tr-input').addEventListener('input', () => {
-    clearTimeout(_trDebounce);
-    _trDebounce = setTimeout(runTranslator, 200);
-  });
-  // Also re-translate when register changes
-  document.getElementById('tr-register').addEventListener('change', () => {
-    if (document.getElementById('tr-input').value.trim()) runTranslator();
-  });
-  // Clear button
-  document.getElementById('tr-clear').addEventListener('click', () => {
-    document.getElementById('tr-input').value = '';
-    runTranslator();
-    document.getElementById('tr-input').focus();
-  });
-  // Copy button
-  document.getElementById('tr-copy').addEventListener('click', () => {
-    if (!_lastTrResult) return;
-    navigator.clipboard.writeText(_lastTrResult.elvish).then(() => {
-      const btn = document.getElementById('tr-copy');
-      btn.textContent = '✓ COPIED';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = '⧉ COPY'; btn.classList.remove('copied'); }, 1500);
-    }).catch(() => toast('Copy failed'));
-  });
-  // Breakdown toggle
-  document.getElementById('tr-details-toggle').addEventListener('click', () => {
-    document.getElementById('tr-details').classList.toggle('collapsed');
-  });
+  // Translator
+  document.getElementById('tr-translate').addEventListener('click', runTranslator);
+  document.getElementById('tr-input').addEventListener('keydown', e => { if (e.key === 'Enter') runTranslator(); });
 
   // Analyzer
   document.getElementById('az-analyze').addEventListener('click', runAnalyzer);
@@ -897,12 +840,6 @@ function initEvents() {
   // Save to repo
   document.getElementById('sb-save-repo').addEventListener('click', async () => {
     if (!requireEditor()) return;
-
-    await SGNGitHub.loadConfig();
-    if (!SGNGitHub.isAvailable()) {
-      toast('GitHub credentials not found in editor.json');
-      return;
-    }
 
     const btn = document.getElementById('sb-save-repo');
     const origText = btn.textContent;

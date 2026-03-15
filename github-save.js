@@ -4,53 +4,53 @@
    Shared module for committing JSON files
    directly to the GitHub repo via the API.
    
-   Reads credentials from editor.json:
-     { "pw": "...", "github_token": "...", "github_repo": "owner/repo" }
+   Token is entered once per session via a
+   prompt and stored in sessionStorage (cleared
+   when the browser tab closes). The token never
+   touches any file or commit.
    
-   The editor.json file is gitignored, so visitors
-   on the live Netlify site will never have access
-   to the token. Saves will simply fail gracefully.
+   The repo is hardcoded since it never changes.
    ══════════════════════════════════════════ */
 
 const SGNGitHub = (function () {
   'use strict';
 
-  let _token = null;
-  let _repo  = null;
-  let _ready = false;
-  let _loadPromise = null;
+  const SESSION_KEY = 'sgn_github_token';
+  const REPO = 'AeliusDesigns/SGN-Star-Map';
 
-  /* ── Load credentials from editor.json ── */
-  function loadConfig() {
-    if (_loadPromise) return _loadPromise;
-    _loadPromise = (async () => {
-      try {
-        const r = await fetch('./editor.json', { cache: 'no-store' });
-        if (!r.ok) return;
-        const d = await r.json();
-        if (d.github_token && d.github_repo) {
-          _token = d.github_token;
-          _repo  = d.github_repo;
-          _ready = true;
-        }
-      } catch { /* editor.json missing or malformed, that is fine */ }
-    })();
-    return _loadPromise;
+  /* ── Get or prompt for token ── */
+  function getToken() {
+    let token = sessionStorage.getItem(SESSION_KEY);
+    if (token) return token;
+
+    token = prompt('Enter GitHub Personal Access Token:');
+    if (!token || !token.trim()) return null;
+
+    token = token.trim();
+    sessionStorage.setItem(SESSION_KEY, token);
+    return token;
   }
 
-  /* Kick off loading immediately */
-  loadConfig();
-
-  /* ── Check if GitHub save is available ── */
+  /* ── Check if token is already stored this session ── */
   function isAvailable() {
-    return _ready;
+    return !!sessionStorage.getItem(SESSION_KEY);
+  }
+
+  /* ── Forget the token (e.g. on auth failure) ── */
+  function clearToken() {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
+
+  /* ── No-op for backward compatibility ── */
+  function loadConfig() {
+    return Promise.resolve();
   }
 
   /* ── Get the current SHA of a file (needed to update it) ── */
-  async function getFileSHA(path) {
+  async function getFileSHA(path, token) {
     const res = await fetch(
-      `https://api.github.com/repos/${_repo}/contents/${encodeURIComponent(path)}`,
-      { headers: { 'Authorization': `token ${_token}` } }
+      `https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(path)}`,
+      { headers: { 'Authorization': `token ${token}` } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -59,9 +59,10 @@ const SGNGitHub = (function () {
 
   /* ── Commit a single file ── */
   async function commitFile(path, content, message) {
-    if (!_ready) throw new Error('GitHub credentials not loaded');
+    const token = getToken();
+    if (!token) throw new Error('No token provided');
 
-    const sha = await getFileSHA(path);
+    const sha = await getFileSHA(path, token);
     const encoded = btoa(unescape(encodeURIComponent(content)));
 
     const body = {
@@ -72,11 +73,11 @@ const SGNGitHub = (function () {
     if (sha) body.sha = sha;
 
     const res = await fetch(
-      `https://api.github.com/repos/${_repo}/contents/${encodeURIComponent(path)}`,
+      `https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(path)}`,
       {
         method: 'PUT',
         headers: {
-          'Authorization': `token ${_token}`,
+          'Authorization': `token ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
@@ -85,6 +86,10 @@ const SGNGitHub = (function () {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        clearToken();
+        throw new Error('Bad credentials. Token cleared; try saving again.');
+      }
       throw new Error(err.message || `GitHub API error ${res.status}`);
     }
 
@@ -93,7 +98,8 @@ const SGNGitHub = (function () {
 
   /* ── Commit multiple files sequentially ── */
   async function commitFiles(files, messagePrefix) {
-    if (!_ready) throw new Error('GitHub credentials not loaded');
+    const token = getToken();
+    if (!token) throw new Error('No token provided');
 
     const results = [];
     for (const f of files) {
@@ -109,7 +115,8 @@ const SGNGitHub = (function () {
     loadConfig,
     isAvailable,
     commitFile,
-    commitFiles
+    commitFiles,
+    clearToken
   };
 
 })();
