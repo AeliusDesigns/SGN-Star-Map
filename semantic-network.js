@@ -699,7 +699,382 @@ const SemanticNetwork = (() => {
     { id: 'instrument', cat: 'knowledge', roots: ['istacalma','ista'], weight: 0.7 },
     { id: 'radiation',  cat: 'celestial', roots: ['calasírë','cala','sírë'], weight: 0.7 },
     { id: 'gravity wave', cat: 'celestial', roots: ['lungëfalma','lungë','falma'], weight: 0.7 },
-    { id: 'spacetime',  cat: 'celestial', roots: ['morvailëfassë','morvailë','fassë'], weight: 0.8 }
+    { id: 'spacetime',  cat: 'celestial', roots: ['morvailëfassë','morvailë','fassë'], weight: 0.8 },
+
+    // ═══ Space & Stellar ═══
+    { id: 'galaxy',      cat: 'celestial', roots: ['aelrindë','ael','rindë'], weight: 1.0 },
+    { id: 'galactic',    cat: 'celestial', roots: ['aelrindëa','aelrindë'], weight: 0.9 },
+    { id: 'star system', cat: 'celestial', roots: ['aelondë','ael'], weight: 0.9 },
+    { id: 'solar system',cat: 'celestial', roots: ['aelondë','anor'], weight: 0.8 },
+    { id: 'planet',      cat: 'celestial', roots: ['cemen'], weight: 1.0 },
+    { id: 'world',       cat: 'celestial', roots: ['cemen','dorë'], weight: 0.9 },
+    { id: 'homeworld',   cat: 'celestial', roots: ['cemenyárë','cemen'], weight: 0.8 },
+    { id: 'comet',       cat: 'celestial', roots: ['aelfalma','ael','falma'], weight: 0.7 },
+    { id: 'asteroid',    cat: 'celestial', roots: ['ondoranya','ondo','ranya'], weight: 0.7 },
+    { id: 'meteor',      cat: 'celestial', roots: ['naurrunya','naur','runya'], weight: 0.7 },
+    { id: 'constellation', cat: 'celestial', roots: ['aeltirion','ael','tir'], weight: 0.8 },
+
+    // ═══ FTL & Propulsion ═══
+    { id: 'warp',        cat: 'celestial', roots: ['vinyahasta','vinya','hasta'], weight: 0.9 },
+    { id: 'hyperspace',  cat: 'celestial', roots: ['vinyahastalë','vinyahasta'], weight: 0.9 },
+    { id: 'jump',        cat: 'celestial', roots: ['vinyahasta'], weight: 0.7 },
+    { id: 'ftl',         cat: 'celestial', roots: ['vinyahasta','vinyahastalë'], weight: 0.8 },
+    { id: 'void travel', cat: 'celestial', roots: ['hastië','hasta','morvailë'], weight: 0.8 },
+
+    // ═══ Ship Systems & Technology ═══
+    { id: 'reactor',     cat: 'knowledge', roots: ['naurondo','naur','ondo'], weight: 0.8 },
+    { id: 'engine',      cat: 'knowledge', roots: ['tulcamë','tulca'], weight: 0.9 },
+    { id: 'power core',  cat: 'knowledge', roots: ['cuivëhón','cuivëlë','hón'], weight: 0.8 },
+    { id: 'shield generator', cat: 'military', roots: ['thaldalë','thal','dalë'], weight: 0.8 },
+    { id: 'sensor',      cat: 'knowledge', roots: ['tirilmë','tir'], weight: 0.8 },
+    { id: 'scanner',     cat: 'knowledge', roots: ['tirilmë','tir','hir'], weight: 0.7 },
+    { id: 'communicator', cat: 'knowledge', roots: ['centilmë','centa'], weight: 0.8 },
+    { id: 'signal',      cat: 'knowledge', roots: ['centasírë','centa','sírë'], weight: 0.8 },
+    { id: 'transmission', cat: 'knowledge', roots: ['centasírë'], weight: 0.7 },
+
+    // ═══ Ship Structure ═══
+    { id: 'hull',        cat: 'military',  roots: ['ciryahelvë','cirya','helvë'], weight: 0.9 },
+    { id: 'bulkhead',    cat: 'military',  roots: ['ciryathallë','cirya','thal'], weight: 0.7 },
+    { id: 'hangar',      cat: 'military',  roots: ['ciryacova','cirya','cova'], weight: 0.8 },
+    { id: 'airlock',     cat: 'military',  roots: ['morvailëando','morvailë','ando'], weight: 0.7 },
+    { id: 'corridor',    cat: 'architecture', roots: ['tiëhallë','tië'], weight: 0.7 },
+
+    // ═══ Settlements & Structures ═══
+    { id: 'colony',      cat: 'social',    roots: ['cemennorë','cemen','nor'], weight: 0.8 },
+    { id: 'outpost',     cat: 'military',  roots: ['tirnorë','tir','nor'], weight: 0.8 },
+    { id: 'station',     cat: 'architecture', roots: ['aerhalla','aer','halla'], weight: 0.8 },
+    { id: 'orbital',     cat: 'architecture', roots: ['tírielmar','tíriel','mar'], weight: 0.7 },
+    { id: 'satellite',   cat: 'celestial', roots: ['tírielmar','tíriel'], weight: 0.7 },
+
+    // ═══ Peoples & Contact ═══
+    { id: 'alien',       cat: 'social',    roots: ['othranossë','othar'], weight: 0.9 },
+    { id: 'species',     cat: 'knowledge', roots: ['nossëa','nostë'], weight: 0.8 },
+    { id: 'civilization', cat: 'social',   roots: ['hérëondë','hérë','dalë'], weight: 0.9 },
+
+    // ═══ Navigation & Spatial ═══
+    { id: 'sector',      cat: 'celestial', roots: ['aeldorë','ael','dorë'], weight: 0.8 },
+    { id: 'quadrant',    cat: 'celestial', roots: ['aeldorë'], weight: 0.7 },
+    { id: 'navigation',  cat: 'knowledge', roots: ['tiëista','tië','ista'], weight: 0.9 },
+    { id: 'coordinates', cat: 'knowledge', roots: ['tíriënot','tírië','notië'], weight: 0.7 },
+    { id: 'trajectory',  cat: 'knowledge', roots: ['tiësírë','tië','sírë'], weight: 0.7 },
+    { id: 'course',      cat: 'knowledge', roots: ['tiësírë','tië'], weight: 0.8 },
+
+    // ═══ Resources & Power ═══
+    { id: 'fuel',        cat: 'nature',    roots: ['naurossa','naur'], weight: 0.7 },
+    { id: 'power',       cat: 'nature',    roots: ['cuivëtulcë','cuivëlë','tulca'], weight: 0.8 },
+    { id: 'energy field', cat: 'nature',   roots: ['tulcathal','tulca','thal'], weight: 0.7 },
+
+    // ═══ Environment ═══
+    { id: 'atmosphere',  cat: 'nature',    roots: ['vaelaerë','vael','aer'], weight: 0.8 },
+    { id: 'oxygen',      cat: 'nature',    roots: ['thúlëvael','thúlë','vael'], weight: 0.7 },
+    { id: 'vacuum',      cat: 'celestial', roots: ['vailëmorë','morvailë'], weight: 0.8 },
+    { id: 'pressure',    cat: 'nature',    roots: ['lungë','ondahasta'], weight: 0.6 },
+
+    // ═══ Naval (extended) ═══
+    { id: 'crew',        cat: 'military',  roots: ['ciryahosta','cirya','hosta'], weight: 0.8 },
+    { id: 'wreckage',    cat: 'military',  roots: ['raucahasta','rauca','hasta'], weight: 0.7 },
+    { id: 'debris',      cat: 'military',  roots: ['raucahasta','rauca'], weight: 0.6 },
+    { id: 'salvage',     cat: 'military',  roots: ['hirhasta','hir','hasta'], weight: 0.7 },
+
+    // ═══ Family & Relationships ═══
+    { id: 'father',      cat: 'social',    roots: ['atar'], weight: 1.0 },
+    { id: 'mother',      cat: 'social',    roots: ['amil'], weight: 1.0 },
+    { id: 'son',         cat: 'social',    roots: ['yondo','hên'], weight: 0.9 },
+    { id: 'daughter',    cat: 'social',    roots: ['yeldë','hên'], weight: 0.9 },
+    { id: 'brother',     cat: 'social',    roots: ['toron'], weight: 0.9 },
+    { id: 'sister',      cat: 'social',    roots: ['nettë'], weight: 0.9 },
+    { id: 'husband',     cat: 'social',    roots: ['verno','vesta'], weight: 0.8 },
+    { id: 'wife',        cat: 'social',    roots: ['vessë','vesta'], weight: 0.8 },
+    { id: 'spouse',      cat: 'social',    roots: ['vestar','vesta'], weight: 0.8 },
+    { id: 'marriage',    cat: 'social',    roots: ['vestië','vesta'], weight: 0.9 },
+    { id: 'wedding',     cat: 'social',    roots: ['vestië','vesta'], weight: 0.8 },
+    { id: 'ancestor',    cat: 'social',    roots: ['nossëatar','atar','nossírë'], weight: 0.8 },
+    { id: 'descendant',  cat: 'social',    roots: ['apsen','hên'], weight: 0.7 },
+    { id: 'elder',       cat: 'social',    roots: ['yárano','yára'], weight: 0.8 },
+    { id: 'infant',      cat: 'social',    roots: ['vinyahên','vinya','hên'], weight: 0.7 },
+    { id: 'baby',        cat: 'social',    roots: ['vinyahên'], weight: 0.7 },
+
+    // ═══ Emotions (extended) ═══
+    { id: 'shame',       cat: 'emotion',   roots: ['nairelë'], weight: 0.8 },
+    { id: 'dishonor',    cat: 'emotion',   roots: ['nairelë'], weight: 0.7 },
+    { id: 'regret',      cat: 'emotion',   roots: ['enyalië'], weight: 0.8 },
+    { id: 'envy',        cat: 'emotion',   roots: ['milvë'], weight: 0.7 },
+    { id: 'jealousy',    cat: 'emotion',   roots: ['milvë'], weight: 0.7 },
+    { id: 'gratitude',   cat: 'emotion',   roots: ['hantalë'], weight: 0.8 },
+    { id: 'thanks',      cat: 'emotion',   roots: ['hantalë'], weight: 0.7 },
+    { id: 'despair',     cat: 'emotion',   roots: ['oiencalë','mor'], weight: 0.8 },
+    { id: 'nostalgia',   cat: 'emotion',   roots: ['yáramellë','yára','mel'], weight: 0.7 },
+
+    // ═══ Communication ═══
+    { id: 'letter',      cat: 'knowledge', roots: ['tecië','teca'], weight: 0.8 },
+    { id: 'message',     cat: 'knowledge', roots: ['centassë','centa'], weight: 0.8 },
+    { id: 'rumor',       cat: 'social',    roots: ['lassírë','lasta'], weight: 0.7 },
+    { id: 'report',      cat: 'military',  roots: ['tíriecenta','tírië','centa'], weight: 0.8 },
+    { id: 'command',     cat: 'military',  roots: ['canvacenta','canva','cáno'], weight: 0.9 },
+    { id: 'question',    cat: 'knowledge', roots: ['maquetië'], weight: 0.8 },
+    { id: 'answer',      cat: 'knowledge', roots: ['hanquetië'], weight: 0.8 },
+    { id: 'reply',       cat: 'knowledge', roots: ['hanquetië'], weight: 0.7 },
+
+    // ═══ Colors ═══
+    { id: 'black',       cat: 'nature',    roots: ['morna','mor'], weight: 0.8 },
+    { id: 'white',       cat: 'nature',    roots: ['lossëa','lossë','sil'], weight: 0.8 },
+    { id: 'green',       cat: 'nature',    roots: ['cálëa','galadh'], weight: 0.8 },
+    { id: 'grey',        cat: 'nature',    roots: ['sinda'], weight: 0.7 },
+    { id: 'gray',        cat: 'nature',    roots: ['sinda'], weight: 0.7 },
+    { id: 'brown',       cat: 'nature',    roots: ['varnë'], weight: 0.7 },
+    { id: 'purple',      cat: 'nature',    roots: ['tuinë'], weight: 0.7 },
+
+    // ═══ Time (extended) ═══
+    { id: 'hour',        cat: 'time',      roots: ['lúmë'], weight: 0.8 },
+    { id: 'moment',      cat: 'time',      roots: ['lúmitë','lúmë'], weight: 0.8 },
+    { id: 'instant',     cat: 'time',      roots: ['lúmitë'], weight: 0.7 },
+    { id: 'century',     cat: 'time',      roots: ['yénrindë','yén'], weight: 0.7 },
+    { id: 'epoch',       cat: 'time',      roots: ['yénambë','yén'], weight: 0.8 },
+    { id: 'tomorrow',    cat: 'time',      roots: ['anarya','anarë'], weight: 0.7 },
+    { id: 'yesterday',   cat: 'time',      roots: ['yáranarë','yára'], weight: 0.7 },
+    { id: 'now',         cat: 'time',      roots: ['sí'], weight: 0.8 },
+    { id: 'soon',        cat: 'time',      roots: ['enyárë'], weight: 0.7 },
+    { id: 'always',      cat: 'time',      roots: ['oialë','var'], weight: 0.8 },
+    { id: 'never',       cat: 'time',      roots: ['ú-oialë'], weight: 0.8 },
+
+    // ═══ Warfare (extended) ═══
+    { id: 'siege',       cat: 'military',  roots: ['hostië','hosta'], weight: 0.8 },
+    { id: 'ambush',      cat: 'military',  roots: ['nurtamahta','nurta','mahta'], weight: 0.8 },
+    { id: 'retreat',     cat: 'military',  roots: ['enthasta','hasta'], weight: 0.8 },
+    { id: 'withdraw',    cat: 'military',  roots: ['enthasta'], weight: 0.7 },
+    { id: 'advance',     cat: 'military',  roots: ['aryahasta','hasta'], weight: 0.8 },
+    { id: 'bombardment', cat: 'military',  roots: ['raucanaurë','rauca','naur'], weight: 0.7 },
+    { id: 'boarding',    cat: 'military',  roots: ['ciryamahta','cirya','mahta'], weight: 0.8 },
+    { id: 'blockade',    cat: 'military',  roots: ['ciryathal','cirya','thal'], weight: 0.8 },
+    { id: 'patrol',      cat: 'military',  roots: ['tíriëhasta','tírië','hasta'], weight: 0.8 },
+    { id: 'escort',      cat: 'military',  roots: ['tirciryë','tir','cirya'], weight: 0.7 },
+    { id: 'reconnaissance', cat: 'military', roots: ['hirtírië','hir','tir'], weight: 0.7 },
+    { id: 'scouting',    cat: 'military',  roots: ['hirtírië'], weight: 0.7 },
+    { id: 'treason',     cat: 'social',    roots: ['vestaucë','vesta','rauca'], weight: 0.8 },
+    { id: 'prisoner',    cat: 'military',  roots: ['mandohon','mandos'], weight: 0.7 },
+    { id: 'captive',     cat: 'military',  roots: ['mandohon'], weight: 0.7 },
+
+    // ═══ Advanced Technology ═══
+    { id: 'computer',    cat: 'knowledge', roots: ['sanmëdalë','sanmë','dalë'], weight: 0.9 },
+    { id: 'AI',          cat: 'knowledge', roots: ['fëadalë','fëa','dalë'], weight: 0.9 },
+    { id: 'artificial intelligence', cat: 'knowledge', roots: ['fëadalë','fëa','dalë'], weight: 0.9 },
+    { id: 'hologram',    cat: 'knowledge', roots: ['calahroa','cala','hroa'], weight: 0.8 },
+    { id: 'drone',       cat: 'military',  roots: ['tirnossë','tir'], weight: 0.7 },
+    { id: 'cybernetic',  cat: 'knowledge', roots: ['ondafëa','ondo','fëa'], weight: 0.7 },
+    { id: 'encryption',  cat: 'knowledge', roots: ['nólëcalma','nólë','calma'], weight: 0.7 },
+    { id: 'data',        cat: 'knowledge', roots: ['istassë','ista'], weight: 0.8 },
+    { id: 'information', cat: 'knowledge', roots: ['istassë','ista'], weight: 0.7 },
+    { id: 'network',     cat: 'knowledge', roots: ['istasírë','ista','sírë'], weight: 0.8 },
+    { id: 'medicine',    cat: 'knowledge', roots: ['sérëdalë','sérë','dalë'], weight: 0.8 },
+    { id: 'medical',     cat: 'knowledge', roots: ['sérëdalë','sérë'], weight: 0.7 },
+    { id: 'diagnostic',  cat: 'knowledge', roots: ['hroatírië','hroa','tírië'], weight: 0.7 },
+
+    // ═══ Materials ═══
+    { id: 'steel',       cat: 'nature',    roots: ['angë','ondo'], weight: 0.8 },
+    { id: 'alloy',       cat: 'nature',    roots: ['angëminya','angë'], weight: 0.7 },
+    { id: 'plasma',      cat: 'nature',    roots: ['naurossa','naur'], weight: 0.8 },
+    { id: 'antimatter',  cat: 'nature',    roots: ['úondassë','ondassë'], weight: 0.8 },
+
+    // ═══ Weapons ═══
+    { id: 'cannon',      cat: 'military',  roots: ['raucanaurion','rauca','naur'], weight: 0.8 },
+    { id: 'turret',      cat: 'military',  roots: ['tíriënaurion','tírië','naur'], weight: 0.7 },
+    { id: 'torpedo',     cat: 'military',  roots: ['hastarunya','hasta','runya'], weight: 0.8 },
+    { id: 'beam',        cat: 'military',  roots: ['calasírion','cala','sírë'], weight: 0.8 },
+    { id: 'laser',       cat: 'military',  roots: ['calasírion','cal'], weight: 0.7 },
+    { id: 'explosive',   cat: 'military',  roots: ['raucaerthin','rauca','erthin'], weight: 0.7 },
+
+    // ═══ Philosophy ═══
+    { id: 'logic',       cat: 'knowledge', roots: ['sanyanolmë','san','nolmë'], weight: 0.8 },
+    { id: 'ethics',      cat: 'knowledge', roots: ['mánolmë','mâ','nolmë'], weight: 0.8 },
+    { id: 'morality',    cat: 'knowledge', roots: ['mánolmë'], weight: 0.7 },
+    { id: 'virtue',      cat: 'spirit',    roots: ['aicalma','cal'], weight: 0.8 },
+    { id: 'conscience',  cat: 'spirit',    roots: ['hónsanmë','hón','sanmë'], weight: 0.8 },
+    { id: 'belief',      cat: 'spirit',    roots: ['estëlië','estel'], weight: 0.8 },
+    { id: 'doubt',       cat: 'knowledge', roots: ['úistië','ista'], weight: 0.7 },
+    { id: 'certainty',   cat: 'knowledge', roots: ['sancalë','sanda','cal'], weight: 0.7 },
+
+    // ═══ Economics ═══
+    { id: 'price',       cat: 'social',    roots: ['mirnotië','mir','notië'], weight: 0.7 },
+    { id: 'wealth',      cat: 'social',    roots: ['mirath','mir'], weight: 0.8 },
+    { id: 'poverty',     cat: 'social',    roots: ['úmirath'], weight: 0.7 },
+    { id: 'guild',       cat: 'social',    roots: ['dalëath','dalë'], weight: 0.8 },
+
+    // ═══ Nature (extended) ═══
+    { id: 'seed',        cat: 'nature',    roots: ['erdë','yesta'], weight: 0.7 },
+    { id: 'root',        cat: 'nature',    roots: ['talca','nor'], weight: 0.7 },
+    { id: 'leaf',        cat: 'nature',    roots: ['lassë','galadh'], weight: 0.8 },
+    { id: 'branch',      cat: 'nature',    roots: ['olva','galadh'], weight: 0.7 },
+    { id: 'fruit',       cat: 'nature',    roots: ['yávë','yavië'], weight: 0.8 },
+    { id: 'eagle',       cat: 'nature',    roots: ['soron','aer'], weight: 0.8 },
+    { id: 'serpent',     cat: 'nature',    roots: ['lócë'], weight: 0.8 },
+    { id: 'snake',       cat: 'nature',    roots: ['lócë'], weight: 0.7 },
+    { id: 'dragon',      cat: 'nature',    roots: ['rámacalócë','naur','lócë'], weight: 0.9 },
+    { id: 'horizon',     cat: 'nature',    roots: ['aerrima','aer','rima'], weight: 0.8 },
+
+    // ═══ Body (extended) ═══
+    { id: 'arm',         cat: 'spirit',    roots: ['rancë'], weight: 0.7 },
+    { id: 'leg',         cat: 'spirit',    roots: ['telcë'], weight: 0.7 },
+    { id: 'finger',      cat: 'spirit',    roots: ['lepsë','mâ'], weight: 0.6 },
+    { id: 'wing',        cat: 'nature',    roots: ['ráma','vilya'], weight: 0.8 },
+    { id: 'tooth',       cat: 'spirit',    roots: ['nelet'], weight: 0.6 },
+    { id: 'horn',        cat: 'nature',    roots: ['tildë'], weight: 0.6 },
+
+    // ═══ Propulsion & Power (dossier) ═══
+    { id: 'propulsion',  cat: 'knowledge', roots: ['nortalë','norta'], weight: 0.8 },
+    { id: 'drive',       cat: 'knowledge', roots: ['nortalë','tulcamë'], weight: 0.7 },
+    { id: 'torch drive', cat: 'knowledge', roots: ['naurtulcë','naur','tulcë'], weight: 0.8 },
+    { id: 'thruster',    cat: 'knowledge', roots: ['naurtulcë'], weight: 0.7 },
+    { id: 'solar sail',  cat: 'knowledge', roots: ['anorcalafassë','anor','cala','fassë'], weight: 0.7 },
+    { id: 'fusion',      cat: 'knowledge', roots: ['erthinyestië','erthin'], weight: 0.9 },
+    { id: 'fusion core', cat: 'knowledge', roots: ['erthinhón','erthin','hón'], weight: 0.8 },
+    { id: 'fusion reactor', cat: 'knowledge', roots: ['erthinhón'], weight: 0.8 },
+    { id: 'capacitor',   cat: 'knowledge', roots: ['cuivëcova','cuivëlë','cova'], weight: 0.7 },
+    { id: 'flux vault',  cat: 'knowledge', roots: ['cuivëcova'], weight: 0.7 },
+    { id: 'flywheel',    cat: 'knowledge', roots: ['quëriecova','querië','cova'], weight: 0.6 },
+
+    // ═══ Sensors (dossier) ═══
+    { id: 'radar',       cat: 'knowledge', roots: ['falmatírilmë','falma','tir'], weight: 0.8 },
+    { id: 'lidar',       cat: 'knowledge', roots: ['calatírilmë','cala','tir'], weight: 0.7 },
+    { id: 'imager',      cat: 'knowledge', roots: ['cenilmë','cena'], weight: 0.7 },
+    { id: 'spectrometer', cat: 'knowledge', roots: ['calaquërilmë','cala','quer'], weight: 0.6 },
+    { id: 'magnetometer', cat: 'knowledge', roots: ['tulcatírilmë','tulcathal','tir'], weight: 0.6 },
+    { id: 'detector',    cat: 'knowledge', roots: ['hirtilmë','hir'], weight: 0.7 },
+
+    // ═══ Electronic Warfare (dossier) ═══
+    { id: 'electronic warfare', cat: 'military', roots: ['centamahta','centa','mahta'], weight: 0.8 },
+    { id: 'jammer',      cat: 'military',  roots: ['centanurta','centa','nurta'], weight: 0.7 },
+    { id: 'countermeasure', cat: 'military', roots: ['enthalië','thal'], weight: 0.7 },
+    { id: 'decoy',       cat: 'military',  roots: ['wanwahroa','wanwa','hroa'], weight: 0.7 },
+
+    // ═══ Armament (dossier) ═══
+    { id: 'lance',       cat: 'military',  roots: ['calahasta','cala','hasta'], weight: 0.9 },
+    { id: 'missile',     cat: 'military',  roots: ['tiëhastarunya','tië','hasta','runya'], weight: 0.8 },
+    { id: 'point defense', cat: 'military', roots: ['thaltirilmë','thal','tir'], weight: 0.8 },
+    { id: 'projectile',  cat: 'military',  roots: ['tulcarunya','tulca','runya'], weight: 0.7 },
+    { id: 'penetrator',  cat: 'military',  roots: ['tercano','ter'], weight: 0.7 },
+    { id: 'sabot',       cat: 'military',  roots: ['raucarunya','rauca','runya'], weight: 0.6 },
+    { id: 'ammunition',  cat: 'military',  roots: ['runyacova','runya','cova'], weight: 0.7 },
+    { id: 'ammo',        cat: 'military',  roots: ['runyacova'], weight: 0.6 },
+    { id: 'autoloader',  cat: 'military',  roots: ['naurionpantë','naurion','panta'], weight: 0.6 },
+    { id: 'barrel',      cat: 'military',  roots: ['naurionossë','naurion'], weight: 0.6 },
+    { id: 'suppression', cat: 'military',  roots: ['nurtanaurë','nurta','naur'], weight: 0.7 },
+
+    // ═══ Armor (dossier) ═══
+    { id: 'armor',       cat: 'military',  roots: ['turma','tur'], weight: 0.9 },
+    { id: 'ablative',    cat: 'military',  roots: ['lanta turma','lanta','turma'], weight: 0.7 },
+    { id: 'ceramic',     cat: 'nature',    roots: ['ondacalë','ondo','cal'], weight: 0.7 },
+    { id: 'laminate',    cat: 'military',  roots: ['parmaturma','parma','turma'], weight: 0.6 },
+    { id: 'lattice',     cat: 'knowledge', roots: ['raicossë','raic'], weight: 0.7 },
+    { id: 'monocrystal', cat: 'knowledge', roots: ['ercalassë','er','calassë'], weight: 0.6 },
+    { id: 'plating',     cat: 'military',  roots: ['turmahelvë','turma','helvë'], weight: 0.7 },
+    { id: 'foam',        cat: 'knowledge', roots: ['lungëmassë','lungë'], weight: 0.6 },
+    { id: 'coating',     cat: 'military',  roots: ['turmafassë','turma','fassë'], weight: 0.6 },
+
+    // ═══ Shields (dossier) ═══
+    { id: 'shield grid', cat: 'military',  roots: ['thalraicë','thal','raicë'], weight: 0.8 },
+    { id: 'halo shield', cat: 'military',  roots: ['thalrindë','thal','rindë'], weight: 0.7 },
+    { id: 'photonic',    cat: 'knowledge', roots: ['calacárëa','cala','cárië'], weight: 0.7 },
+
+    // ═══ Craft Types (dossier) ═══
+    { id: 'interceptor', cat: 'military',  roots: ['rámaciryë','ráma','cirya'], weight: 0.8 },
+    { id: 'transport',   cat: 'military',  roots: ['colciryë','cola','cirya'], weight: 0.8 },
+    { id: 'fighter',     cat: 'military',  roots: ['mahtaciryë','mahta','cirya'], weight: 0.8 },
+    { id: 'frigate',     cat: 'military',  roots: ['tirciryë','tir','cirya'], weight: 0.8 },
+
+    // ═══ Thermal & Systems (dossier) ═══
+    { id: 'heat',        cat: 'nature',    roots: ['urucalë','ur','cal'], weight: 0.8 },
+    { id: 'thermal',     cat: 'nature',    roots: ['urucalë'], weight: 0.7 },
+    { id: 'radiator',    cat: 'knowledge', roots: ['urulantilmë','uru','lanta'], weight: 0.7 },
+    { id: 'coolant',     cat: 'knowledge', roots: ['ringassë','ringa'], weight: 0.7 },
+    { id: 'cooling',     cat: 'knowledge', roots: ['ringalë','ringa'], weight: 0.7 },
+    { id: 'ram intake',  cat: 'knowledge', roots: ['thúlëmapë','thúlë','mapë'], weight: 0.6 },
+    { id: 'cloning',     cat: 'knowledge', roots: ['ontalë','onta'], weight: 0.7 },
+    { id: 'repair',      cat: 'knowledge', roots: ['envanyalë','envanya'], weight: 0.7 },
+    { id: 'mending',     cat: 'knowledge', roots: ['envanyalë'], weight: 0.6 },
+    { id: 'docking',     cat: 'knowledge', roots: ['ciryavestë','cirya','vesta'], weight: 0.7 },
+
+    // ═══ Ground Vehicles (dossier) ═══
+    { id: 'tank',        cat: 'military',  roots: ['turmaroch','turma','roch'], weight: 0.9 },
+    { id: 'vehicle',     cat: 'knowledge', roots: ['nortaroch','norta','roch'], weight: 0.8 },
+    { id: 'driver',      cat: 'social',    roots: ['nortano','norta'], weight: 0.7 },
+    { id: 'gunner',      cat: 'military',  roots: ['nauritar','naur'], weight: 0.7 },
+    { id: 'fire control', cat: 'military', roots: ['naurësanmë','naur','sanmë'], weight: 0.8 },
+    { id: 'targeting',   cat: 'military',  roots: ['centatírilmë','centa','tírië'], weight: 0.7 },
+    { id: 'hatch',       cat: 'knowledge', roots: ['latando','lat','ando'], weight: 0.6 },
+    { id: 'self-destruct', cat: 'military', roots: ['ciryafiralë','cirya','fira'], weight: 0.7 },
+
+    // ═══ Operational Terms (dossier) ═══
+    { id: 'sortie',      cat: 'military',  roots: ['ciryalanta','cirya','lanta'], weight: 0.8 },
+    { id: 'strike',      cat: 'military',  roots: ['raucahasta','rauca','hasta'], weight: 0.8 },
+    { id: 'interdiction', cat: 'military', roots: ['tiëthallë','tië','thal'], weight: 0.7 },
+    { id: 'combined arms', cat: 'military', roots: ['ilyamahtië','ilya','mahta'], weight: 0.7 },
+    { id: 'hardpoint',   cat: 'military',  roots: ['naurionvestë','naurion','vestë'], weight: 0.6 },
+    { id: 'modular',     cat: 'knowledge', roots: ['pantalë','panta'], weight: 0.7 },
+    { id: 'maintenance', cat: 'knowledge', roots: ['camnolë','cam','nolë'], weight: 0.7 },
+    { id: 'logistics',   cat: 'military',  roots: ['nortëcolë','norta','cola'], weight: 0.8 },
+    { id: 'resupply',    cat: 'military',  roots: ['enyantië','anta'], weight: 0.7 },
+    { id: 'replenishment', cat: 'military', roots: ['enyantië'], weight: 0.7 },
+    { id: 'deployment',  cat: 'military',  roots: ['hastanortië','hasta','norta'], weight: 0.8 },
+    { id: 'operational range', cat: 'military', roots: ['andahastië','anda','hastië'], weight: 0.6 },
+    { id: 'survivability', cat: 'military', roots: ['cuivëtulcië','cuivëlë','tulcë'], weight: 0.7 },
+    { id: 'kinetic',     cat: 'knowledge', roots: ['tulcië','tulcalë'], weight: 0.7 },
+    { id: 'caliber',     cat: 'military',  roots: ['naurionandë','naurion'], weight: 0.6 },
+    { id: 'contested',   cat: 'military',  roots: ['mahtadorë','mahta','dorë'], weight: 0.6 },
+    { id: 'tracked vehicle', cat: 'military', roots: ['nortacemë','norta','cemë'], weight: 0.7 },
+
+    // ═══ Aircraft & Rotorcraft ═══
+    { id: 'rotor',       cat: 'knowledge', roots: ['quërirámë','querië','ráma'], weight: 0.7 },
+    { id: 'helicopter',  cat: 'military',  roots: ['quërirámaciryë','quërirámë','cirya'], weight: 0.8 },
+    { id: 'rotorcraft',  cat: 'military',  roots: ['quërirámaciryë'], weight: 0.8 },
+    { id: 'VTOL',        cat: 'knowledge', roots: ['ortahastië','orta','hastië'], weight: 0.7 },
+    { id: 'fuselage',    cat: 'knowledge', roots: ['ciryahón','cirya','hón'], weight: 0.7 },
+    { id: 'nose',        cat: 'knowledge', roots: ['ciryatië','cirya','tië'], weight: 0.6 },
+    { id: 'prow',        cat: 'knowledge', roots: ['ciryatië'], weight: 0.6 },
+    { id: 'tail',        cat: 'knowledge', roots: ['ciryatellë','cirya'], weight: 0.6 },
+    { id: 'cockpit',     cat: 'knowledge', roots: ['tirilmar','tir','mar'], weight: 0.8 },
+    { id: 'gimbal',      cat: 'knowledge', roots: ['quëricenta','querië','centa'], weight: 0.6 },
+    { id: 'altitude',    cat: 'knowledge', roots: ['hallëtírië','halla','tírië'], weight: 0.7 },
+    { id: 'hover',       cat: 'knowledge', roots: ['haratírië','hara','tírië'], weight: 0.7 },
+    { id: 'endurance',   cat: 'military',  roots: ['cuivëandë','cuivëlë','anda'], weight: 0.7 },
+    { id: 'loiter',      cat: 'military',  roots: ['harahastië','hara','hastië'], weight: 0.6 },
+    { id: 'rendezvous',  cat: 'military',  roots: ['omentië'], weight: 0.7 },
+
+    // ═══ Weapon Systems (aircraft) ═══
+    { id: 'particle beam', cat: 'military', roots: ['erthintulcë','erthin','tulcë'], weight: 0.8 },
+    { id: 'warhead',     cat: 'military',  roots: ['raucahón','rauca','hón'], weight: 0.8 },
+    { id: 'fragmentation', cat: 'military', roots: ['raucalantë','rauca','lanta'], weight: 0.7 },
+    { id: 'thermobaric', cat: 'military',  roots: ['thúlëraucë','thúlë','rauca'], weight: 0.7 },
+    { id: 'guidance',    cat: 'military',  roots: ['tiëhirilmë','tië','hir'], weight: 0.8 },
+    { id: 'seeker',      cat: 'military',  roots: ['hiritar','hir'], weight: 0.7 },
+    { id: 'datalink',    cat: 'knowledge', roots: ['istahallë','ista','hallë'], weight: 0.7 },
+
+    // ═══ Countermeasures ═══
+    { id: 'flare',       cat: 'military',  roots: ['uruwanwa','uru','wanwa'], weight: 0.7 },
+    { id: 'chaff',       cat: 'military',  roots: ['falmawanwa','falma','wanwa'], weight: 0.7 },
+    { id: 'obscurant',   cat: 'military',  roots: ['nurtaúsquë','nurta','usquë'], weight: 0.7 },
+    { id: 'smoke screen', cat: 'military', roots: ['nurtaúsquë','usquë'], weight: 0.7 },
+    { id: 'active protection', cat: 'military', roots: ['thaltíriënurta','thal','tírië'], weight: 0.7 },
+    { id: 'IFF',         cat: 'military',  roots: ['nossëtirilmë','nossë','tir'], weight: 0.7 },
+
+    // ═══ Stealth & Maneuver ═══
+    { id: 'stealth',     cat: 'military',  roots: ['nurtahastië','nurta','hastië'], weight: 0.8 },
+    { id: 'evasion',     cat: 'military',  roots: ['leryahastië','lerya','hastië'], weight: 0.7 },
+    { id: 'maneuver',    cat: 'military',  roots: ['tiëpantië','tië','panta'], weight: 0.7 },
+    { id: 'speed',       cat: 'knowledge', roots: ['lancië','lanc'], weight: 0.8 },
+    { id: 'velocity',    cat: 'knowledge', roots: ['lancië'], weight: 0.7 },
+
+    // ═══ Light & Physics (dossier) ═══
+    { id: 'hardlight',   cat: 'knowledge', roots: ['tulcacala','tulca','cala'], weight: 0.8 },
+    { id: 'photon',      cat: 'knowledge', roots: ['calerthin','cala','erthin'], weight: 0.8 },
+    { id: 'boson',       cat: 'knowledge', roots: ['tulcërthin','tulca','erthin'], weight: 0.7 },
+    { id: 'wavelength',  cat: 'knowledge', roots: ['falmanotië','falma','notië'], weight: 0.7 },
+    { id: 'infrared',    cat: 'knowledge', roots: ['urucala','uru','cala'], weight: 0.7 },
+    { id: 'ultraviolet', cat: 'knowledge', roots: ['aicacala','aica','cala'], weight: 0.7 },
+    { id: 'processor',   cat: 'knowledge', roots: ['sanmëhón','sanmë','hón'], weight: 0.8 },
+    { id: 'beacon',      cat: 'knowledge', roots: ['centacalma','centa','calma'], weight: 0.7 },
+    { id: 'uplink',      cat: 'knowledge', roots: ['aelcentië','ael','centië'], weight: 0.6 },
+    { id: 'mesh',        cat: 'knowledge', roots: ['raicëistë','raicë','istë'], weight: 0.7 },
+    { id: 'tactical mesh', cat: 'military', roots: ['raicëistë','raicë'], weight: 0.7 }
   ];
 
   /* ── Cultural metaphor mappings ── */
