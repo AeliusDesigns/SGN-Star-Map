@@ -455,6 +455,7 @@ document.getElementById('btn-save-repo').addEventListener('click', async () => {
 });
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&#34;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ══════════════════════════════════════════
    VIEW ENTRY (DOSSIER)
@@ -800,11 +801,11 @@ function editEntry(id, tpl) {
     templateFields = `
       <div class="edit-section">
         <div class="edit-section-title">System Identification</div>
-        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. ICAS-AURION — Shipborne AI Command Model"/></div>
-        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Strategic AI / Integrated Command Assistant"/></div>
-        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${esc(e.opStatus||'')}" placeholder="e.g. Active Service — Fleetwide Standard"/></div>
-        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
-        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Vanyamar Orbital Research Foundry"/></div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. ICAS-AURION — Shipborne AI Command Model"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. Strategic AI / Integrated Command Assistant"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${escAttr(e.opStatus||'')}" placeholder="e.g. Active Service — Fleetwide Standard"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Vanyamar Orbital Research Foundry"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Primary function and operational purpose...">${esc(e.role||'')}</textarea></div>
       </div>
       <div class="edit-section">
@@ -816,18 +817,18 @@ function editEntry(id, tpl) {
       </div>
       <div class="edit-section">
         <div class="edit-section-title">Document Footer</div>
-        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — CYBERNETICS DIVISION"/></div>
-        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. ICAS-AURION-SYS-013-B"/></div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${escAttr(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — CYBERNETICS DIVISION"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${escAttr(e.revision||'')}" placeholder="e.g. ICAS-AURION-SYS-013-B"/></div>
       </div>
     `;
   } else if (cat === 'lore') {
     templateFields = `
       <div class="edit-section">
         <div class="edit-section-title">Context</div>
-        <div class="form-row"><span class="fl">Subject</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. The Sundering of Calandorë"/></div>
-        <div class="form-row"><span class="fl">Era / Period</span><input id="ed-era" class="sci-input" type="text" value="${esc(e.era||'')}" placeholder="e.g. Second Age of Stars / Pre-Expansion"/></div>
-        <div class="form-row"><span class="fl">Region</span><input id="ed-region" class="sci-input" type="text" value="${esc(e.region||'')}" placeholder="e.g. Arandorë Eldainë / Vanyamar System"/></div>
-        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. Historical Event / Mythology / Cultural Tradition"/></div>
+        <div class="form-row"><span class="fl">Subject</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. The Sundering of Calandorë"/></div>
+        <div class="form-row"><span class="fl">Era / Period</span><input id="ed-era" class="sci-input" type="text" value="${escAttr(e.era||'')}" placeholder="e.g. Second Age of Stars / Pre-Expansion"/></div>
+        <div class="form-row"><span class="fl">Region</span><input id="ed-region" class="sci-input" type="text" value="${escAttr(e.region||'')}" placeholder="e.g. Arandorë Eldainë / Vanyamar System"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. Historical Event / Mythology / Cultural Tradition"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-summary" class="sci-textarea" style="min-height:80px;" placeholder="Brief overview — the essential facts before the full account...">${esc(e.summary||'')}</textarea></div>
       </div>
     `;
@@ -835,19 +836,19 @@ function editEntry(id, tpl) {
     templateFields = `
       <div class="edit-section">
         <div class="edit-section-title">Document Header</div>
-        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="e.g. Doctrine, Structure & Fleet Operating Manual"/></div>
-        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
-        <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${esc(e.distribution||'')}" placeholder="e.g. Restricted — AEN Command, Fleet Staff, Authorized Personnel Only"/></div>
-        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. Doctrine, Structure & Fleet Operating Manual"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
+        <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${escAttr(e.distribution||'')}" placeholder="e.g. Restricted — AEN Command, Fleet Staff, Authorized Personnel Only"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Top Secret — AEN Command Eyes Only"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Purpose</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="What this document provides — executive summary of its function...">${esc(e.role||'')}</textarea></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Scope</span><textarea id="ed-scope" class="sci-textarea" style="min-height:60px;" placeholder="What areas this document covers...">${esc(e.scope||'')}</textarea></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Authority</span><textarea id="ed-authority" class="sci-textarea" style="min-height:40px;" placeholder="Issuing authority and binding status...">${esc(e.authority||'')}</textarea></div>
       </div>
       <div class="edit-section">
         <div class="edit-section-title">Document Footer</div>
-        <div class="form-row"><span class="fl">Prepared By</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Doctrine & Fleet Employment Office, Anorvalas Naval Command"/></div>
-        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
-        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. AEN-DOCTRINE-OVR-001-A"/></div>
+        <div class="form-row"><span class="fl">Prepared By</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Doctrine & Fleet Employment Office, Anorvalas Naval Command"/></div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${escAttr(e.docClass||'')}" placeholder="e.g. CLASSIFIED — AEN INTERNAL / STRATEGIC DOCTRINE"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${escAttr(e.revision||'')}" placeholder="e.g. AEN-DOCTRINE-OVR-001-A"/></div>
       </div>
     `;
   } else if (cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
@@ -860,11 +861,11 @@ function editEntry(id, tpl) {
     templateFields = `
       <div class="edit-section">
         <div class="edit-section-title">${detailLabel}</div>
-        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="${desigPlaceholder}"/></div>
-        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${esc(e.classification||'')}" placeholder="${classPlaceholder}"/></div>
-        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${esc(e.opStatus||'')}" placeholder="e.g. Active Service — AEN Fleet Standard"/></div>
-        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${esc(e.accessLevel||'')}" placeholder="e.g. Restricted — AEN Command & Engineering Division Only"/></div>
-        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${esc(e.origin||'')}" placeholder="e.g. Calandorë Orbital Shipworks"/></div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="${desigPlaceholder}"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="${classPlaceholder}"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${escAttr(e.opStatus||'')}" placeholder="e.g. Active Service — AEN Fleet Standard"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Restricted — AEN Command & Engineering Division Only"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Calandorë Orbital Shipworks"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Role</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="${rolePlaceholder}">${esc(e.role||'')}</textarea></div>
       </div>
       <div class="edit-section">
@@ -876,8 +877,8 @@ function editEntry(id, tpl) {
       </div>
       <div class="edit-section">
         <div class="edit-section-title">Document Footer</div>
-        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${esc(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — MEDICAL & BIOLOGICS COMMAND"/></div>
-        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${esc(e.revision||'')}" placeholder="e.g. VANY-CMCTC-001-B"/></div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${escAttr(e.docClass||'')}" placeholder="e.g. INTERNAL AEN — MEDICAL & BIOLOGICS COMMAND"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${escAttr(e.revision||'')}" placeholder="e.g. VANY-CMCTC-001-B"/></div>
       </div>
     `;
   }
@@ -897,8 +898,8 @@ function editEntry(id, tpl) {
       <div class="editor-title">${isNew ? 'NEW ' + cat.toUpperCase() + ' ENTRY' : 'EDIT ENTRY'}</div>
       <div class="edit-section">
         <div class="edit-section-title">Identity</div>
-        <div class="form-row"><span class="fl">Title</span><input id="ed-title" class="sci-input" type="text" value="${esc(e.title||'')}" placeholder="Entry title..."/></div>
-        ${cat==='freeform' ? `<div class="form-row"><span class="fl">Subtitle</span><input id="ed-desig" class="sci-input" type="text" value="${esc(e.designation||'')}" placeholder="Optional subtitle..."/></div>` : ''}
+        <div class="form-row"><span class="fl">Title</span><input id="ed-title" class="sci-input" type="text" value="${escAttr(e.title||'')}" placeholder="Entry title..."/></div>
+        ${cat==='freeform' ? `<div class="form-row"><span class="fl">Subtitle</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="Optional subtitle..."/></div>` : ''}
       </div>
       ${templateFields}
       <div class="edit-section">
@@ -971,8 +972,8 @@ function editEntry(id, tpl) {
 
 function statRow(key, val, idx) {
   return `<div class="stat-editor-row">
-    <input class="sk sci-input" type="text" value="${esc(key)}" placeholder="Stat name (e.g. Length)"/>
-    <input class="sv sci-input" type="text" value="${esc(val)}" placeholder="Value (e.g. 18 meters)"/>
+    <input class="sk sci-input" type="text" value="${escAttr(key)}" placeholder="Stat name (e.g. Length)"/>
+    <input class="sv sci-input" type="text" value="${escAttr(val)}" placeholder="Value (e.g. 18 meters)"/>
     <button type="button" class="stat-del" title="Remove">✕</button>
   </div>`;
 }
