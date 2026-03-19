@@ -20,6 +20,10 @@
       {
         "date": "4129.02.29",
         "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+      },
+      {
+        "date": "4180.09.26",
+        "text": "Conducted a meeting on behalf of the Realm with the Dolls at the Galactic Assembly"
       }
     ],
     "relationships": [
@@ -36,7 +40,7 @@
         "targetName": ""
       }
     ],
-    "updated": 1773603213775
+    "updated": 1773891692174
   },
   {
     "id": "PER_MMR9ZIUI_2MT",
