@@ -547,7 +547,7 @@
   },
   "dictionary": {
     "version": "1.0",
-    "totalEntries": 719,
+    "totalEntries": 720,
     "entries": [
       {
         "id": "R001",
@@ -12369,6 +12369,23 @@
           "tara"
         ],
         "updated": 1773925674687
+      },
+      {
+        "id": "GEN_MMXHKJ27",
+        "word": "hestëa",
+        "ipa": "/hɛs.ˈtɛ.a/",
+        "pos": "noun",
+        "definitions": [
+          "choose",
+          "having the quality of to choose"
+        ],
+        "etymology": "From hesta (to choose) + -ëa (adjectival)",
+        "tags": [
+          "generated",
+          "standard",
+          "hesta"
+        ],
+        "updated": 1773925716607
       }
     ],
     "commonPhrases": [
