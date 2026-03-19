@@ -244,6 +244,33 @@
     /* toast */
     .wiki-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);padding:10px 20px;background:rgba(92,219,122,.15);border:1px solid rgba(92,219,122,.3);border-radius:3px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:200;}
     .wiki-toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    /* ── Classified lock icon in sidebar ── */
+    .post-item-lock{color:var(--red-alert);font-size:10px;opacity:.7;}
+
+    /* ── Classified lockscreen ── */
+    .classified-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;position:relative;overflow:hidden;}
+    .classified-screen::before{content:'CLASSIFIED';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-15deg);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:120px;letter-spacing:20px;color:rgba(255,59,59,.03);pointer-events:none;white-space:nowrap;}
+    .classified-icon{font-size:64px;margin-bottom:24px;opacity:.6;animation:cls-pulse 3s ease-in-out infinite;}
+    @keyframes cls-pulse{0%,100%{opacity:.4;transform:scale(1);}50%{opacity:.7;transform:scale(1.05);}}
+    .classified-badge{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--red-alert);border:1px solid rgba(255,59,59,.3);padding:6px 16px;border-radius:2px;background:rgba(255,59,59,.06);margin-bottom:24px;}
+    .classified-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;letter-spacing:3px;color:var(--text);margin-bottom:8px;}
+    .classified-body{font-family:'Exo 2',sans-serif;font-size:14px;color:var(--text-dim);line-height:1.8;max-width:480px;margin-bottom:8px;}
+    .classified-divider{width:120px;height:1px;background:linear-gradient(90deg,transparent,var(--red-alert),transparent);margin:16px auto;opacity:.3;}
+    .classified-unlock{background:transparent;border:1px solid rgba(255,59,59,.4);color:var(--red-alert);border-radius:3px;padding:10px 28px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+    .classified-unlock:hover{border-color:var(--red-alert);background:rgba(255,59,59,.08);box-shadow:0 0 20px rgba(255,59,59,.15);}
+    .classified-footer{margin-top:24px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-muted);text-transform:uppercase;opacity:.5;}
+
+    /* ── Classified toggle in editor ── */
+    .classified-toggle{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:3px;margin-top:10px;background:rgba(5,8,16,.5);cursor:pointer;transition:all .15s;user-select:none;}
+    .classified-toggle:hover{border-color:var(--border2);}
+    .classified-toggle.active{border-color:rgba(255,59,59,.4);background:rgba(255,59,59,.06);}
+    .classified-toggle-switch{width:36px;height:18px;border-radius:9px;background:var(--border2);position:relative;transition:background .2s;flex-shrink:0;}
+    .classified-toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--text-muted);transition:all .2s;}
+    .classified-toggle.active .classified-toggle-switch{background:rgba(255,59,59,.5);}
+    .classified-toggle.active .classified-toggle-switch::after{left:20px;background:var(--red-alert);}
+    .classified-toggle-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);transition:color .2s;}
+    .classified-toggle.active .classified-toggle-label{color:var(--red-alert);}
   </style>
 </head>
 <body>
@@ -309,6 +336,7 @@ let activeId = null;
 let filterCat = 'all';
 let _editorPW = null;
 let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
+let classifiedUnlocked = false;
 
 async function load() {
   let fileEntries = null;
@@ -401,7 +429,7 @@ function renderList() {
 
   postList.innerHTML = items.map(e => `
     <div class="post-item${e.id===activeId?' active':''}" data-id="${e.id}">
-      <div class="post-item-title">${esc(e.title || 'Untitled')}</div>
+      <div class="post-item-title">${e.classified ? '<span class="post-item-lock">\u2B21 </span>' : ''}${esc(e.title || 'Untitled')}</div>
       <div class="post-item-meta">
         <span class="post-item-cat ${e.category}">${(e.category||'freeform').toUpperCase()}</span>
         <span>${e.designation ? esc(e.designation) : ''}</span>
@@ -465,6 +493,38 @@ const main = document.getElementById('main');
 function viewEntry(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
+
+  /* ── Classified gate ── */
+  if (e.classified && !classifiedUnlocked) {
+    main.innerHTML = `
+      <div class="classified-screen">
+        <div class="classified-icon">\u2B21</div>
+        <div class="classified-badge">Classified Document</div>
+        <div class="classified-title">${esc(e.title || 'Untitled')}</div>
+        <div class="classified-divider"></div>
+        <div class="classified-body">
+          This document has been classified by<br/>
+          <strong style="color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1px;">The Valarind\u00EB, the Council of the Seven Great Houses.</strong>
+        </div>
+        <div class="classified-body" style="margin-top:4px;font-size:13px;">
+          Further information may be obtained from the Grand Archive<br/>
+          under the authority of the Loremasters.
+        </div>
+        <div class="classified-divider"></div>
+        <button class="classified-unlock" id="cls-unlock">Request Access</button>
+        <div class="classified-footer">AEN Document Control // Restricted Distribution</div>
+      </div>
+    `;
+    document.getElementById('cls-unlock').onclick = () => {
+      if (requireEditor()) {
+        classifiedUnlocked = true;
+        viewEntry(id);
+        toast('Classified access granted');
+      }
+    };
+    return;
+  }
+
   const cat = e.category || 'freeform';
   const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',lore:'LORE & HISTORY',doctrine:'DOCTRINE & ORGANIZATION',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
 
@@ -575,39 +635,44 @@ function showNewEntryPicker() {
   main.innerHTML = `
     <div class="editor-page">
       <div class="editor-title">Create New Entry</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:16px;">
         <div class="template-card" data-tpl="ship">
-          <div style="font-size:28px;margin-bottom:8px;">⬡</div>
+          <div style="font-size:28px;margin-bottom:8px;">\u2B21</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--cyan);">Ship Dossier</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Naval combat asset with structured specs.</div>
         </div>
         <div class="template-card" data-tpl="vehicle">
-          <div style="font-size:28px;margin-bottom:8px;">◈</div>
+          <div style="font-size:28px;margin-bottom:8px;">\u25C8</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--gold);">Vehicle Dossier</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Ground, air, or orbital vehicle.</div>
         </div>
         <div class="template-card" data-tpl="soldier">
-          <div style="font-size:28px;margin-bottom:8px;">◉</div>
+          <div style="font-size:28px;margin-bottom:8px;">\u25C9</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--green);">Soldier / Unit</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Personnel type or combat role.</div>
         </div>
         <div class="template-card" data-tpl="technology">
-          <div style="font-size:28px;margin-bottom:8px;">⚙</div>
+          <div style="font-size:28px;margin-bottom:8px;">\u2699</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--purple);">Technology</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Weapons, shields, propulsion, materials, sensors — any tech system.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Shields, propulsion, materials, sensors, AI, defense systems.</div>
+        </div>
+        <div class="template-card" data-tpl="weapon">
+          <div style="font-size:28px;margin-bottom:8px;">\u2694</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--red-alert);">Weapon System</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Infantry arms, vehicle mounts, ship lances, melee weapons, ordnance.</div>
         </div>
         <div class="template-card" data-tpl="lore">
-          <div style="font-size:28px;margin-bottom:8px;">📜</div>
+          <div style="font-size:28px;margin-bottom:8px;">\uD83D\uDCDC</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--amber);">Lore & History</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Factions, events, mythology, culture, places, timelines.</div>
         </div>
         <div class="template-card" data-tpl="doctrine">
-          <div style="font-size:28px;margin-bottom:8px;">📋</div>
+          <div style="font-size:28px;margin-bottom:8px;">\uD83D\uDCCB</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--slate);">Doctrine & Org</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Rank structures, formations, SOPs, fleet manuals, codex directives.</div>
         </div>
         <div class="template-card" data-tpl="freeform">
-          <div style="font-size:28px;margin-bottom:8px;">✦</div>
+          <div style="font-size:28px;margin-bottom:8px;">\u2726</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--text);">Freeform Entry</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Full rich-text editor, no template.</div>
         </div>
@@ -785,18 +850,46 @@ function setupEditorImageHandlers(editorEl) {
    ══════════════════════════════════════════ */
 function editEntry(id, tpl) {
   const isNew = !id;
+  const isWeaponTpl = (tpl === 'weapon');
+  const saveCat = isWeaponTpl ? 'technology' : (tpl || 'freeform');
   const e = id ? entries.find(x => x.id === id) : {
-    id:genId(), category:tpl||'freeform', title:'', designation:'', classification:'',
-    role:'', stats:[], body:'', updated:Date.now(),
+    id:genId(), category:saveCat, title:'', designation:'', classification:'',
+    role:'', stats:[], body:'', updated:Date.now(), classified:false,
     /* tech-specific */ opStatus:'', accessLevel:'', origin:'', docClass:'', revision:'',
     /* lore-specific */ era:'', region:'', summary:'',
     /* doctrine-specific */ distribution:'', scope:'', authority:''
   };
+  const isWeaponEdit = isWeaponTpl || (e._weaponTpl === true);
   const cat = e.category || 'freeform';
 
   let templateFields = '';
 
-  if (cat === 'technology') {
+  if (isWeaponEdit) {
+    const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">Weapon Identification</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. AESIR-3 Beam Rifle / AURELION-21 Hard-Light Blade"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. Directed-Energy Assault Rifle / Hard-Light Melee Weapon"/></div>
+        <div class="form-row"><span class="fl">Op. Status</span><input id="ed-opstatus" class="sci-input" type="text" value="${escAttr(e.opStatus||'')}" placeholder="e.g. Active Service — Marine Standard Issue"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Classified — AEN Military Document"/></div>
+        <div class="form-row"><span class="fl">Origin</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. AEN Weapons Program, Vanyamar Orbital Research Foundry"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Purpose</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Role and operational context for this weapon system...">${esc(e.role||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Weapon Specifications</div>
+          <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ SPEC</button>
+        </div>
+        <div id="stat-list">${statsHTML}</div>
+      </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${escAttr(e.docClass||'')}" placeholder="e.g. CLASSIFIED — AEN MILITARY DOCUMENT"/></div>
+        <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${escAttr(e.revision||'')}" placeholder="e.g. AEN-MARINE-DE-CAT / Rev. 02B"/></div>
+      </div>
+    `;
+  } else if (cat === 'technology') {
     const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
     templateFields = `
       <div class="edit-section">
@@ -884,7 +977,7 @@ function editEntry(id, tpl) {
   }
 
   const bodyLabel = {
-    technology:'System Overview / Capabilities / Security',
+    technology: isWeaponEdit ? 'Operational Characteristics / Notes / Ammo Types' : 'System Overview / Capabilities / Security',
     lore:'Full Account',
     freeform:'Content',
     doctrine:'Ranks / Formations / Procedures / Tables',
@@ -893,13 +986,19 @@ function editEntry(id, tpl) {
     soldier:'Overview / Enhancements / Equipment / Safeguards'
   }[cat] || 'Extended Content';
 
+  const editorLabel = isWeaponEdit ? 'WEAPON SYSTEM' : cat.toUpperCase();
+
   main.innerHTML = `
     <div class="editor-page">
-      <div class="editor-title">${isNew ? 'NEW ' + cat.toUpperCase() + ' ENTRY' : 'EDIT ENTRY'}</div>
+      <div class="editor-title">${isNew ? 'NEW ' + editorLabel + ' ENTRY' : 'EDIT ENTRY'}</div>
       <div class="edit-section">
         <div class="edit-section-title">Identity</div>
         <div class="form-row"><span class="fl">Title</span><input id="ed-title" class="sci-input" type="text" value="${escAttr(e.title||'')}" placeholder="Entry title..."/></div>
         ${cat==='freeform' ? `<div class="form-row"><span class="fl">Subtitle</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="Optional subtitle..."/></div>` : ''}
+        <div class="classified-toggle${e.classified ? ' active' : ''}" id="ed-classified-toggle">
+          <div class="classified-toggle-switch"></div>
+          <span class="classified-toggle-label">Classified Document</span>
+        </div>
       </div>
       ${templateFields}
       <div class="edit-section">
@@ -916,7 +1015,11 @@ function editEntry(id, tpl) {
 
   wireToolbar();
 
-  // stat rows (ship/vehicle/soldier/technology)
+  // classified toggle
+  const clsToggle = document.getElementById('ed-classified-toggle');
+  clsToggle?.addEventListener('click', () => clsToggle.classList.toggle('active'));
+
+  // stat rows (ship/vehicle/soldier/technology/weapon)
   const statList = document.getElementById('stat-list');
   document.getElementById('add-stat')?.addEventListener('click', () => {
     const idx = statList?.querySelectorAll('.stat-editor-row').length || 0;
@@ -937,6 +1040,8 @@ function editEntry(id, tpl) {
       designation: document.getElementById('ed-desig')?.value.trim() || '',
       classification: document.getElementById('ed-class')?.value.trim() || '',
       role: document.getElementById('ed-role')?.value.trim() || '',
+      classified: document.getElementById('ed-classified-toggle')?.classList.contains('active') || false,
+      _weaponTpl: isWeaponEdit || false,
       stats: statList ? Array.from(statList.querySelectorAll('.stat-editor-row')).map(row => ({
         key: row.querySelector('.sk').value.trim(),
         val: row.querySelector('.sv').value.trim()
