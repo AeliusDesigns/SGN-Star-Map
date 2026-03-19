@@ -185,6 +185,21 @@
     .dossier-divider.slate{background:linear-gradient(90deg,var(--slate-dim),transparent 80%);}
     .dossier-divider.teal{background:linear-gradient(90deg,#1a8a78,transparent 80%);}
 
+    /* ── Species dossier ── */
+    .dossier-species-header{margin-bottom:18px;border:1px solid rgba(56,219,200,.2);border-radius:3px;overflow:hidden;}
+    .dossier-species-row{display:flex;border-bottom:1px solid rgba(56,219,200,.1);padding:0;}
+    .dossier-species-row:last-child{border-bottom:none;}
+    .dossier-species-key{font-family:'Share Tech Mono',monospace;font-size:11px;color:#1a8a78;letter-spacing:1.5px;text-transform:uppercase;padding:8px 12px;width:160px;flex-shrink:0;background:rgba(56,219,200,.04);border-right:1px solid rgba(56,219,200,.1);}
+    .dossier-species-val{font-family:'Exo 2',sans-serif;font-size:13px;color:var(--text);padding:8px 12px;flex:1;}
+    .dossier-species-summary{margin-bottom:20px;background:rgba(56,219,200,.03);border-left:3px solid #1a8a78;padding:14px 18px;border-radius:0 3px 3px 0;}
+    .dossier-species-summary-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#1a8a78;margin-bottom:6px;}
+    .dossier-species-summary p{font-size:14px;color:var(--text-dim);line-height:1.7;margin:0;}
+    .dossier-species-class-table{margin-bottom:20px;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+    .dossier-species-class-row{display:flex;border-bottom:1px solid var(--border);}
+    .dossier-species-class-row:last-child{border-bottom:none;}
+    .dossier-species-class-key{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:#38dbc8;padding:10px 14px;width:200px;flex-shrink:0;background:rgba(56,219,200,.04);border-right:1px solid var(--border);}
+    .dossier-species-class-val{font-family:'Exo 2',sans-serif;font-size:13px;color:var(--text);padding:10px 14px;flex:1;line-height:1.5;}
+
     .dossier-section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
 
     /* ── Technology dossier ── */
@@ -546,14 +561,14 @@ function viewEntry(id) {
 
   /* ── Structured metadata header (tech + ship/vehicle/soldier/doctrine) ── */
   let metaHeaderHTML = '';
-  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine' || cat === 'species') {
+  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') {
     const fields = [
       e.opStatus   ? ['Operational Status', e.opStatus] : null,
       e.accessLevel? ['Access Level', e.accessLevel] : null,
       e.origin     ? ['Origin', e.origin] : null,
     ].filter(Boolean);
     /* doctrine has extra fields: distribution, scope, authority */
-    if (cat === 'doctrine' || cat === 'species') {
+    if (cat === 'doctrine') {
       if (e.distribution) fields.splice(2, 0, ['Distribution', e.distribution]);
       if (e.scope) fields.push(['Scope', e.scope]);
       if (e.authority) fields.push(['Authority', e.authority]);
@@ -567,7 +582,7 @@ function viewEntry(id) {
 
   /* ── Document classification footer (tech + ship/vehicle/soldier/doctrine) ── */
   let docFooterHTML = '';
-  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine' || cat === 'species') && (e.docClass || e.revision)) {
+  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') && (e.docClass || e.revision)) {
     docFooterHTML = `<div class="dossier-doc-footer">
       ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
       ${e.revision ? `<div class="dossier-doc-rev">Revision: ${esc(e.revision)}</div>` : ''}
@@ -589,6 +604,44 @@ function viewEntry(id) {
     `;
   }
 
+  /* ── Species-specific rendering ── */
+  let speciesHeaderHTML = '';
+  let speciesClassHTML = '';
+  if (cat === 'species') {
+    /* Document header as a teal-accented table */
+    const docFields = [
+      e.opStatus    ? ['Document Type', e.opStatus] : null,
+      e.classification ? ['Classification', e.classification] : null,
+      e.accessLevel ? ['Access Level', e.accessLevel] : null,
+      e.origin      ? ['Issuing Authority', e.origin] : null,
+      e.distribution? ['Distribution', e.distribution] : null,
+    ].filter(Boolean);
+    if (docFields.length) {
+      speciesHeaderHTML = `<div class="dossier-species-header">
+        ${docFields.map(([k,v]) => `<div class="dossier-species-row"><span class="dossier-species-key">${esc(k)}</span><span class="dossier-species-val">${esc(v)}</span></div>`).join('')}
+      </div>`;
+    }
+    if (e.role) {
+      speciesHeaderHTML += `<div class="dossier-species-summary"><div class="dossier-species-summary-label">Summary</div><p>${esc(e.role)}</p></div>`;
+    }
+
+    /* Species classification as a proper two-column table */
+    if (e.stats && e.stats.length) {
+      speciesClassHTML = `<div class="dossier-section-label">Species Classification</div>
+        <div class="dossier-species-class-table">
+          ${e.stats.map(s => `<div class="dossier-species-class-row"><span class="dossier-species-class-key">${esc(s.key)}</span><span class="dossier-species-class-val">${esc(s.val)}</span></div>`).join('')}
+        </div>`;
+    }
+
+    /* Species doc footer */
+    if (e.docClass || e.revision) {
+      docFooterHTML = `<div class="dossier-doc-footer">
+        ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
+        ${e.revision ? `<div class="dossier-doc-rev">Reference: ${esc(e.revision)}</div>` : ''}
+      </div>`;
+    }
+  }
+
   /* ── Divider accent by category ── */
   const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : (cat==='doctrine' ? ' slate' : (cat==='species' ? ' teal' : '')));
 
@@ -602,10 +655,10 @@ function viewEntry(id) {
       <div class="dossier-title">${esc(e.title || 'Untitled')}</div>
       <div class="dossier-subtitle">${esc(e.designation || '')}</div>
       <div class="dossier-divider${divAccent}"></div>
-      ${metaHeaderHTML}
+      ${cat === 'species' ? speciesHeaderHTML : metaHeaderHTML}
       ${loreHeaderHTML}
-      ${e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
-      ${statsHTML}
+      ${cat !== 'species' && e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
+      ${cat === 'species' ? speciesClassHTML : statsHTML}
       ${e.body ? `<div class="dossier-divider${divAccent}"></div><div class="dossier-body">${e.body}</div>` : ''}
       ${docFooterHTML}
       <div class="dossier-actions">
@@ -961,8 +1014,8 @@ function editEntry(id, tpl) {
         <div class="form-row"><span class="fl">Subject</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. Taralind\u00EB: The High Elves of Arandor\u00EB Eldain\u00EB"/></div>
         <div class="form-row"><span class="fl">Doc. Type</span><input id="ed-opstatus" class="sci-input" type="text" value="${escAttr(e.opStatus||'')}" placeholder="e.g. Species Record: Archival Dossier"/></div>
         <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. PUBLIC RECORD: GENERAL ARCHIVE"/></div>
-        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Public Release, Restricted, etc."/></div>
-        <div class="form-row"><span class="fl">Issuing Auth.</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Loremasters of the Grand Archive"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Public Record: General Archive"/></div>
+        <div class="form-row"><span class="fl">Issuing Auth.</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Office of the Archival Record, Valarind\u00EB Secretariat"/></div>
         <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${escAttr(e.distribution||'')}" placeholder="e.g. All Member Worlds \u00b7 Public Archive \u00b7 Diplomatic Registry"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Brief overview of the species and their significance...">${esc(e.role||'')}</textarea></div>
       </div>
