@@ -1014,8 +1014,8 @@ function editEntry(id, tpl) {
         <div class="form-row"><span class="fl">Subject</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. Taralind\u00EB: The High Elves of Arandor\u00EB Eldain\u00EB"/></div>
         <div class="form-row"><span class="fl">Doc. Type</span><input id="ed-opstatus" class="sci-input" type="text" value="${escAttr(e.opStatus||'')}" placeholder="e.g. Species Record: Archival Dossier"/></div>
         <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. PUBLIC RECORD: GENERAL ARCHIVE"/></div>
-        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Public Record: General Archive"/></div>
-        <div class="form-row"><span class="fl">Issuing Auth.</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Office of the Archival Record, Valarind\u00EB Secretariat"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Restricted, Public, Top Secret"/></div>
+        <div class="form-row"><span class="fl">Issuing Auth.</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Loremasters of the Grand Archive, Loremasters Guild"/></div>
         <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${escAttr(e.distribution||'')}" placeholder="e.g. All Member Worlds \u00b7 Public Archive \u00b7 Diplomatic Registry"/></div>
         <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Brief overview of the species and their significance...">${esc(e.role||'')}</textarea></div>
       </div>
