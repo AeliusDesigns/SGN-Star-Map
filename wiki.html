@@ -97,6 +97,7 @@
     .post-item-cat.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
     .post-item-cat.doctrine{border-color:rgba(143,170,190,.3);color:var(--slate-dim);}
     .post-item-cat.freeform{border-color:rgba(90,122,153,.4);color:var(--text-dim);}
+    .post-item-cat.species{border-color:rgba(56,219,200,.3);color:#1a8a78;}
 
     .sb-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;}
     .sb-footer .pbtn{flex:1;}
@@ -173,6 +174,7 @@
     .dossier-class-tag.lore{border-color:rgba(255,158,68,.3);color:var(--amber-dim);}
     .dossier-class-tag.doctrine{border-color:rgba(143,170,190,.3);color:var(--slate-dim);}
     .dossier-class-tag.freeform{border-color:var(--border2);color:var(--text-muted);}
+    .dossier-class-tag.species{border-color:rgba(56,219,200,.3);color:#1a8a78;}
 
     .dossier-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:32px;letter-spacing:2px;color:var(--text);line-height:1.15;margin-bottom:4px;}
     .dossier-subtitle{font-family:'Exo 2',sans-serif;font-size:14px;color:var(--text-dim);margin-bottom:20px;font-weight:300;}
@@ -181,6 +183,7 @@
     .dossier-divider.gold{background:linear-gradient(90deg,var(--gold-dim),transparent 80%);}
     .dossier-divider.purple{background:linear-gradient(90deg,var(--purple-dim),transparent 80%);}
     .dossier-divider.slate{background:linear-gradient(90deg,var(--slate-dim),transparent 80%);}
+    .dossier-divider.teal{background:linear-gradient(90deg,#1a8a78,transparent 80%);}
 
     .dossier-section-label{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
 
@@ -306,6 +309,7 @@
         <button class="sb-filter" data-cat="technology">TECH</button>
         <button class="sb-filter" data-cat="lore">LORE</button>
         <button class="sb-filter" data-cat="doctrine">DOCTRINE</button>
+        <button class="sb-filter" data-cat="species">SPECIES</button>
         <button class="sb-filter" data-cat="freeform">OTHER</button>
       </div>
     </div>
@@ -526,11 +530,11 @@ function viewEntry(id) {
   }
 
   const cat = e.category || 'freeform';
-  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',lore:'LORE & HISTORY',doctrine:'DOCTRINE & ORGANIZATION',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
+  const catLabel = {ship:'NAVAL ASSET',vehicle:'GROUND / AIR VEHICLE',soldier:'PERSONNEL / UNIT',technology:'TECHNOLOGY',species:'SPECIES DOSSIER',lore:'LORE & HISTORY',doctrine:'DOCTRINE & ORGANIZATION',freeform:'GENERAL ENTRY'}[cat] || 'ENTRY';
 
   let statsHTML = '';
   if (e.stats && e.stats.length) {
-    const statsLabel = {technology:'Technical Summary',ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance',doctrine:'Key Parameters'}[cat] || 'Specifications';
+    const statsLabel = {technology:'Technical Summary',species:'Species Classification',ship:'General Characteristics',vehicle:'General Characteristics',soldier:'Specifications / Performance',doctrine:'Key Parameters'}[cat] || 'Specifications';
     statsHTML = `<div class="dossier-section-label">${statsLabel}</div>
       <div class="dossier-stats">${e.stats.map(s => `
         <div class="dossier-stat">
@@ -542,14 +546,14 @@ function viewEntry(id) {
 
   /* ── Structured metadata header (tech + ship/vehicle/soldier/doctrine) ── */
   let metaHeaderHTML = '';
-  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') {
+  if (cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine' || cat === 'species') {
     const fields = [
       e.opStatus   ? ['Operational Status', e.opStatus] : null,
       e.accessLevel? ['Access Level', e.accessLevel] : null,
       e.origin     ? ['Origin', e.origin] : null,
     ].filter(Boolean);
     /* doctrine has extra fields: distribution, scope, authority */
-    if (cat === 'doctrine') {
+    if (cat === 'doctrine' || cat === 'species') {
       if (e.distribution) fields.splice(2, 0, ['Distribution', e.distribution]);
       if (e.scope) fields.push(['Scope', e.scope]);
       if (e.authority) fields.push(['Authority', e.authority]);
@@ -563,7 +567,7 @@ function viewEntry(id) {
 
   /* ── Document classification footer (tech + ship/vehicle/soldier/doctrine) ── */
   let docFooterHTML = '';
-  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine') && (e.docClass || e.revision)) {
+  if ((cat === 'technology' || cat === 'ship' || cat === 'vehicle' || cat === 'soldier' || cat === 'doctrine' || cat === 'species') && (e.docClass || e.revision)) {
     docFooterHTML = `<div class="dossier-doc-footer">
       ${e.docClass ? `<div class="dossier-doc-class">${esc(e.docClass)}</div>` : ''}
       ${e.revision ? `<div class="dossier-doc-rev">Revision: ${esc(e.revision)}</div>` : ''}
@@ -586,7 +590,7 @@ function viewEntry(id) {
   }
 
   /* ── Divider accent by category ── */
-  const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : (cat==='doctrine' ? ' slate' : ''));
+  const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : (cat==='doctrine' ? ' slate' : (cat==='species' ? ' teal' : '')));
 
   main.innerHTML = `
     <div class="dossier">
@@ -660,6 +664,11 @@ function showNewEntryPicker() {
           <div style="font-size:28px;margin-bottom:8px;">\u2694</div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:var(--red-alert);">Weapon System</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Infantry arms, vehicle mounts, ship lances, melee weapons, ordnance.</div>
+        </div>
+        <div class="template-card" data-tpl="species">
+          <div style="font-size:28px;margin-bottom:8px;">\u2606</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:17px;color:#38dbc8;">Species Dossier</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Elven lineages, alien species, xeno-biological records, archival dossiers.</div>
         </div>
         <div class="template-card" data-tpl="lore">
           <div style="font-size:28px;margin-bottom:8px;">\uD83D\uDCDC</div>
@@ -944,6 +953,32 @@ function editEntry(id, tpl) {
         <div class="form-row"><span class="fl">Revision</span><input id="ed-revision" class="sci-input" type="text" value="${escAttr(e.revision||'')}" placeholder="e.g. AEN-DOCTRINE-OVR-001-A"/></div>
       </div>
     `;
+  } else if (cat === 'species') {
+    const statsHTML = (e.stats||[]).map((s,i) => statRow(s.key, s.val, i)).join('');
+    templateFields = `
+      <div class="edit-section">
+        <div class="edit-section-title">Species Identification</div>
+        <div class="form-row"><span class="fl">Designation</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="e.g. Taralind\u00EB (Crown Folk) / Korban Empire Species Record"/></div>
+        <div class="form-row"><span class="fl">Classification</span><input id="ed-class" class="sci-input" type="text" value="${escAttr(e.classification||'')}" placeholder="e.g. Terrestrial Mammal, Elven Lineage (Primary)"/></div>
+        <div class="form-row"><span class="fl">Doc. Type</span><input id="ed-opstatus" class="sci-input" type="text" value="${escAttr(e.opStatus||'')}" placeholder="e.g. Species Record: Archival Dossier"/></div>
+        <div class="form-row"><span class="fl">Access Level</span><input id="ed-access" class="sci-input" type="text" value="${escAttr(e.accessLevel||'')}" placeholder="e.g. Public Record: General Archive"/></div>
+        <div class="form-row"><span class="fl">Issuing Authority</span><input id="ed-origin" class="sci-input" type="text" value="${escAttr(e.origin||'')}" placeholder="e.g. Office of the Archival Record, Valarind\u00EB Secretariat"/></div>
+        <div class="form-row"><span class="fl">Distribution</span><input id="ed-distribution" class="sci-input" type="text" value="${escAttr(e.distribution||'')}" placeholder="e.g. All Member Worlds \u00b7 Public Archive \u00b7 Diplomatic Registry"/></div>
+        <div class="form-row" style="align-items:start;"><span class="fl" style="padding-top:8px;">Summary</span><textarea id="ed-role" class="sci-textarea" style="min-height:60px;" placeholder="Brief overview of the species and their significance...">${esc(e.role||'')}</textarea></div>
+      </div>
+      <div class="edit-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="edit-section-title" style="flex:1;border:none;margin:0;padding:0;">Species Classification</div>
+          <button type="button" class="pbtn primary" id="add-stat" style="padding:3px 10px;margin-bottom:8px;">+ FIELD</button>
+        </div>
+        <div id="stat-list">${statsHTML}</div>
+      </div>
+      <div class="edit-section">
+        <div class="edit-section-title">Document Footer</div>
+        <div class="form-row"><span class="fl">Doc. Class</span><input id="ed-docclass" class="sci-input" type="text" value="${escAttr(e.docClass||'')}" placeholder="e.g. PUBLIC RECORD — GENERAL ARCHIVE"/></div>
+        <div class="form-row"><span class="fl">Reference</span><input id="ed-revision" class="sci-input" type="text" value="${escAttr(e.revision||'')}" placeholder="e.g. AE-ARCH-SPEC-001-TARALINDE"/></div>
+      </div>
+    `;
   } else if (cat === 'ship' || cat === 'vehicle' || cat === 'soldier') {
     const detailLabel = {ship:'Ship Identification',vehicle:'Vehicle Identification',soldier:'Unit Identification'}[cat];
     const desigPlaceholder = {ship:'e.g. Thalasrën-Class Light Frigate — Troop Transport & Close-Support Frigate',vehicle:'e.g. Velendril "Wardancer" — Tracked IFV / Mechanized Assault Carrier',soldier:'e.g. Caelyndor Marinyr Clone Trooper Corps (CM-CTC)'}[cat];
@@ -978,6 +1013,7 @@ function editEntry(id, tpl) {
 
   const bodyLabel = {
     technology: isWeaponEdit ? 'Operational Characteristics / Notes / Ammo Types' : 'System Overview / Capabilities / Security',
+    species:'Overview / Physical Description / Culture / History',
     lore:'Full Account',
     freeform:'Content',
     doctrine:'Ranks / Formations / Procedures / Tables',
