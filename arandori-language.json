@@ -547,7 +547,7 @@
   },
   "dictionary": {
     "version": "1.0",
-    "totalEntries": 687,
+    "totalEntries": 688,
     "entries": [
       {
         "id": "R001",
@@ -11846,6 +11846,24 @@
           "parma"
         ],
         "updated": 1773566977192
+      },
+      {
+        "id": "GEN_MMXGSNKC",
+        "word": "aratara",
+        "ipa": "/a.ɾa.ˈta.ɾa/",
+        "pos": "noun",
+        "definitions": [
+          "High King",
+          "high-crowned"
+        ],
+        "etymology": "ara (high) + tara (crowned)",
+        "tags": [
+          "generated",
+          "compound",
+          "ara",
+          "tara"
+        ],
+        "updated": 1773924416076
       }
     ],
     "commonPhrases": [
