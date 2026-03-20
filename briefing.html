@@ -31,10 +31,10 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .hud-nav.active{color:var(--cyan) !important;text-shadow:0 0 8px rgba(56,232,255,.5);}
 .hud-spacer{flex:1;}
 
-.content{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:72px 32px 60px;}
+.content{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:0 32px 60px;}
 
 /* Cover */
-.cover{text-align:center;padding:90px 0 36px;position:relative;}
+.cover{text-align:center;padding:90px 0 16px;position:relative;}
 .cover-glow{position:absolute;top:50%;left:50%;width:500px;height:500px;transform:translate(-50%,-55%);background:radial-gradient(circle,rgba(245,197,66,.03) 0%,rgba(56,232,255,.015) 30%,transparent 65%);pointer-events:none;}
 .emblem{width:200px;height:200px;margin:0 auto 18px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .emblem::after{content:'';position:absolute;inset:-40px;border-radius:50%;background:radial-gradient(circle,rgba(245,197,66,.12) 0%,rgba(245,197,66,.06) 30%,rgba(245,197,66,.02) 55%,transparent 75%);pointer-events:none;z-index:1;}
@@ -43,7 +43,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .e-ring.r2{inset:-6px;border-color:rgba(56,232,255,.06);border-style:dashed;animation:espin-r 40s linear infinite;}
 @keyframes espin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes espin-r{from{transform:rotate(360deg)}to{transform:rotate(0)}}
-.e-img{width:180px;height:180px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 20px rgba(245,197,66,.3)) drop-shadow(0 0 50px rgba(245,197,66,.15)) drop-shadow(0 0 80px rgba(245,197,66,.08));transition:filter .3s;}
+.e-img{width:220px;height:220px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 20px rgba(245,197,66,.3)) drop-shadow(0 0 50px rgba(245,197,66,.15)) drop-shadow(0 0 80px rgba(245,197,66,.08));transition:filter .3s;}
 .emblem:hover .e-img{filter:drop-shadow(0 0 24px rgba(245,197,66,.4)) drop-shadow(0 0 60px rgba(245,197,66,.2)) drop-shadow(0 0 100px rgba(245,197,66,.1));}
 .cover-realm{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:36px;letter-spacing:4px;text-transform:uppercase;}
 .cover-realm em{font-style:normal;color:var(--gold);text-shadow:0 0 20px rgba(245,197,66,.15);}
