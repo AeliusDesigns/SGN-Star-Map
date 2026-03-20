@@ -95,7 +95,7 @@ function makeProgram(vsSrc, fsSrc) {
    SHADERS
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Background nebula + 3D parallax starfield ── */
+/* ── Background nebula (clouds only, no stars) ── */
 const VS_BG = `
 attribute vec2 position;
 varying vec2 vUV;
@@ -112,7 +112,6 @@ uniform vec3 uPan;
 uniform float uZoom;
 uniform vec2 uRot;
 float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-float hash2(vec2 p){ return fract(sin(dot(p,vec2(269.5,183.3)))*43758.5453); }
 float noise(vec2 p){
   vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
@@ -124,103 +123,62 @@ float fbm(vec2 p){
   for(int i=0;i<6;i++){ v+=a*noise(p); p=rot*p*2.0; a*=0.5; }
   return v;
 }
-
-// Single star layer at a given depth (parallax factor)
-float starLayer(vec2 uv, vec2 offset, float scale, float density, float seed){
-  vec2 gv = uv * scale + offset;
-  vec2 id = floor(gv);
-  vec2 fv = fract(gv) - 0.5;
-
-  float star = 0.0;
-  // Check 3x3 neighborhood for smooth stars near cell edges
-  for(int y=-1; y<=1; y++){
-    for(int x=-1; x<=1; x++){
-      vec2 neighbor = vec2(float(x), float(y));
-      vec2 cellId = id + neighbor;
-      float rnd = hash(cellId + seed);
-      float rnd2 = hash2(cellId + seed);
-      if(rnd < density){
-        vec2 starPos = neighbor + vec2(hash(cellId * 1.3 + seed) - 0.5, hash(cellId * 2.7 + seed + 50.0) - 0.5) * 0.8;
-        float d = length(fv - starPos);
-        // Bright core + soft glow halo
-        float core = smoothstep(0.07, 0.0, d);
-        float glow = smoothstep(0.18, 0.0, d) * 0.4;
-        float brightness = core + glow;
-        // Twinkle
-        float twinkle = 0.6 + 0.4 * sin(uTime * (0.8 + rnd2 * 3.0) + rnd * 6.2831);
-        // Size variation: some stars are bigger
-        float sizeMul = 0.5 + rnd2 * 0.5;
-        star += brightness * twinkle * sizeMul;
-      }
-    }
-  }
-  return star;
-}
-
 void main(){
   vec2 uv = vUV;
   vec2 aspect = vec2(uRes.x/uRes.y, 1.0);
-  vec2 off = uPan.xy * 0.0002;
+  vec2 off = uPan.xy * 0.0002 + uRot * 0.3;
   vec2 p = (uv - 0.5) * aspect * 2.5 + off;
 
-  // Slow ambient drift per layer (always moving, even without user input)
-  float t = uTime * 0.008;
-  vec2 drift1 = vec2(sin(t * 0.7) * 0.3, cos(t * 0.5) * 0.2);
-  vec2 drift2 = vec2(cos(t * 0.9) * 0.4, sin(t * 0.6) * 0.3);
-  vec2 drift3 = vec2(sin(t * 1.1) * 0.5, cos(t * 0.8) * 0.4);
-  vec2 drift4 = vec2(cos(t * 1.3) * 0.6, sin(t * 1.0) * 0.5);
-  vec2 drift5 = vec2(sin(t * 1.5) * 0.8, cos(t * 1.2) * 0.6);
-
-  // Nebula clouds (subtle, dark)
   float n1 = fbm(p * 0.7 + uTime * 0.003);
   float n2 = fbm(p * 1.4 + vec2(5.0,3.0) + uTime * 0.005);
   float n3 = fbm(p * 2.8 + vec2(10.0,7.0));
   float n4 = fbm(p * 0.4 + vec2(-3.0,8.0) + uTime * 0.002);
 
-  vec3 col = vec3(0.012, 0.018, 0.045);                         // deeper void base
-  col += vec3(0.006, 0.025, 0.05) * smoothstep(0.35,0.75,n1);    // blue clouds
-  col += vec3(0.01, 0.03, 0.04) * smoothstep(0.45,0.85,n2) * 0.4; // teal wisps
-  col += vec3(0.025, 0.006, 0.04) * smoothstep(0.55,0.9,n3) * 0.25; // faint violet
-  col += vec3(0.004, 0.01, 0.03) * smoothstep(0.25,0.65,n4) * 0.3;  // deep blue haze
+  vec3 col = vec3(0.012, 0.018, 0.045);
+  col += vec3(0.006, 0.025, 0.05) * smoothstep(0.35,0.75,n1);
+  col += vec3(0.01, 0.03, 0.04) * smoothstep(0.45,0.85,n2) * 0.4;
+  col += vec3(0.025, 0.006, 0.04) * smoothstep(0.55,0.9,n3) * 0.25;
+  col += vec3(0.004, 0.01, 0.03) * smoothstep(0.25,0.65,n4) * 0.3;
 
-  // Combined camera movement: pan + orbit rotation
-  // Rotation creates a large offset that makes the background respond to orbiting
-  vec2 rotOff = uRot * 8.0;
-  vec2 panOff = off * 80.0 + rotOff;
-
-  // 3D parallax star layers with ambient drift
-  // Far layer: barely moves
-  float farStars = starLayer(uv * aspect, panOff * 0.1 + drift1, 180.0, 0.07, 0.0);
-  col += farStars * vec3(0.6, 0.65, 0.8) * 0.7;
-
-  // Mid-far layer
-  float midFarStars = starLayer(uv * aspect, panOff * 0.25 + drift2, 140.0, 0.06, 100.0);
-  col += midFarStars * vec3(0.65, 0.7, 0.85) * 0.8;
-
-  // Mid layer
-  float midStars = starLayer(uv * aspect, panOff * 0.5 + drift3, 100.0, 0.05, 200.0);
-  col += midStars * vec3(0.7, 0.8, 0.95) * 0.9;
-
-  // Near-mid layer
-  float nearMidStars = starLayer(uv * aspect, panOff * 0.8 + drift4, 70.0, 0.04, 300.0);
-  col += nearMidStars * vec3(0.8, 0.85, 1.0) * 1.0;
-
-  // Near layer: moves most with camera
-  float nearStars = starLayer(uv * aspect, panOff * 1.2 + drift5, 45.0, 0.035, 400.0);
-  col += nearStars * vec3(0.9, 0.92, 1.0) * 1.1;
-
-  // Zoom affects parallax spread: when zoomed in, layers separate more
-  // (already handled via uPan scaling since zoom changes pan range)
-
-  // Fog/depth fade at edges
   float fog = 1.0 - 0.35 * length((uv - 0.5) * 1.3);
   col *= fog;
 
-  // Very subtle color variation drift over time
-  col += vec3(0.003, 0.001, 0.005) * sin(uTime * 0.1 + uv.x * 3.0) * 0.5;
-
   gl_FragColor = vec4(col, 1.0);
 }`;
+
+/* ── 3D Background stars (real geometry, same camera) ── */
+const VS_BGSTARS = `
+attribute vec3 position;
+attribute vec3 aColor;
+attribute float aSize;
+uniform mat4 uMVP;
+uniform float uTime;
+varying vec3 vColor;
+varying float vTwinkle;
+void main(){
+  gl_Position = uMVP * vec4(position, 1.0);
+  float dist = gl_Position.w;
+  gl_PointSize = aSize * (600.0 / dist);
+  gl_PointSize = clamp(gl_PointSize, 1.0, 14.0);
+  vColor = aColor;
+  float id = dot(position.xy, vec2(127.1, 311.7));
+  vTwinkle = 0.6 + 0.4 * sin(uTime * (1.0 + fract(sin(id) * 43758.5) * 3.0) + id);
+}`;
+const FS_BGSTARS = `
+precision highp float;
+varying vec3 vColor;
+varying float vTwinkle;
+void main(){
+  vec2 uv = gl_PointCoord * 2.0 - 1.0;
+  float r = length(uv);
+  float core = exp(-r * r * 18.0);
+  float glow = exp(-r * r * 3.0) * 0.35;
+  float alpha = clamp((core + glow) * vTwinkle, 0.0, 1.0);
+  vec3 white = vec3(1.0, 0.98, 0.94);
+  vec3 col = mix(vColor, white, core * 0.7);
+  gl_FragColor = vec4(col, alpha);
+}`;
+
 
 /* ── Simple lines (for lanes) ── */
 const VS_LINES = `
@@ -375,6 +333,7 @@ void main(){
 
 /* ── Compile programs ── */
 const progBG     = makeProgram(VS_BG, FS_BG);
+const progBGStars = makeProgram(VS_BGSTARS, FS_BGSTARS);
 const progPoints = makeProgram(VS_POINTS, FS_POINTS);
 const progLines  = makeProgram(VS_LINES, FS_LINES);
 const progHalo   = makeProgram(VS_HALO, FS_HALO);
@@ -389,6 +348,55 @@ const aPosB   = gl.getAttribLocation(progBG, 'position');
 const bgVBO   = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, bgVBO);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+/* 3D Background Stars */
+const aPos_bgstars   = gl.getAttribLocation(progBGStars, 'position');
+const aColor_bgstars = gl.getAttribLocation(progBGStars, 'aColor');
+const aSize_bgstars  = gl.getAttribLocation(progBGStars, 'aSize');
+const uMVP_bgstars   = gl.getUniformLocation(progBGStars, 'uMVP');
+const uTime_bgstars  = gl.getUniformLocation(progBGStars, 'uTime');
+
+/* Generate 3D background star field geometry */
+const BG_STAR_COUNT = 5000;
+const bgStarData = new Float32Array(BG_STAR_COUNT * 7); // x,y,z, r,g,b, size
+(function generateBGStars() {
+  function seededRand(i) { return (Math.sin(i * 127.1 + 311.7) * 43758.5453) % 1; }
+  for (let i = 0; i < BG_STAR_COUNT; i++) {
+    const off = i * 7;
+    // Distribute in a large sphere shell around the origin
+    // Inner radius 2000, outer radius 15000 — well beyond the star systems
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 2000 + Math.random() * 13000;
+    bgStarData[off]     = r * Math.sin(phi) * Math.cos(theta);  // x
+    bgStarData[off + 1] = r * Math.sin(phi) * Math.sin(theta);  // y
+    bgStarData[off + 2] = r * Math.cos(phi);                     // z
+    // Color: cool whites and blue-whites with occasional warm tints
+    const temp = Math.random();
+    if (temp < 0.6) {
+      // Cool white/blue
+      bgStarData[off + 3] = 0.7 + Math.random() * 0.3;
+      bgStarData[off + 4] = 0.75 + Math.random() * 0.25;
+      bgStarData[off + 5] = 0.85 + Math.random() * 0.15;
+    } else if (temp < 0.85) {
+      // Warm white/yellow
+      bgStarData[off + 3] = 0.9 + Math.random() * 0.1;
+      bgStarData[off + 4] = 0.8 + Math.random() * 0.15;
+      bgStarData[off + 5] = 0.6 + Math.random() * 0.2;
+    } else {
+      // Faint blue/cyan
+      bgStarData[off + 3] = 0.4 + Math.random() * 0.3;
+      bgStarData[off + 4] = 0.6 + Math.random() * 0.3;
+      bgStarData[off + 5] = 0.8 + Math.random() * 0.2;
+    }
+    // Size: mostly small, some larger
+    const sizeMul = Math.random();
+    bgStarData[off + 6] = sizeMul < 0.9 ? 2.0 + Math.random() * 4.0 : 5.0 + Math.random() * 8.0;
+  }
+})();
+const bgStarsVBO = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, bgStarsVBO);
+gl.bufferData(gl.ARRAY_BUFFER, bgStarData, gl.STATIC_DRAW);
 
 /* Points */
 const aPos_points   = gl.getAttribLocation(progPoints, 'position');
@@ -1867,6 +1875,24 @@ function loop() {
   gl.disableVertexAttribArray(aPosB);
 
   gl.enable(gl.BLEND);
+
+  /* ── 1b. 3D Background Stars (real geometry, same camera) ── */
+  gl.useProgram(progBGStars);
+  gl.uniformMatrix4fv(uMVP_bgstars, false, mvp);
+  gl.uniform1f(uTime_bgstars, wallTime);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bgStarsVBO);
+  const bgStride = 7 * 4;
+  gl.enableVertexAttribArray(aPos_bgstars);
+  gl.vertexAttribPointer(aPos_bgstars, 3, gl.FLOAT, false, bgStride, 0);
+  gl.enableVertexAttribArray(aColor_bgstars);
+  gl.vertexAttribPointer(aColor_bgstars, 3, gl.FLOAT, false, bgStride, 3 * 4);
+  gl.enableVertexAttribArray(aSize_bgstars);
+  gl.vertexAttribPointer(aSize_bgstars, 1, gl.FLOAT, false, bgStride, 6 * 4);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.drawArrays(gl.POINTS, 0, BG_STAR_COUNT);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.disableVertexAttribArray(aColor_bgstars);
+  gl.disableVertexAttribArray(aSize_bgstars);
 
   /* ── 2. Lanes — multi-pass glow using simple GL_LINES ── */
   if (linesVBO && lineVertCount > 0) {
