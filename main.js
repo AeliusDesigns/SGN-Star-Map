@@ -158,8 +158,8 @@ varying float vTwinkle;
 void main(){
   gl_Position = uMVP * vec4(position, 1.0);
   float dist = gl_Position.w;
-  gl_PointSize = aSize * (600.0 / dist);
-  gl_PointSize = clamp(gl_PointSize, 1.0, 14.0);
+  gl_PointSize = aSize * (900.0 / dist);
+  gl_PointSize = clamp(gl_PointSize, 1.5, 18.0);
   vColor = aColor;
   float id = dot(position.xy, vec2(127.1, 311.7));
   vTwinkle = 0.6 + 0.4 * sin(uTime * (1.0 + fract(sin(id) * 43758.5) * 3.0) + id);
@@ -171,11 +171,24 @@ varying float vTwinkle;
 void main(){
   vec2 uv = gl_PointCoord * 2.0 - 1.0;
   float r = length(uv);
-  float core = exp(-r * r * 18.0);
-  float glow = exp(-r * r * 3.0) * 0.35;
-  float alpha = clamp((core + glow) * vTwinkle, 0.0, 1.0);
+
+  // Bright white core
+  float core = exp(-r * r * 16.0);
+  // Colored inner glow
+  float inner = exp(-r * r * 4.0) * 0.5;
+  // Soft outer glow
+  float outer = exp(-r * r * 1.5) * 0.25;
+
+  // 4-point diffraction spikes (subtle)
+  float spike = 0.0;
+  spike += exp(-pow(abs(uv.x), 0.8) * 60.0) * exp(-r * 2.0) * 0.2;
+  spike += exp(-pow(abs(uv.y), 0.8) * 60.0) * exp(-r * 2.0) * 0.2;
+
+  float alpha = clamp((core + inner + outer + spike) * vTwinkle, 0.0, 1.0);
   vec3 white = vec3(1.0, 0.98, 0.94);
-  vec3 col = mix(vColor, white, core * 0.7);
+  vec3 col = mix(vColor, white, core * 0.8) * (1.0 + core * 1.5);
+  col += vColor * outer * 2.0;
+
   gl_FragColor = vec4(col, alpha);
 }`;
 
