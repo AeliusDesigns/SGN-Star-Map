@@ -34,16 +34,16 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .content{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:72px 32px 60px;}
 
 /* Cover */
-.cover{text-align:center;padding:44px 0 36px;position:relative;}
+.cover{text-align:center;padding:90px 0 36px;position:relative;}
 .cover-glow{position:absolute;top:50%;left:50%;width:500px;height:500px;transform:translate(-50%,-55%);background:radial-gradient(circle,rgba(245,197,66,.03) 0%,rgba(56,232,255,.015) 30%,transparent 65%);pointer-events:none;}
-.emblem{width:150px;height:150px;margin:0 auto 18px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.emblem::after{content:'';position:absolute;inset:-30px;border-radius:50%;background:radial-gradient(circle,rgba(245,197,66,.12) 0%,rgba(245,197,66,.06) 30%,rgba(245,197,66,.02) 55%,transparent 75%);pointer-events:none;z-index:1;}
+.emblem{width:200px;height:200px;margin:0 auto 18px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.emblem::after{content:'';position:absolute;inset:-40px;border-radius:50%;background:radial-gradient(circle,rgba(245,197,66,.12) 0%,rgba(245,197,66,.06) 30%,rgba(245,197,66,.02) 55%,transparent 75%);pointer-events:none;z-index:1;}
 .e-ring{position:absolute;border-radius:50%;border:1px solid;}
 .e-ring.r1{inset:-14px;border-color:rgba(245,197,66,.1);animation:espin 55s linear infinite;}
 .e-ring.r2{inset:-6px;border-color:rgba(56,232,255,.06);border-style:dashed;animation:espin-r 40s linear infinite;}
 @keyframes espin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes espin-r{from{transform:rotate(360deg)}to{transform:rotate(0)}}
-.e-img{width:130px;height:130px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 20px rgba(245,197,66,.3)) drop-shadow(0 0 50px rgba(245,197,66,.15)) drop-shadow(0 0 80px rgba(245,197,66,.08));transition:filter .3s;}
+.e-img{width:180px;height:180px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 20px rgba(245,197,66,.3)) drop-shadow(0 0 50px rgba(245,197,66,.15)) drop-shadow(0 0 80px rgba(245,197,66,.08));transition:filter .3s;}
 .emblem:hover .e-img{filter:drop-shadow(0 0 24px rgba(245,197,66,.4)) drop-shadow(0 0 60px rgba(245,197,66,.2)) drop-shadow(0 0 100px rgba(245,197,66,.1));}
 .cover-realm{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:36px;letter-spacing:4px;text-transform:uppercase;}
 .cover-realm em{font-style:normal;color:var(--gold);text-shadow:0 0 20px rgba(245,197,66,.15);}
@@ -211,29 +211,30 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 </div>
 
 <div id="app">
-<div class="content">
 
-  <!-- COVER -->
-  <div class="cover fi d1">
-    <div class="cover-glow"></div>
-    <div class="emblem">
-      <div class="e-ring r1"></div>
-      <div class="e-ring r2"></div>
-      <img class="e-img" src="./SYMBOL.png" alt="Arandorë Eldainë"/>
-    </div>
-    <div class="cover-realm">Arandor&euml; <em>Eldain&euml;</em></div>
-    <div class="cover-subrealm">The High Realm of the Elves</div>
-    <div class="cover-office">
-      Office of Foreign Affairs and Diplomatic Engagement<br>
-      Anorvalas Ecumenopolis &middot; Capital District &middot; Calenor&euml; System
-    </div>
-    <div class="cover-line"></div>
-    <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--text-dim);margin-top:14px;line-height:1.8;">
-      DOCUMENT TYPE: Diplomatic Briefing &middot; State Overview<br>
-      CLASSIFICATION: Foreign Distribution &mdash; Diplomatic Registry<br>
-      REFERENCE: AE-DIPLO-OFA-STATE-001
-    </div>
+<!-- COVER (outside .content so save/load doesn't overwrite it) -->
+<div class="cover fi d1">
+  <div class="cover-glow"></div>
+  <div class="emblem">
+    <div class="e-ring r1"></div>
+    <div class="e-ring r2"></div>
+    <img class="e-img" src="./SYMBOL.png" alt="Arandor&euml; Eldain&euml;"/>
   </div>
+  <div class="cover-realm">Arandor&euml; <em>Eldain&euml;</em></div>
+  <div class="cover-subrealm">The High Realm of the Elves</div>
+  <div class="cover-office">
+    Office of Foreign Affairs and Diplomatic Engagement<br>
+    Anorvalas Ecumenopolis &middot; Capital District &middot; Calenor&euml; System
+  </div>
+  <div class="cover-line"></div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--text-dim);margin-top:14px;line-height:1.8;">
+    DOCUMENT TYPE: Diplomatic Briefing &middot; State Overview<br>
+    CLASSIFICATION: Foreign Distribution &mdash; Diplomatic Registry<br>
+    REFERENCE: AE-DIPLO-OFA-STATE-001
+  </div>
+</div>
+
+<div class="content">
 
   <!-- KEY INFO TABLE -->
   <div class="keytable fi d2">
@@ -586,6 +587,13 @@ body.edit-mode .key-hint{display:block;}
   }
 
   // Load saved state: localStorage first, then try briefing-state.json
+  // Version check: clear stale saves from before the emblem was moved out of .content
+  var STATE_VERSION = 'v2';
+  var savedVersion = localStorage.getItem(STORE_KEY + '_ver');
+  if (savedVersion !== STATE_VERSION) {
+    localStorage.removeItem(STORE_KEY);
+    try { localStorage.setItem(STORE_KEY + '_ver', STATE_VERSION); } catch(e) {}
+  }
   var saved = localStorage.getItem(STORE_KEY);
   if(saved){
     var content = document.querySelector('.content');
