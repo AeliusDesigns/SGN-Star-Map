@@ -142,10 +142,15 @@ float starLayer(vec2 uv, vec2 offset, float scale, float density, float seed){
       if(rnd < density){
         vec2 starPos = neighbor + vec2(hash(cellId * 1.3 + seed) - 0.5, hash(cellId * 2.7 + seed + 50.0) - 0.5) * 0.8;
         float d = length(fv - starPos);
-        float brightness = smoothstep(0.04, 0.0, d);
+        // Bright core + soft glow halo
+        float core = smoothstep(0.07, 0.0, d);
+        float glow = smoothstep(0.18, 0.0, d) * 0.4;
+        float brightness = core + glow;
         // Twinkle
         float twinkle = 0.6 + 0.4 * sin(uTime * (0.8 + rnd2 * 3.0) + rnd * 6.2831);
-        star += brightness * twinkle * (0.3 + rnd2 * 0.7);
+        // Size variation: some stars are bigger
+        float sizeMul = 0.5 + rnd2 * 0.5;
+        star += brightness * twinkle * sizeMul;
       }
     }
   }
