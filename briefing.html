@@ -588,25 +588,36 @@ body.edit-mode .key-hint{display:block;}
 
   // Load saved state: localStorage first, then try briefing-state.json
   // Version check: clear stale saves from before the emblem was moved out of .content
-  var STATE_VERSION = 'v2';
+  var STATE_VERSION = 'v3';
   var savedVersion = localStorage.getItem(STORE_KEY + '_ver');
   if (savedVersion !== STATE_VERSION) {
     localStorage.removeItem(STORE_KEY);
     try { localStorage.setItem(STORE_KEY + '_ver', STATE_VERSION); } catch(e) {}
   }
+
+  function stripCoverFromHTML(html) {
+    // Remove any old cover section that might be baked into saved state
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    var oldCover = tmp.querySelector('.cover');
+    if (oldCover) oldCover.remove();
+    return tmp.innerHTML;
+  }
+
   var saved = localStorage.getItem(STORE_KEY);
   if(saved){
     var content = document.querySelector('.content');
-    if(content) content.innerHTML = saved;
+    if(content) content.innerHTML = stripCoverFromHTML(saved);
   } else {
     // Try loading from repo file
     fetch('./briefing-state.json', { cache: 'no-store' })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(d && d.html){
+          var clean = stripCoverFromHTML(d.html);
           var content = document.querySelector('.content');
-          if(content) content.innerHTML = d.html;
-          try { localStorage.setItem(STORE_KEY, d.html); } catch(e) {}
+          if(content) content.innerHTML = clean;
+          try { localStorage.setItem(STORE_KEY, clean); } catch(e) {}
         }
       })
       .catch(function(){});
