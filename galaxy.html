@@ -1,637 +1,241 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SGN — Galaxy Map</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-/* ── SGN Design Tokens ────────────────────────────────── */
-:root {
-  --void: #050810;
-  --void-rgb: 5, 8, 16;
-  --cyan: #38e8ff;
-  --cyan-rgb: 56, 232, 255;
-  --gold: #f5c542;
-  --gold-rgb: 245, 197, 66;
-  --amber: #ffaa00;
-  --red: #ff3c3c;
-  --green: #3cff7e;
-  --white: #e0e8f0;
-  --white-dim: #8090a0;
-  --panel-bg: rgba(5, 8, 16, 0.92);
-  --panel-border: rgba(56, 232, 255, 0.15);
-  --panel-border-active: rgba(56, 232, 255, 0.4);
-  --font-display: 'Rajdhani', sans-serif;
-  --font-mono: 'Share Tech Mono', monospace;
-  --font-body: 'Exo 2', sans-serif;
-  --scanline-opacity: 0.03;
-}
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SGN — Galaxy Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@200;300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void:       #050810;
+      --deep:       #080d18;
+      --surface:    #0c1220;
+      --surface2:   #111b2e;
+      --border:     #1a2d46;
+      --border2:    #243d5e;
+      --cyan:       #38e8ff;
+      --cyan-dim:   #1a7090;
+      --gold:       #f5c542;
+      --gold-dim:   #7a6020;
+      --red-alert:  #ff3b3b;
+      --green:      #5cdb7a;
+      --text:       #c8deff;
+      --text-dim:   #5a7a99;
+      --text-muted: #2e4a66;
+      --glow-cyan:  rgba(56,232,255,.18);
+      --glow-gold:  rgba(245,197,66,.18);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--void); color: var(--text); font-family: 'Exo 2', sans-serif; overflow: hidden; }
+    canvas#gl { display: block; width: 100vw; height: 100vh; position: fixed; inset: 0; z-index: 0; }
 
-/* ── Reset ────────────────────────────────────────────── */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%; height: 100%; overflow: hidden; background: var(--void); color: var(--white); font-family: var(--font-body); }
+    * { cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.6' stroke-opacity='0.3' stroke-dasharray='2 2'/><circle cx='4' cy='2' r='1.5' fill='%2338e8ff' fill-opacity='0.8'/><circle cx='4' cy='2' r='0.8' fill='%23fff'/></g></svg>") 4 2, auto !important; }
+    a, button, [onclick], select, .hud-nav, .sb-save-btn, .panel-close, .pbtn, .legend-item, .tag-remove { cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.5' stroke-linecap='round'/><line x1='2' y1='24' x2='14' y2='20' stroke='%2338e8ff' stroke-width='0.8' stroke-opacity='0.5' stroke-dasharray='2 2'/><polygon points='4,2 2,24 14,20' fill='%2338e8ff' fill-opacity='0.06'/><circle cx='4' cy='2' r='2.5' fill='%2338e8ff' fill-opacity='0.5'/><circle cx='4' cy='2' r='1.2' fill='%23fff'/></g></svg>") 4 2, pointer !important; }
 
-/* ── Custom Cursor ────────────────────────────────────── */
-body {
-  cursor: crosshair;
-}
+    body::before { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,.04) 3px, rgba(0,0,0,.04) 4px); pointer-events: none; z-index: 2; }
+    body::after { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(2,5,12,.85) 100%); pointer-events: none; z-index: 2; }
 
-/* ── Scanline Overlay ─────────────────────────────────── */
-#scanlines {
-  position: fixed; inset: 0; z-index: 9999; pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, var(--scanline-opacity)) 2px,
-    rgba(0, 0, 0, var(--scanline-opacity)) 4px
-  );
-}
+    #hud { position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 20; display: flex; align-items: center; gap: 0; background: linear-gradient(180deg, rgba(5,8,16,.97) 0%, rgba(5,8,16,.7) 100%); border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); padding: 0 20px; pointer-events: none; }
+    #hud::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent 0%, var(--cyan-dim) 15%, var(--cyan) 50%, var(--cyan-dim) 85%, transparent 100%); opacity: .4; }
+    .hud-logo { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 6px; color: var(--cyan); text-transform: uppercase; white-space: nowrap; text-shadow: 0 0 16px rgba(56,232,255,.7), 0 0 32px rgba(56,232,255,.3); }
+    .hud-sep { width: 1px; height: 18px; background: var(--border2); margin: 0 14px; flex-shrink: 0; opacity: .6; }
+    .hud-item { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: var(--text-dim); white-space: nowrap; letter-spacing: 1.5px; text-transform: uppercase; }
+    .hud-nav { transition: color .12s; pointer-events: all; text-decoration: none; }
+    .hud-nav:hover { color: var(--cyan) !important; }
+    .hud-nav.active { color: var(--cyan) !important; text-shadow: 0 0 8px rgba(56,232,255,.5); }
+    .hud-spacer { flex: 1; }
+    .hud-hint { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; }
 
-/* ── HUD Header ───────────────────────────────────────── */
-#hud-header {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  height: 48px;
-  background: linear-gradient(180deg, rgba(var(--void-rgb), 0.95) 0%, rgba(var(--void-rgb), 0.8) 100%);
-  border-bottom: 1px solid var(--panel-border);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 20px;
-  font-family: var(--font-display);
-}
+    .corner-bracket { position: fixed; width: 22px; height: 22px; z-index: 15; pointer-events: none; }
+    .corner-bracket::before, .corner-bracket::after { content: ''; position: absolute; background: var(--cyan); opacity: .35; }
+    .corner-bracket.tl { top: 56px; left: 10px; } .corner-bracket.tr { top: 56px; right: 10px; }
+    .corner-bracket.bl { bottom: 40px; left: 10px; } .corner-bracket.br { bottom: 40px; right: 10px; }
+    .corner-bracket.tl::before,.corner-bracket.tr::before { top:0; height:1px; width:100%; }
+    .corner-bracket.tl::after,.corner-bracket.tr::after { top:0; height:100%; width:1px; }
+    .corner-bracket.bl::before,.corner-bracket.br::before { bottom:0; height:1px; width:100%; }
+    .corner-bracket.bl::after,.corner-bracket.br::after { bottom:0; height:100%; width:1px; }
+    .corner-bracket.tr::after { right:0; left:auto; } .corner-bracket.br::after { right:0; left:auto; }
 
-#hud-header .nav-links {
-  display: flex; gap: 4px; align-items: center;
-}
+    #statusBar { position: fixed; bottom: 0; left: 0; right: 0; height: 36px; z-index: 20; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: linear-gradient(0deg, rgba(5,8,16,.97) 0%, rgba(5,8,16,.6) 100%); border-top: 1px solid var(--border); pointer-events: none; }
+    #statusBar::before { content: ''; position: absolute; top: -1px; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent 0%, var(--border2) 30%, var(--border2) 70%, transparent 100%); }
+    .sb-item { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+    .sb-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 5px var(--cyan); flex-shrink: 0; animation: dotpulse 2.8s ease-in-out infinite; }
+    .sb-dot.gold { background: var(--gold); box-shadow: 0 0 5px var(--gold); }
+    @keyframes dotpulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+    .sb-spacer { flex: 1; }
+    .sb-save-btn { background: transparent; border: 1px solid var(--gold-dim); color: var(--gold); border-radius: 2px; padding: 2px 10px; font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; transition: all .12s; pointer-events: all; white-space: nowrap; }
+    .sb-save-btn:hover { border-color: var(--gold); background: rgba(245,197,66,.08); box-shadow: 0 0 8px rgba(245,197,66,.2); }
 
-#hud-header .nav-links a {
-  color: var(--white-dim);
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  padding: 6px 12px;
-  border-radius: 2px;
-  transition: color 0.2s, background 0.2s;
-}
+    #select-rect { position: fixed; border: 1px solid var(--cyan); background: rgba(56,232,255,.06); pointer-events: none; display: none; z-index: 15; }
 
-#hud-header .nav-links a:hover {
-  color: var(--cyan);
-  background: rgba(var(--cyan-rgb), 0.08);
-}
+    #sidePanel { position: fixed; top: 0; right: 0; height: 100vh; width: 340px; background: rgba(5,8,16,.97); border-left: 1px solid var(--border); color: var(--text); transform: translateX(100%); transition: transform .22s cubic-bezier(.16,1,.3,1); display: flex; flex-direction: column; z-index: 25; overflow: hidden; }
+    #sidePanel::after { content: ''; position: absolute; top: 0; left: 0; width: 1px; height: 100%; background: linear-gradient(180deg, var(--cyan) 0%, rgba(56,232,255,.2) 40%, transparent 100%); opacity: .6; pointer-events: none; }
+    .panel-header { padding: 14px; border-bottom: 1px solid var(--border); margin-top: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+    .panel-title { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
+    .panel-close { background: transparent; border: 1px solid var(--border2); color: var(--text-muted); width: 26px; height: 26px; border-radius: 2px; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .12s; pointer-events: all; }
+    .panel-close:hover { border-color: var(--red-alert); color: var(--red-alert); }
+    #sp-body { flex: 1; overflow-y: auto; padding: 14px; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+    #sp-body::-webkit-scrollbar { width: 3px; } #sp-body::-webkit-scrollbar-track { background: transparent; } #sp-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
-#hud-header .nav-links a.active {
-  color: var(--cyan);
-  background: rgba(var(--cyan-rgb), 0.12);
-  border-bottom: 2px solid var(--cyan);
-}
+    .field-group { margin-bottom: 12px; }
+    .fl { display: block; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+    .sci-input, .sci-select { width: 100%; background: rgba(5,8,16,.9); color: var(--text); border: 1px solid var(--border2); border-radius: 2px; padding: 6px 8px; font-family: 'Exo 2', sans-serif; font-size: 14px; outline: none; transition: border-color .12s, box-shadow .12s; }
+    .sci-input:focus, .sci-select:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(56,232,255,.08); }
+    .sci-select option { background: #080d18; }
 
-#hud-logo {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--cyan);
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  margin-right: 24px;
-  text-shadow: 0 0 12px rgba(var(--cyan-rgb), 0.4);
-}
+    .tag-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .tag-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(56,232,255,.07); border: 1px solid rgba(56,232,255,.2); border-radius: 2px; padding: 1px 6px; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--cyan-dim); letter-spacing: 1px; text-transform: uppercase; }
+    .tag-chip.capital { border-color: rgba(245,197,66,.3); color: var(--gold); background: rgba(245,197,66,.04); }
+    .tag-chip.homeworld { border-color: rgba(245,197,66,.4); color: var(--gold); background: rgba(245,197,66,.06); }
+    .tag-chip.contested { border-color: rgba(255,59,59,.3); color: var(--red-alert); background: rgba(255,59,59,.04); }
+    .tag-remove { font-size: 12px; line-height: 1; opacity: 0.5; }
+    .tag-remove:hover { opacity: 1; }
 
-#hud-clock {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--gold);
-  letter-spacing: 1px;
-}
+    .pbtn { background: transparent; border: 1px solid var(--border2); color: var(--text-dim); border-radius: 2px; padding: 5px 10px; font-family: 'Share Tech Mono', monospace; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; transition: all .12s; pointer-events: all; }
+    .pbtn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(56,232,255,.05); box-shadow: 0 0 8px rgba(56,232,255,.15); }
+    .pbtn.primary { border-color: var(--cyan-dim); color: var(--cyan); }
+    .pbtn.danger { border-color: #3a2020; color: #cc6666; }
+    .pbtn.danger:hover { border-color: var(--red-alert); color: var(--red-alert); background: rgba(255,59,59,.05); }
 
-/* ── WebGL Canvas ─────────────────────────────────────── */
-#galaxy-canvas {
-  position: fixed;
-  top: 48px; left: 0; right: 0; bottom: 0;
-  width: 100%;
-  height: calc(100vh - 48px);
-  display: block;
-}
+    #legend-panel { position: fixed; bottom: 44px; left: 14px; z-index: 18; background: rgba(5,8,16,.95); border: 1px solid var(--border); border-radius: 3px; padding: 10px 14px; min-width: 170px; max-height: 280px; overflow-y: auto; backdrop-filter: blur(6px); pointer-events: all; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+    .legend-title { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-family: 'Exo 2', sans-serif; font-size: 12px; color: var(--text); transition: opacity .15s; }
+    .legend-item.hidden-polity { opacity: 0.3; }
+    .legend-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .legend-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .legend-count { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-muted); }
+    .legend-delete { font-size: 13px; color: var(--text-muted); transition: color .12s; }
+    .legend-delete:hover { color: var(--red-alert); }
 
-/* ── Selection Rectangle ──────────────────────────────── */
-#select-rect {
-  position: fixed;
-  border: 1px solid var(--cyan);
-  background: rgba(var(--cyan-rgb), 0.08);
-  pointer-events: none;
-  display: none;
-  z-index: 50;
-}
+    #bulk-bar { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 18; background: rgba(5,8,16,.95); border: 1px solid var(--cyan-dim); border-radius: 3px; padding: 8px 14px; display: none; align-items: center; gap: 10px; font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--cyan); letter-spacing: 1px; backdrop-filter: blur(6px); pointer-events: all; box-shadow: 0 0 16px rgba(56,232,255,.1); }
+    #bulk-bar.visible { display: flex; }
 
-/* ── Side Panel ───────────────────────────────────────── */
-#side-panel {
-  position: fixed;
-  top: 48px; right: 0;
-  width: 320px;
-  height: calc(100vh - 48px);
-  background: var(--panel-bg);
-  border-left: 1px solid var(--panel-border);
-  z-index: 80;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
+    #editor-lock { position: fixed; top: 60px; right: 14px; z-index: 18; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; border: 1px solid var(--border); background: rgba(5,8,16,.8); transition: all .15s; pointer-events: all; }
+    #editor-lock.locked { color: var(--red-alert); border-color: rgba(255,59,59,.25); }
+    #editor-lock.unlocked { color: var(--green); border-color: rgba(92,219,122,.25); }
 
-#side-panel.open {
-  transform: translateX(0);
-}
+    #polity-modal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; background: rgba(2,4,10,.85); backdrop-filter: blur(8px); }
+    #polity-modal.open { display: flex; }
+    .modal-content { background: rgba(5,8,16,.97); border: 1px solid var(--border2); border-radius: 4px; padding: 24px; width: 340px; max-width: 90vw; box-shadow: 0 0 40px rgba(56,232,255,.08); }
+    .modal-title { font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan); margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
-#side-panel .panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--panel-border);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--cyan);
-}
+    #tooltip { position: fixed; pointer-events: none; display: none; z-index: 30; transform: translate(14px, -50%); }
+    .tip-inner { background: rgba(8,13,24,.92); border: 1px solid var(--border2); border-radius: 3px; padding: 9px 13px; min-width: 140px; position: relative; box-shadow: 0 0 24px rgba(56,232,255,.1), 0 6px 24px rgba(0,0,0,.7); backdrop-filter: blur(6px); }
+    .tip-inner::before { content: ''; position: absolute; inset: 0; border-radius: 3px; background: linear-gradient(135deg, rgba(56,232,255,.05), transparent 60%); }
+    .tip-corner { position: absolute; width: 7px; height: 7px; }
+    .tip-corner.tl { top:-1px; left:-1px; border-top:1px solid var(--cyan); border-left:1px solid var(--cyan); }
+    .tip-corner.tr { top:-1px; right:-1px; border-top:1px solid var(--cyan); border-right:1px solid var(--cyan); }
+    .tip-corner.bl { bottom:-1px; left:-1px; border-bottom:1px solid var(--cyan); border-left:1px solid var(--cyan); }
+    .tip-corner.br { bottom:-1px; right:-1px; border-bottom:1px solid var(--cyan); border-right:1px solid var(--cyan); }
+    .tip-name { font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 600; color: var(--cyan); letter-spacing: 1px; }
+    .tip-id { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text-muted); margin-top: 2px; letter-spacing: 1px; }
+    .tip-owner { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+    .tip-tags { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
 
-#side-panel .panel-header button {
-  background: none; border: none; color: var(--white-dim); cursor: pointer;
-  font-size: 18px; line-height: 1;
-}
-#side-panel .panel-header button:hover { color: var(--cyan); }
+    #toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-20px); z-index: 300; background: rgba(8,13,24,.95); border: 1px solid var(--cyan-dim); border-radius: 3px; padding: 8px 16px; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--cyan); letter-spacing: 1.5px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-#side-panel .panel-body {
-  flex: 1; overflow-y: auto; padding: 16px;
-}
-
-#side-panel .panel-body::-webkit-scrollbar { width: 4px; }
-#side-panel .panel-body::-webkit-scrollbar-track { background: transparent; }
-#side-panel .panel-body::-webkit-scrollbar-thumb { background: rgba(var(--cyan-rgb), 0.2); border-radius: 2px; }
-
-/* ── Form Elements ────────────────────────────────────── */
-.field-group {
-  margin-bottom: 14px;
-}
-
-.field-label {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--white-dim);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 5px;
-}
-
-.field-input, .field-select {
-  width: 100%;
-  background: rgba(var(--void-rgb), 0.6);
-  border: 1px solid var(--panel-border);
-  color: var(--white);
-  font-family: var(--font-body);
-  font-size: 13px;
-  padding: 7px 10px;
-  border-radius: 3px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.field-input:focus, .field-select:focus {
-  border-color: var(--panel-border-active);
-}
-
-.field-select {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238090a0'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
-}
-
-.field-select option {
-  background: var(--void);
-  color: var(--white);
-}
-
-/* ── Tags ─────────────────────────────────────────────── */
-.tag-container {
-  display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px;
-}
-
-.tag-pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  border: 1px solid;
-  cursor: default;
-}
-
-.tag-pill .tag-remove {
-  cursor: pointer;
-  opacity: 0.6;
-  font-size: 11px;
-  line-height: 1;
-}
-.tag-pill .tag-remove:hover { opacity: 1; }
-
-.tag-pill[data-tag="capital"]    { color: var(--gold); border-color: rgba(245,197,66,0.4); background: rgba(245,197,66,0.08); }
-.tag-pill[data-tag="homeworld"]  { color: var(--cyan); border-color: rgba(56,232,255,0.4); background: rgba(56,232,255,0.08); }
-.tag-pill[data-tag="fortress"]   { color: #a0a0ff; border-color: rgba(160,160,255,0.4); background: rgba(160,160,255,0.08); }
-.tag-pill[data-tag="outpost"]    { color: #80c0a0; border-color: rgba(128,192,160,0.4); background: rgba(128,192,160,0.08); }
-.tag-pill[data-tag="frontier"]   { color: #c0c080; border-color: rgba(192,192,128,0.4); background: rgba(192,192,128,0.08); }
-.tag-pill[data-tag="contested"]  { color: var(--red); border-color: rgba(255,60,60,0.4); background: rgba(255,60,60,0.08); }
-.tag-pill[data-tag="dangerous"]  { color: #ff6060; border-color: rgba(255,96,96,0.4); background: rgba(255,96,96,0.08); }
-.tag-pill[data-tag="trade"]      { color: var(--green); border-color: rgba(60,255,126,0.4); background: rgba(60,255,126,0.08); }
-.tag-pill[data-tag="ruins"]      { color: #c090ff; border-color: rgba(192,144,255,0.4); background: rgba(192,144,255,0.08); }
-.tag-pill[data-tag="anomaly"]    { color: #ff90c0; border-color: rgba(255,144,192,0.4); background: rgba(255,144,192,0.08); }
-
-/* ── Buttons ──────────────────────────────────────────── */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 7px 14px;
-  border: 1px solid var(--panel-border);
-  background: rgba(var(--void-rgb), 0.4);
-  color: var(--white);
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn:hover {
-  border-color: var(--panel-border-active);
-  background: rgba(var(--cyan-rgb), 0.08);
-  color: var(--cyan);
-}
-
-.btn-cyan {
-  border-color: rgba(var(--cyan-rgb), 0.3);
-  color: var(--cyan);
-}
-
-.btn-gold {
-  border-color: rgba(var(--gold-rgb), 0.3);
-  color: var(--gold);
-}
-
-.btn-red {
-  border-color: rgba(255, 60, 60, 0.3);
-  color: var(--red);
-}
-
-.btn-sm {
-  padding: 4px 10px;
-  font-size: 10px;
-}
-
-/* ── Legend Panel ──────────────────────────────────────── */
-#legend-panel {
-  position: fixed;
-  bottom: 16px; left: 16px;
-  z-index: 80;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  padding: 12px 16px;
-  min-width: 180px;
-  max-height: 300px;
-  overflow-y: auto;
-  font-family: var(--font-display);
-}
-
-#legend-panel .legend-title {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--cyan);
-  margin-bottom: 8px;
-}
-
-.legend-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 3px 0;
-  font-size: 12px;
-  color: var(--white);
-  cursor: pointer;
-  opacity: 1;
-  transition: opacity 0.2s;
-}
-
-.legend-item.hidden-polity {
-  opacity: 0.35;
-}
-
-.legend-swatch {
-  width: 10px; height: 10px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.legend-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.legend-count {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--white-dim);
-}
-
-/* ── Status Bar ───────────────────────────────────────── */
-#status-bar {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: 28px;
-  background: rgba(var(--void-rgb), 0.9);
-  border-top: 1px solid var(--panel-border);
-  display: flex; align-items: center;
-  padding: 0 16px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--white-dim);
-  z-index: 80;
-  gap: 20px;
-}
-
-#status-bar .status-item {
-  display: flex; align-items: center; gap: 5px;
-}
-
-#status-bar .status-label {
-  color: var(--cyan);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-/* ── Polity Editor Modal ──────────────────────────────── */
-#polity-modal {
-  position: fixed; inset: 0;
-  z-index: 200;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.6);
-}
-
-#polity-modal.open {
-  display: flex;
-}
-
-#polity-modal .modal-content {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border-active);
-  border-radius: 6px;
-  padding: 24px;
-  width: 360px;
-  max-width: 90vw;
-}
-
-#polity-modal .modal-title {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--cyan);
-  margin-bottom: 16px;
-}
-
-#polity-modal .modal-actions {
-  display: flex; gap: 8px; justify-content: flex-end;
-  margin-top: 16px;
-}
-
-/* ── Boot Overlay ─────────────────────────────────────── */
-#boot-overlay {
-  position: fixed; inset: 0;
-  z-index: 10000;
-  background: var(--void);
-  display: flex; align-items: center; justify-content: center;
-  flex-direction: column;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--cyan);
-  transition: opacity 0.6s;
-}
-
-#boot-overlay.fade-out {
-  opacity: 0;
-  pointer-events: none;
-}
-
-#boot-log {
-  width: 500px;
-  max-width: 90vw;
-}
-
-#boot-log .boot-line {
-  opacity: 0;
-  margin-bottom: 3px;
-  white-space: pre;
-}
-
-#boot-log .boot-line.visible {
-  opacity: 1;
-}
-
-.boot-ok { color: var(--green); }
-.boot-warn { color: var(--gold); }
-
-/* ── Toast ────────────────────────────────────────────── */
-#toast {
-  position: fixed;
-  top: 60px; right: 20px;
-  z-index: 300;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border-active);
-  border-radius: 4px;
-  padding: 10px 16px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--cyan);
-  transform: translateX(120%);
-  transition: transform 0.3s;
-  pointer-events: none;
-}
-
-#toast.show {
-  transform: translateX(0);
-}
-
-/* ── Editor Lock Indicator ────────────────────────────── */
-#editor-lock {
-  position: fixed;
-  top: 56px; right: 16px;
-  z-index: 90;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 3px;
-  border: 1px solid var(--panel-border);
-  background: rgba(var(--void-rgb), 0.6);
-  transition: all 0.2s;
-}
-
-#editor-lock.locked {
-  color: var(--red);
-  border-color: rgba(255,60,60,0.3);
-}
-
-#editor-lock.unlocked {
-  color: var(--green);
-  border-color: rgba(60,255,126,0.3);
-}
-
-/* ── Bulk Selection Info ──────────────────────────────── */
-#bulk-bar {
-  position: fixed;
-  top: 56px; left: 50%;
-  transform: translateX(-50%);
-  z-index: 90;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border-active);
-  border-radius: 4px;
-  padding: 8px 16px;
-  display: none;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  color: var(--cyan);
-  letter-spacing: 1px;
-}
-
-#bulk-bar.visible {
-  display: flex;
-}
-
-/* ── Scrollbar global ─────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(var(--cyan-rgb), 0.15); border-radius: 2px; }
-</style>
+    .meta-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(26,45,70,.35); }
+    .meta-row:last-child { border-bottom: none; }
+    .mk { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; width: 72px; flex-shrink: 0; }
+    .mv { font-size: 14px; color: var(--text); flex: 1; }
+    .mv.hi { color: var(--cyan); font-family: 'Share Tech Mono', monospace; font-size: 13px; }
+    .mv.go { color: var(--gold); }
+  </style>
 </head>
 <body>
+  <canvas id="gl"></canvas>
+  <div class="corner-bracket tl"></div>
+  <div class="corner-bracket tr"></div>
+  <div class="corner-bracket bl"></div>
+  <div class="corner-bracket br"></div>
 
-<!-- Scanlines -->
-<div id="scanlines"></div>
-
-<!-- Boot Overlay -->
-<div id="boot-overlay">
-  <div id="boot-log"></div>
-</div>
-
-<!-- HUD Header -->
-<header id="hud-header">
-  <div style="display:flex;align-items:center;">
-    <span id="hud-logo">SGN</span>
-    <nav class="nav-links">
-      <a href="briefing.html">Briefing</a>
-      <a href="index.html">Star Chart</a>
-      <a href="wiki.html">Codex</a>
-      <a href="personnel.html">Personnel</a>
-      <a href="orbat.html">ORBAT</a>
-      <a href="language.html">Language</a>
-      <a href="galaxy.html" class="active">Galaxy Map</a>
-    </nav>
+  <div id="hud">
+    <div class="hud-logo">SGN</div>
+    <div class="hud-sep"></div>
+    <a href="./briefing.html" class="hud-item hud-nav">BRIEFING</a>
+    <div class="hud-sep"></div>
+    <a href="./index.html" class="hud-item hud-nav">STAR CHART</a>
+    <div class="hud-sep"></div>
+    <a href="./galaxy.html" class="hud-item hud-nav active">GALAXY MAP</a>
+    <div class="hud-sep"></div>
+    <a href="./wiki.html" class="hud-item hud-nav">CODEX</a>
+    <div class="hud-sep"></div>
+    <a href="./personnel.html" class="hud-item hud-nav">PERSONNEL</a>
+    <div class="hud-sep"></div>
+    <a href="./orbat.html" class="hud-item hud-nav">ORBAT</a>
+    <div class="hud-sep"></div>
+    <a href="./language.html" class="hud-item hud-nav">LANGUAGE</a>
+    <div class="hud-spacer"></div>
+    <div class="hud-hint">SHIFT+DRAG ROTATE &middot; SCROLL ZOOM &middot; RMB PAN</div>
   </div>
-  <div id="hud-clock">STARDATE ...</div>
-</header>
 
-<!-- WebGL Canvas -->
-<canvas id="galaxy-canvas"></canvas>
-
-<!-- Selection Rectangle -->
-<div id="select-rect"></div>
-
-<!-- Bulk Selection Bar -->
-<div id="bulk-bar">
-  <span id="bulk-count">0 systems selected</span>
-  <select id="bulk-polity-select" class="field-select" style="width:160px;font-size:11px;padding:4px 8px;">
-    <option value="">Assign polity...</option>
-  </select>
-  <button class="btn btn-cyan btn-sm" id="bulk-assign-btn">Assign</button>
-  <button class="btn btn-sm" id="bulk-clear-btn">Clear</button>
-</div>
-
-<!-- Editor Lock -->
-<div id="editor-lock" class="locked" title="Click to authenticate as editor">&#x1F512; LOCKED</div>
-
-<!-- Side Panel -->
-<div id="side-panel">
-  <div class="panel-header">
-    <span id="panel-title">System Details</span>
-    <button id="panel-close">&times;</button>
+  <div id="select-rect"></div>
+  <div id="bulk-bar">
+    <span id="bulk-count">0 SELECTED</span>
+    <select id="bulk-polity-select" class="sci-select" style="width:150px;font-size:11px;padding:3px 6px;"><option value="">Assign polity...</option></select>
+    <button class="pbtn primary" id="bulk-assign-btn" style="padding:3px 8px;font-size:10px;">ASSIGN</button>
+    <button class="pbtn" id="bulk-clear-btn" style="padding:3px 8px;font-size:10px;">CLEAR</button>
   </div>
-  <div class="panel-body" id="panel-body">
-    <!-- Populated dynamically -->
-  </div>
-</div>
+  <div id="editor-lock" class="locked">&#x1F512; LOCKED</div>
 
-<!-- Legend -->
-<div id="legend-panel">
-  <div class="legend-title">Polities</div>
-  <div id="legend-list"></div>
-  <div style="margin-top:10px;">
-    <button class="btn btn-cyan btn-sm" id="add-polity-btn">+ New Polity</button>
-  </div>
-</div>
-
-<!-- Polity Modal -->
-<div id="polity-modal">
-  <div class="modal-content">
-    <div class="modal-title" id="modal-title">New Polity</div>
-    <div class="field-group">
-      <label class="field-label">Name</label>
-      <input type="text" class="field-input" id="polity-name-input" placeholder="Polity name...">
-    </div>
-    <div class="field-group">
-      <label class="field-label">Color</label>
-      <input type="color" id="polity-color-input" value="#38e8ff" style="width:100%;height:36px;border:1px solid var(--panel-border);background:transparent;cursor:pointer;border-radius:3px;">
-    </div>
-    <div class="field-group">
-      <label class="field-label">Description (optional)</label>
-      <input type="text" class="field-input" id="polity-desc-input" placeholder="Brief description...">
-    </div>
-    <div class="modal-actions">
-      <button class="btn" id="modal-cancel">Cancel</button>
-      <button class="btn btn-cyan" id="modal-confirm">Create</button>
+  <div id="tooltip">
+    <div class="tip-inner">
+      <div class="tip-corner tl"></div><div class="tip-corner tr"></div>
+      <div class="tip-corner bl"></div><div class="tip-corner br"></div>
+      <div class="tip-name" id="tip-name">--</div>
+      <div class="tip-id" id="tip-id"></div>
+      <div class="tip-owner" id="tip-owner"></div>
+      <div class="tip-tags" id="tip-tags"></div>
     </div>
   </div>
-</div>
 
-<!-- Toast -->
-<div id="toast"></div>
+  <div id="sidePanel">
+    <div class="panel-header">
+      <span class="panel-title" id="panel-title">SYSTEM DETAILS</span>
+      <button class="panel-close" id="panel-close">&#x2715;</button>
+    </div>
+    <div id="sp-body"></div>
+  </div>
 
-<!-- Status Bar -->
-<div id="status-bar">
-  <div class="status-item"><span class="status-label">Systems:</span> <span id="stat-systems">0</span></div>
-  <div class="status-item"><span class="status-label">Polities:</span> <span id="stat-polities">0</span></div>
-  <div class="status-item"><span class="status-label">Camera:</span> <span id="stat-camera">0, 0, 0</span></div>
-  <div class="status-item"><span class="status-label">FPS:</span> <span id="stat-fps">0</span></div>
-</div>
+  <div id="legend-panel">
+    <div class="legend-title">POLITIES</div>
+    <div id="legend-list"></div>
+    <div style="margin-top:10px;">
+      <button class="pbtn primary" id="add-polity-btn" style="padding:3px 8px;font-size:10px;width:100%;">+ NEW POLITY</button>
+    </div>
+  </div>
 
-<!-- Galaxy JS -->
-<script src="galaxy.js"></script>
+  <div id="polity-modal">
+    <div class="modal-content">
+      <div class="modal-title" id="modal-title">NEW POLITY</div>
+      <div class="field-group"><label class="fl">Name</label><input type="text" class="sci-input" id="polity-name-input" placeholder="Polity name..."></div>
+      <div class="field-group"><label class="fl">Color</label><input type="color" id="polity-color-input" value="#38e8ff" style="width:100%;height:32px;border:1px solid var(--border2);background:transparent;border-radius:2px;"></div>
+      <div class="field-group"><label class="fl">Description</label><input type="text" class="sci-input" id="polity-desc-input" placeholder="Brief description..."></div>
+      <div class="modal-actions">
+        <button class="pbtn" id="modal-cancel">CANCEL</button>
+        <button class="pbtn primary" id="modal-confirm">CREATE</button>
+      </div>
+    </div>
+  </div>
 
+  <div id="toast"></div>
+
+  <div id="statusBar">
+    <div class="sb-item"><div class="sb-dot"></div><span id="sb-sys">LOADING</span></div>
+    <div class="sb-item"><div class="sb-dot gold"></div><span id="sb-polities">0 POLITIES</span></div>
+    <div class="sb-spacer"></div>
+    <button class="sb-save-btn" id="sb-save-repo">&#x2193; SAVE TO REPO</button>
+    <div class="sb-item"><div class="sb-dot" style="opacity:.3;"></div>SHIFT+DRAG=SELECT &middot; /=SEARCH</div>
+  </div>
+
+  <script src="./github-save.js"></script>
+  <script src="./boot.js"></script>
+  <script src="./galaxy.js"></script>
+  <script src="./search.js"></script>
+  <script src="./stardate.js"></script>
 </body>
 </html>
