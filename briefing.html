@@ -36,14 +36,14 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 /* Cover */
 .cover{text-align:center;padding:44px 0 36px;position:relative;}
 .cover-glow{position:absolute;top:50%;left:50%;width:500px;height:500px;transform:translate(-50%,-55%);background:radial-gradient(circle,rgba(245,197,66,.03) 0%,rgba(56,232,255,.015) 30%,transparent 65%);pointer-events:none;}
-.emblem{width:110px;height:110px;margin:0 auto 18px;position:relative;display:flex;align-items:center;justify-content:center;}
+.emblem{width:150px;height:150px;margin:0 auto 18px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .e-ring{position:absolute;border-radius:50%;border:1px solid;}
-.e-ring.r1{inset:0;border-color:rgba(245,197,66,.1);animation:espin 55s linear infinite;}
-.e-ring.r2{inset:12px;border-color:rgba(56,232,255,.08);border-style:dashed;animation:espin-r 40s linear infinite;}
-.e-ring.r3{inset:24px;border-color:rgba(245,197,66,.12);}
+.e-ring.r1{inset:-14px;border-color:rgba(245,197,66,.08);animation:espin 55s linear infinite;}
+.e-ring.r2{inset:-6px;border-color:rgba(56,232,255,.06);border-style:dashed;animation:espin-r 40s linear infinite;}
 @keyframes espin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes espin-r{from{transform:rotate(360deg)}to{transform:rotate(0)}}
-.e-text{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:26px;letter-spacing:6px;color:var(--gold);text-shadow:0 0 16px rgba(245,197,66,.2);position:relative;z-index:2;}
+.e-img{width:130px;height:130px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 18px rgba(245,197,66,.25)) drop-shadow(0 0 40px rgba(245,197,66,.1));transition:filter .3s;}
+.emblem:hover .e-img{filter:drop-shadow(0 0 22px rgba(245,197,66,.35)) drop-shadow(0 0 50px rgba(245,197,66,.15));}
 .cover-realm{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:36px;letter-spacing:4px;text-transform:uppercase;}
 .cover-realm em{font-style:normal;color:var(--gold);text-shadow:0 0 20px rgba(245,197,66,.15);}
 .cover-subrealm{font-family:'Rajdhani',sans-serif;font-weight:300;font-size:15px;letter-spacing:6px;color:var(--text-dim);text-transform:uppercase;margin-top:2px;}
@@ -215,7 +215,11 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <!-- COVER -->
   <div class="cover fi d1">
     <div class="cover-glow"></div>
-    <div class="emblem"><div class="e-ring r1"></div><div class="e-ring r2"></div><div class="e-ring r3"></div><div class="e-text">AEN</div></div>
+    <div class="emblem">
+      <div class="e-ring r1"></div>
+      <div class="e-ring r2"></div>
+      <img class="e-img" src="./SYMBOL.png" alt="Arandorë Eldainë"/>
+    </div>
     <div class="cover-realm">Arandor&euml; <em>Eldain&euml;</em></div>
     <div class="cover-subrealm">The High Realm of the Elves</div>
     <div class="cover-office">
@@ -453,7 +457,7 @@ body.edit-mode .key-hint{display:block;}
 (function(){
   var STORE_KEY = 'sgn_diplo_brief_v1';
   var editMode = false;
-  var emblem = document.querySelector('.e-text');
+  var emblem = document.querySelector('.emblem');
   var indicator = document.getElementById('editIndicator');
   var toast = document.getElementById('saveToast');
   var clickCount = 0;
