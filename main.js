@@ -110,6 +110,7 @@ uniform float uTime;
 uniform vec2 uRes;
 uniform vec3 uPan;
 uniform float uZoom;
+uniform vec2 uRot;
 float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float hash2(vec2 p){ return fract(sin(dot(p,vec2(269.5,183.3)))*43758.5453); }
 float noise(vec2 p){
@@ -177,29 +178,31 @@ void main(){
   col += vec3(0.025, 0.006, 0.04) * smoothstep(0.55,0.9,n3) * 0.25; // faint violet
   col += vec3(0.004, 0.01, 0.03) * smoothstep(0.25,0.65,n4) * 0.3;  // deep blue haze
 
-  // Parallax multiplier (increased for visible separation)
-  vec2 panOff = off * 80.0;
+  // Combined camera movement: pan + orbit rotation
+  // Rotation creates a large offset that makes the background respond to orbiting
+  vec2 rotOff = uRot * 8.0;
+  vec2 panOff = off * 80.0 + rotOff;
 
   // 3D parallax star layers with ambient drift
   // Far layer: barely moves
-  float farStars = starLayer(uv * aspect, panOff * 0.1 + drift1, 180.0, 0.06, 0.0);
-  col += farStars * vec3(0.5, 0.55, 0.7) * 0.5;
+  float farStars = starLayer(uv * aspect, panOff * 0.1 + drift1, 180.0, 0.07, 0.0);
+  col += farStars * vec3(0.6, 0.65, 0.8) * 0.7;
 
   // Mid-far layer
-  float midFarStars = starLayer(uv * aspect, panOff * 0.25 + drift2, 140.0, 0.05, 100.0);
-  col += midFarStars * vec3(0.55, 0.6, 0.8) * 0.6;
+  float midFarStars = starLayer(uv * aspect, panOff * 0.25 + drift2, 140.0, 0.06, 100.0);
+  col += midFarStars * vec3(0.65, 0.7, 0.85) * 0.8;
 
   // Mid layer
-  float midStars = starLayer(uv * aspect, panOff * 0.5 + drift3, 100.0, 0.04, 200.0);
-  col += midStars * vec3(0.6, 0.7, 0.9) * 0.7;
+  float midStars = starLayer(uv * aspect, panOff * 0.5 + drift3, 100.0, 0.05, 200.0);
+  col += midStars * vec3(0.7, 0.8, 0.95) * 0.9;
 
   // Near-mid layer
-  float nearMidStars = starLayer(uv * aspect, panOff * 0.8 + drift4, 70.0, 0.03, 300.0);
-  col += nearMidStars * vec3(0.7, 0.75, 0.9) * 0.8;
+  float nearMidStars = starLayer(uv * aspect, panOff * 0.8 + drift4, 70.0, 0.04, 300.0);
+  col += nearMidStars * vec3(0.8, 0.85, 1.0) * 1.0;
 
   // Near layer: moves most with camera
-  float nearStars = starLayer(uv * aspect, panOff * 1.2 + drift5, 45.0, 0.025, 400.0);
-  col += nearStars * vec3(0.8, 0.85, 1.0) * 0.9;
+  float nearStars = starLayer(uv * aspect, panOff * 1.2 + drift5, 45.0, 0.035, 400.0);
+  col += nearStars * vec3(0.9, 0.92, 1.0) * 1.1;
 
   // Zoom affects parallax spread: when zoomed in, layers separate more
   // (already handled via uPan scaling since zoom changes pan range)
@@ -376,6 +379,7 @@ const uTimeBG = gl.getUniformLocation(progBG, 'uTime');
 const uResBG  = gl.getUniformLocation(progBG, 'uRes');
 const uPanBG  = gl.getUniformLocation(progBG, 'uPan');
 const uZoomBG = gl.getUniformLocation(progBG, 'uZoom');
+const uRotBG  = gl.getUniformLocation(progBG, 'uRot');
 const aPosB   = gl.getAttribLocation(progBG, 'position');
 const bgVBO   = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, bgVBO);
@@ -1850,6 +1854,7 @@ function loop() {
   gl.uniform2f(uResBG, W, H);
   gl.uniform3f(uPanBG, panX, panY, 0);
   gl.uniform1f(uZoomBG, dist / 1800.0);
+  gl.uniform2f(uRotBG, yaw, pitch);
   gl.bindBuffer(gl.ARRAY_BUFFER, bgVBO);
   gl.enableVertexAttribArray(aPosB);
   gl.vertexAttribPointer(aPosB, 2, gl.FLOAT, false, 0, 0);
