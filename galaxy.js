@@ -311,6 +311,128 @@ void main(){
   gl_FragColor=vec4(col,clamp(alpha,0.0,1.0));
 }`;
 
+  /* ── Supermassive Black Hole shader ── */
+  /* Rendered as a large GL_POINT. The fragment shader fakes:
+     - Dark shadow (event horizon)
+     - Photon ring / Einstein ring (bright thin ring from lensed light)
+     - Accretion disc (hot material orbiting, doppler-shifted)
+     - Gravitational lensing distortion of nearby stars (glow warping)
+     All purely analytical in the fragment shader — no raymarching. */
+
+  const VS_BLACKHOLE = `
+attribute vec3 position;
+uniform mat4 uMVP;
+uniform float uPixelSize;
+void main(){
+  gl_Position = uMVP * vec4(position, 1.0);
+  gl_PointSize = uPixelSize;
+}`;
+
+  const FS_BLACKHOLE = `
+precision highp float;
+uniform float uTime;
+uniform float uPixelSize;
+
+void main(){
+  vec2 uv = gl_PointCoord * 2.0 - 1.0;
+  float r = length(uv);
+  float ang = atan(uv.y, uv.x);
+  float PI = 3.14159265;
+
+  /* ── Radii (normalized to point size) ── */
+  float shadowR = 0.12;       /* event horizon */
+  float photonR = 0.16;       /* photon sphere */
+  float iscoR   = 0.24;       /* innermost stable orbit */
+  float discOuter = 0.55;     /* accretion disc outer edge */
+
+  /* ── Event horizon: pure black ── */
+  float shadow = 1.0 - smoothstep(shadowR - 0.01, shadowR + 0.01, r);
+
+  /* ── Photon ring: thin bright ring of lensed light ── */
+  float photonRing = exp(-pow((r - photonR) / 0.012, 2.0)) * 1.8;
+  /* Slight flicker from turbulent lensing */
+  photonRing *= 0.9 + 0.1 * sin(ang * 6.0 + uTime * 3.0);
+
+  /* ── Accretion disc: hot material with doppler shift ── */
+  /* Disc is viewed at an angle, so it appears as an elliptical band.
+     We fake this with a vertically compressed coordinate. */
+  vec2 discUV = vec2(uv.x, uv.y * 2.2); /* tilt compression */
+  float discR = length(discUV);
+  float discAng = atan(discUV.y, discUV.x);
+
+  /* Disc band: between ISCO and outer edge */
+  float discMask = smoothstep(iscoR - 0.02, iscoR + 0.02, discR)
+                 * (1.0 - smoothstep(discOuter - 0.04, discOuter + 0.02, discR));
+
+  /* Temperature gradient: hotter near center (bluer white), cooler outside (orange) */
+  float tempT = smoothstep(iscoR, discOuter, discR);
+  vec3 hotColor  = vec3(0.85, 0.9, 1.0);    /* blue-white near ISCO */
+  vec3 warmColor = vec3(1.0, 0.65, 0.25);    /* orange at outer disc */
+  vec3 coolColor = vec3(0.6, 0.2, 0.05);     /* dim red at very edge */
+  vec3 discColor = mix(hotColor, warmColor, smoothstep(0.0, 0.6, tempT));
+  discColor = mix(discColor, coolColor, smoothstep(0.6, 1.0, tempT));
+
+  /* Orbital structure: spiral arms in the disc */
+  float spiral = sin(discAng * 3.0 - discR * 25.0 + uTime * 1.2) * 0.5 + 0.5;
+  float turbulence = sin(discAng * 7.0 + discR * 40.0 - uTime * 2.5) * 0.3 + 0.7;
+  float discBright = discMask * (0.5 + spiral * 0.3) * turbulence;
+
+  /* Doppler beaming: approaching side brighter, receding dimmer */
+  float doppler = 0.7 + 0.3 * sin(discAng - uTime * 0.8);
+  discBright *= doppler;
+
+  /* Disc should be BEHIND the shadow */
+  discBright *= (1.0 - shadow);
+
+  /* ── Gravitational lensing glow: light bent around the hole ── */
+  /* Creates a soft bright halo just outside the photon ring */
+  float lensGlow = exp(-pow((r - photonR * 1.5) / 0.08, 2.0)) * 0.35;
+  lensGlow += exp(-pow((r - photonR * 2.5) / 0.15, 2.0)) * 0.12;
+  /* The lensing also creates a secondary image (Einstein ring) at ~2x photon radius */
+  float einsteinRing = exp(-pow((r - photonR * 2.0) / 0.018, 2.0)) * 0.5;
+  einsteinRing *= 0.85 + 0.15 * sin(ang * 4.0 - uTime * 1.5);
+
+  /* ── Compose ── */
+  vec3 col = vec3(0.0);
+
+  /* Accretion disc */
+  col += discColor * discBright * 0.9;
+
+  /* Photon ring (white-blue) */
+  col += vec3(0.8, 0.88, 1.0) * photonRing * (1.0 - shadow);
+
+  /* Einstein ring (subtle warm from lensed disc light) */
+  col += vec3(0.9, 0.75, 0.5) * einsteinRing * (1.0 - shadow);
+
+  /* Lensing glow (very subtle blue) */
+  col += vec3(0.3, 0.45, 0.7) * lensGlow * (1.0 - shadow);
+
+  /* Very faint outer gravitational influence halo */
+  float outerHalo = exp(-r * r * 2.0) * 0.06;
+  col += vec3(0.2, 0.3, 0.5) * outerHalo;
+
+  /* Event horizon kills everything inside */
+  col *= (1.0 - shadow);
+
+  /* Alpha: visible where there's any light, plus the black shadow region */
+  float alpha = clamp(shadow * 0.95 + discBright + photonRing + einsteinRing * 0.8 + lensGlow + outerHalo, 0.0, 1.0);
+
+  /* Fade out at edges of point */
+  alpha *= 1.0 - smoothstep(0.7, 1.0, r);
+
+  if(alpha < 0.003) discard;
+
+  gl_FragColor = vec4(col, alpha);
+}`;
+
+  /* Black hole positions (normalized coords from density analysis) */
+  const BLACK_HOLES = [
+    { xn: 0.33, yn: 0.485, label: 'Sagittarius A* analog' },
+    { xn: 0.675, yn: 0.44,  label: 'Sagittarius A* analog' },
+  ];
+  let blackHoleWorldPos = [];
+  let blackHoleVBO = null;
+
   /* ── World position from normalized coords ── */
   /* Uses smooth spatial noise for Y so nearby systems have coherent heights.
      This prevents lanes from zigzagging wildly between connected systems. */
@@ -813,6 +935,25 @@ void main(){
     gl.disableVertexAttribArray(aPos_h);
   }
 
+  /* ── Draw Black Hole ── */
+  let progBlackHole = null;
+  function drawBlackHole(pos, pixSize, time) {
+    if (!progBlackHole) return;
+    gl.useProgram(progBlackHole);
+    gl.uniformMatrix4fv(gl.getUniformLocation(progBlackHole, 'uMVP'), false, buildMVP());
+    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uPixelSize'), pixSize);
+    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uTime'), time);
+    gl.bindBuffer(gl.ARRAY_BUFFER, blackHoleVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.DYNAMIC_DRAW);
+    const aPos = gl.getAttribLocation(progBlackHole, 'position');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArrays(gl.POINTS, 0, 1);
+    gl.disableVertexAttribArray(aPos);
+  }
+
   /* ── Render Loop ── */
   function render(){
     const W=canvas.width, H=canvas.height;
@@ -916,7 +1057,12 @@ void main(){
       gl.disableVertexAttribArray(sP); gl.disableVertexAttribArray(sC); gl.disableVertexAttribArray(sS);
     }
 
-    /* 6. Hover & Selection halos (same as main.js) */
+    /* 6. Supermassive black holes */
+    for(const bhPos of blackHoleWorldPos){
+      drawBlackHole(bhPos, 120.0, wallTime);
+    }
+
+    /* 7. Hover & Selection halos (same as main.js) */
     const t=wallTime;
     if(hoveredSystemId){
       drawHalo(hoveredSystemId, 70.0, t, [0.20,0.60,0.70], [0.35,0.95,1.0], 0.0);
@@ -986,12 +1132,21 @@ void main(){
     progTerritory=makeProgram(VS_TERR,FS_TERR);
     progLines=makeProgram(VS_LINES,FS_LINES);
     progHalo=makeProgram(VS_HALO,FS_HALO);
+    progBlackHole=makeProgram(VS_BLACKHOLE,FS_BLACKHOLE);
 
     /* Build geometry */
     bgVBO=gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER,bgVBO);
     gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
     haloVBO=gl.createBuffer();
+    blackHoleVBO=gl.createBuffer();
+
+    /* Compute black hole world positions (at galactic plane Y=0) */
+    blackHoleWorldPos=BLACK_HOLES.map(bh=>[
+      (bh.xn-0.5)*GALAXY_SPREAD_X,
+      0,
+      (bh.yn-0.5)*GALAXY_SPREAD_Z
+    ]);
 
     buildBGStars();
     rebuildStarsVBO();
