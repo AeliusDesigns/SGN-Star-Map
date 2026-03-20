@@ -171,11 +171,11 @@ void main(){
   float n3 = fbm(p * 2.8 + vec2(10.0,7.0));
   float n4 = fbm(p * 0.4 + vec2(-3.0,8.0) + uTime * 0.002);
 
-  vec3 col = vec3(0.015, 0.022, 0.055);                         // deep void base
-  col += vec3(0.008, 0.035, 0.07) * smoothstep(0.3,0.7,n1);    // blue clouds
-  col += vec3(0.015, 0.045, 0.055) * smoothstep(0.4,0.8,n2) * 0.5; // teal wisps
-  col += vec3(0.035, 0.008, 0.055) * smoothstep(0.5,0.9,n3) * 0.3; // faint violet
-  col += vec3(0.005, 0.015, 0.04) * smoothstep(0.2,0.6,n4) * 0.4;  // deep blue haze
+  vec3 col = vec3(0.012, 0.018, 0.045);                         // deeper void base
+  col += vec3(0.006, 0.025, 0.05) * smoothstep(0.35,0.75,n1);    // blue clouds
+  col += vec3(0.01, 0.03, 0.04) * smoothstep(0.45,0.85,n2) * 0.4; // teal wisps
+  col += vec3(0.025, 0.006, 0.04) * smoothstep(0.55,0.9,n3) * 0.25; // faint violet
+  col += vec3(0.004, 0.01, 0.03) * smoothstep(0.25,0.65,n4) * 0.3;  // deep blue haze
 
   // Parallax multiplier (increased for visible separation)
   vec2 panOff = off * 80.0;
@@ -183,23 +183,23 @@ void main(){
   // 3D parallax star layers with ambient drift
   // Far layer: barely moves
   float farStars = starLayer(uv * aspect, panOff * 0.1 + drift1, 180.0, 0.06, 0.0);
-  col += farStars * vec3(0.3, 0.35, 0.5) * 0.15;
+  col += farStars * vec3(0.5, 0.55, 0.7) * 0.5;
 
   // Mid-far layer
   float midFarStars = starLayer(uv * aspect, panOff * 0.25 + drift2, 140.0, 0.05, 100.0);
-  col += midFarStars * vec3(0.35, 0.4, 0.6) * 0.2;
+  col += midFarStars * vec3(0.55, 0.6, 0.8) * 0.6;
 
   // Mid layer
   float midStars = starLayer(uv * aspect, panOff * 0.5 + drift3, 100.0, 0.04, 200.0);
-  col += midStars * vec3(0.4, 0.5, 0.7) * 0.25;
+  col += midStars * vec3(0.6, 0.7, 0.9) * 0.7;
 
   // Near-mid layer
   float nearMidStars = starLayer(uv * aspect, panOff * 0.8 + drift4, 70.0, 0.03, 300.0);
-  col += nearMidStars * vec3(0.5, 0.55, 0.75) * 0.3;
+  col += nearMidStars * vec3(0.7, 0.75, 0.9) * 0.8;
 
   // Near layer: moves most with camera
   float nearStars = starLayer(uv * aspect, panOff * 1.2 + drift5, 45.0, 0.025, 400.0);
-  col += nearStars * vec3(0.6, 0.65, 0.85) * 0.35;
+  col += nearStars * vec3(0.8, 0.85, 1.0) * 0.9;
 
   // Zoom affects parallax spread: when zoomed in, layers separate more
   // (already handled via uPan scaling since zoom changes pan range)
