@@ -427,10 +427,11 @@ void main(){
 
   /* Black hole positions (normalized coords from density analysis) */
   const BLACK_HOLES = [
-    { xn: 0.33, yn: 0.485, label: 'Sagittarius A* analog' },
-    { xn: 0.675, yn: 0.44,  label: 'Sagittarius A* analog' },
+    { xn: 0.335, yn: 0.387, size: 100.0 },   /* smaller western galaxy (1493 systems) */
+    { xn: 0.639, yn: 0.415, size: 160.0 },   /* larger eastern galaxy (3491 systems) */
   ];
   let blackHoleWorldPos = [];
+  let blackHoleSizes = [];
   let blackHoleVBO = null;
 
   /* ── World position from normalized coords ── */
@@ -1058,8 +1059,8 @@ void main(){
     }
 
     /* 6. Supermassive black holes */
-    for(const bhPos of blackHoleWorldPos){
-      drawBlackHole(bhPos, 120.0, wallTime);
+    for(let i=0;i<blackHoleWorldPos.length;i++){
+      drawBlackHole(blackHoleWorldPos[i], blackHoleSizes[i], wallTime);
     }
 
     /* 7. Hover & Selection halos (same as main.js) */
@@ -1147,6 +1148,7 @@ void main(){
       0,
       (bh.yn-0.5)*GALAXY_SPREAD_Z
     ]);
+    blackHoleSizes=BLACK_HOLES.map(bh=>bh.size);
 
     buildBGStars();
     rebuildStarsVBO();
