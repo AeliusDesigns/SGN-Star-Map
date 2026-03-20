@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGN — Galaxy Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── SGN Design Tokens ────────────────────────────────── */
+:root {
+  --void: #050810;
+  --void-rgb: 5, 8, 16;
+  --cyan: #38e8ff;
+  --cyan-rgb: 56, 232, 255;
+  --gold: #f5c542;
+  --gold-rgb: 245, 197, 66;
+  --amber: #ffaa00;
+  --red: #ff3c3c;
+  --green: #3cff7e;
+  --white: #e0e8f0;
+  --white-dim: #8090a0;
+  --panel-bg: rgba(5, 8, 16, 0.92);
+  --panel-border: rgba(56, 232, 255, 0.15);
+  --panel-border-active: rgba(56, 232, 255, 0.4);
+  --font-display: 'Rajdhani', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-body: 'Exo 2', sans-serif;
+  --scanline-opacity: 0.03;
+}
+
+/* ── Reset ────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--void); color: var(--white); font-family: var(--font-body); }
+
+/* ── Custom Cursor ────────────────────────────────────── */
+body {
+  cursor: crosshair;
+}
+
+/* ── Scanline Overlay ─────────────────────────────────── */
+#scanlines {
+  position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 4px
+  );
+}
+
+/* ── HUD Header ───────────────────────────────────────── */
+#hud-header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 48px;
+  background: linear-gradient(180deg, rgba(var(--void-rgb), 0.95) 0%, rgba(var(--void-rgb), 0.8) 100%);
+  border-bottom: 1px solid var(--panel-border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  font-family: var(--font-display);
+}
+
+#hud-header .nav-links {
+  display: flex; gap: 4px; align-items: center;
+}
+
+#hud-header .nav-links a {
+  color: var(--white-dim);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 2px;
+  transition: color 0.2s, background 0.2s;
+}
+
+#hud-header .nav-links a:hover {
+  color: var(--cyan);
+  background: rgba(var(--cyan-rgb), 0.08);
+}
+
+#hud-header .nav-links a.active {
+  color: var(--cyan);
+  background: rgba(var(--cyan-rgb), 0.12);
+  border-bottom: 2px solid var(--cyan);
+}
+
+#hud-logo {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--cyan);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-right: 24px;
+  text-shadow: 0 0 12px rgba(var(--cyan-rgb), 0.4);
+}
+
+#hud-clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+/* ── WebGL Canvas ─────────────────────────────────────── */
+#galaxy-canvas {
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: calc(100vh - 48px);
+  display: block;
+}
+
+/* ── Selection Rectangle ──────────────────────────────── */
+#select-rect {
+  position: fixed;
+  border: 1px solid var(--cyan);
+  background: rgba(var(--cyan-rgb), 0.08);
+  pointer-events: none;
+  display: none;
+  z-index: 50;
+}
+
+/* ── Side Panel ───────────────────────────────────────── */
+#side-panel {
+  position: fixed;
+  top: 48px; right: 0;
+  width: 320px;
+  height: calc(100vh - 48px);
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+#side-panel.open {
+  transform: translateX(0);
+}
+
+#side-panel .panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--panel-border);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+#side-panel .panel-header button {
+  background: none; border: none; color: var(--white-dim); cursor: pointer;
+  font-size: 18px; line-height: 1;
+}
+#side-panel .panel-header button:hover { color: var(--cyan); }
+
+#side-panel .panel-body {
+  flex: 1; overflow-y: auto; padding: 16px;
+}
+
+#side-panel .panel-body::-webkit-scrollbar { width: 4px; }
+#side-panel .panel-body::-webkit-scrollbar-track { background: transparent; }
+#side-panel .panel-body::-webkit-scrollbar-thumb { background: rgba(var(--cyan-rgb), 0.2); border-radius: 2px; }
+
+/* ── Form Elements ────────────────────────────────────── */
+.field-group {
+  margin-bottom: 14px;
+}
+
+.field-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--white-dim);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.field-input, .field-select {
+  width: 100%;
+  background: rgba(var(--void-rgb), 0.6);
+  border: 1px solid var(--panel-border);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field-input:focus, .field-select:focus {
+  border-color: var(--panel-border-active);
+}
+
+.field-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238090a0'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.field-select option {
+  background: var(--void);
+  color: var(--white);
+}
+
+/* ── Tags ─────────────────────────────────────────────── */
+.tag-container {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px;
+}
+
+.tag-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 1px solid;
+  cursor: default;
+}
+
+.tag-pill .tag-remove {
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 11px;
+  line-height: 1;
+}
+.tag-pill .tag-remove:hover { opacity: 1; }
+
+.tag-pill[data-tag="capital"]    { color: var(--gold); border-color: rgba(245,197,66,0.4); background: rgba(245,197,66,0.08); }
+.tag-pill[data-tag="homeworld"]  { color: var(--cyan); border-color: rgba(56,232,255,0.4); background: rgba(56,232,255,0.08); }
+.tag-pill[data-tag="fortress"]   { color: #a0a0ff; border-color: rgba(160,160,255,0.4); background: rgba(160,160,255,0.08); }
+.tag-pill[data-tag="outpost"]    { color: #80c0a0; border-color: rgba(128,192,160,0.4); background: rgba(128,192,160,0.08); }
+.tag-pill[data-tag="frontier"]   { color: #c0c080; border-color: rgba(192,192,128,0.4); background: rgba(192,192,128,0.08); }
+.tag-pill[data-tag="contested"]  { color: var(--red); border-color: rgba(255,60,60,0.4); background: rgba(255,60,60,0.08); }
+.tag-pill[data-tag="dangerous"]  { color: #ff6060; border-color: rgba(255,96,96,0.4); background: rgba(255,96,96,0.08); }
+.tag-pill[data-tag="trade"]      { color: var(--green); border-color: rgba(60,255,126,0.4); background: rgba(60,255,126,0.08); }
+.tag-pill[data-tag="ruins"]      { color: #c090ff; border-color: rgba(192,144,255,0.4); background: rgba(192,144,255,0.08); }
+.tag-pill[data-tag="anomaly"]    { color: #ff90c0; border-color: rgba(255,144,192,0.4); background: rgba(255,144,192,0.08); }
+
+/* ── Buttons ──────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--panel-border);
+  background: rgba(var(--void-rgb), 0.4);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  border-color: var(--panel-border-active);
+  background: rgba(var(--cyan-rgb), 0.08);
+  color: var(--cyan);
+}
+
+.btn-cyan {
+  border-color: rgba(var(--cyan-rgb), 0.3);
+  color: var(--cyan);
+}
+
+.btn-gold {
+  border-color: rgba(var(--gold-rgb), 0.3);
+  color: var(--gold);
+}
+
+.btn-red {
+  border-color: rgba(255, 60, 60, 0.3);
+  color: var(--red);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 10px;
+}
+
+/* ── Legend Panel ──────────────────────────────────────── */
+#legend-panel {
+  position: fixed;
+  bottom: 16px; left: 16px;
+  z-index: 80;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 12px 16px;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: var(--font-display);
+}
+
+#legend-panel .legend-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 8px;
+}
+
+.legend-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--white);
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+.legend-item.hidden-polity {
+  opacity: 0.35;
+}
+
+.legend-swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--white-dim);
+}
+
+/* ── Status Bar ───────────────────────────────────────── */
+#status-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  background: rgba(var(--void-rgb), 0.9);
+  border-top: 1px solid var(--panel-border);
+  display: flex; align-items: center;
+  padding: 0 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--white-dim);
+  z-index: 80;
+  gap: 20px;
+}
+
+#status-bar .status-item {
+  display: flex; align-items: center; gap: 5px;
+}
+
+#status-bar .status-label {
+  color: var(--cyan);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── Polity Editor Modal ──────────────────────────────── */
+#polity-modal {
+  position: fixed; inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.6);
+}
+
+#polity-modal.open {
+  display: flex;
+}
+
+#polity-modal .modal-content {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border-active);
+  border-radius: 6px;
+  padding: 24px;
+  width: 360px;
+  max-width: 90vw;
+}
+
+#polity-modal .modal-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 16px;
+}
+
+#polity-modal .modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* ── Boot Overlay ─────────────────────────────────────── */
+#boot-overlay {
+  position: fixed; inset: 0;
+  z-index: 10000;
+  background: var(--void);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--cyan);
+  transition: opacity 0.6s;
+}
+
+#boot-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#boot-log {
+  width: 500px;
+  max-width: 90vw;
+}
+
+#boot-log .boot-line {
+  opacity: 0;
+  margin-bottom: 3px;
+  white-space: pre;
+}
+
+#boot-log .boot-line.visible {
+  opacity: 1;
+}
+
+.boot-ok { color: var(--green); }
+.boot-warn { color: var(--gold); }
+
+/* ── Toast ────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  top: 60px; right: 20px;
+  z-index: 300;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border-active);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan);
+  transform: translateX(120%);
+  transition: transform 0.3s;
+  pointer-events: none;
+}
+
+#toast.show {
+  transform: translateX(0);
+}
+
+/* ── Editor Lock Indicator ────────────────────────────── */
+#editor-lock {
+  position: fixed;
+  top: 56px; right: 16px;
+  z-index: 90;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--panel-border);
+  background: rgba(var(--void-rgb), 0.6);
+  transition: all 0.2s;
+}
+
+#editor-lock.locked {
+  color: var(--red);
+  border-color: rgba(255,60,60,0.3);
+}
+
+#editor-lock.unlocked {
+  color: var(--green);
+  border-color: rgba(60,255,126,0.3);
+}
+
+/* ── Bulk Selection Info ──────────────────────────────── */
+#bulk-bar {
+  position: fixed;
+  top: 56px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border-active);
+  border-radius: 4px;
+  padding: 8px 16px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+
+#bulk-bar.visible {
+  display: flex;
+}
+
+/* ── Scrollbar global ─────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(var(--cyan-rgb), 0.15); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Scanlines -->
+<div id="scanlines"></div>
+
+<!-- Boot Overlay -->
+<div id="boot-overlay">
+  <div id="boot-log"></div>
+</div>
+
+<!-- HUD Header -->
+<header id="hud-header">
+  <div style="display:flex;align-items:center;">
+    <span id="hud-logo">SGN</span>
+    <nav class="nav-links">
+      <a href="briefing.html">Briefing</a>
+      <a href="index.html">Star Chart</a>
+      <a href="wiki.html">Codex</a>
+      <a href="personnel.html">Personnel</a>
+      <a href="orbat.html">ORBAT</a>
+      <a href="language.html">Language</a>
+      <a href="galaxy.html" class="active">Galaxy Map</a>
+    </nav>
+  </div>
+  <div id="hud-clock">STARDATE ...</div>
+</header>
+
+<!-- WebGL Canvas -->
+<canvas id="galaxy-canvas"></canvas>
+
+<!-- Selection Rectangle -->
+<div id="select-rect"></div>
+
+<!-- Bulk Selection Bar -->
+<div id="bulk-bar">
+  <span id="bulk-count">0 systems selected</span>
+  <select id="bulk-polity-select" class="field-select" style="width:160px;font-size:11px;padding:4px 8px;">
+    <option value="">Assign polity...</option>
+  </select>
+  <button class="btn btn-cyan btn-sm" id="bulk-assign-btn">Assign</button>
+  <button class="btn btn-sm" id="bulk-clear-btn">Clear</button>
+</div>
+
+<!-- Editor Lock -->
+<div id="editor-lock" class="locked" title="Click to authenticate as editor">&#x1F512; LOCKED</div>
+
+<!-- Side Panel -->
+<div id="side-panel">
+  <div class="panel-header">
+    <span id="panel-title">System Details</span>
+    <button id="panel-close">&times;</button>
+  </div>
+  <div class="panel-body" id="panel-body">
+    <!-- Populated dynamically -->
+  </div>
+</div>
+
+<!-- Legend -->
+<div id="legend-panel">
+  <div class="legend-title">Polities</div>
+  <div id="legend-list"></div>
+  <div style="margin-top:10px;">
+    <button class="btn btn-cyan btn-sm" id="add-polity-btn">+ New Polity</button>
+  </div>
+</div>
+
+<!-- Polity Modal -->
+<div id="polity-modal">
+  <div class="modal-content">
+    <div class="modal-title" id="modal-title">New Polity</div>
+    <div class="field-group">
+      <label class="field-label">Name</label>
+      <input type="text" class="field-input" id="polity-name-input" placeholder="Polity name...">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Color</label>
+      <input type="color" id="polity-color-input" value="#38e8ff" style="width:100%;height:36px;border:1px solid var(--panel-border);background:transparent;cursor:pointer;border-radius:3px;">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Description (optional)</label>
+      <input type="text" class="field-input" id="polity-desc-input" placeholder="Brief description...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn btn-cyan" id="modal-confirm">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Status Bar -->
+<div id="status-bar">
+  <div class="status-item"><span class="status-label">Systems:</span> <span id="stat-systems">0</span></div>
+  <div class="status-item"><span class="status-label">Polities:</span> <span id="stat-polities">0</span></div>
+  <div class="status-item"><span class="status-label">Camera:</span> <span id="stat-camera">0, 0, 0</span></div>
+  <div class="status-item"><span class="status-label">FPS:</span> <span id="stat-fps">0</span></div>
+</div>
+
+<!-- Galaxy JS -->
+<script src="galaxy.js"></script>
+
+</body>
+</html>
