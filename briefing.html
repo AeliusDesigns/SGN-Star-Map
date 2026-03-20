@@ -37,13 +37,14 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .cover{text-align:center;padding:44px 0 36px;position:relative;}
 .cover-glow{position:absolute;top:50%;left:50%;width:500px;height:500px;transform:translate(-50%,-55%);background:radial-gradient(circle,rgba(245,197,66,.03) 0%,rgba(56,232,255,.015) 30%,transparent 65%);pointer-events:none;}
 .emblem{width:150px;height:150px;margin:0 auto 18px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.emblem::after{content:'';position:absolute;inset:-30px;border-radius:50%;background:radial-gradient(circle,rgba(245,197,66,.12) 0%,rgba(245,197,66,.06) 30%,rgba(245,197,66,.02) 55%,transparent 75%);pointer-events:none;z-index:1;}
 .e-ring{position:absolute;border-radius:50%;border:1px solid;}
-.e-ring.r1{inset:-14px;border-color:rgba(245,197,66,.08);animation:espin 55s linear infinite;}
+.e-ring.r1{inset:-14px;border-color:rgba(245,197,66,.1);animation:espin 55s linear infinite;}
 .e-ring.r2{inset:-6px;border-color:rgba(56,232,255,.06);border-style:dashed;animation:espin-r 40s linear infinite;}
 @keyframes espin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes espin-r{from{transform:rotate(360deg)}to{transform:rotate(0)}}
-.e-img{width:130px;height:130px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 18px rgba(245,197,66,.25)) drop-shadow(0 0 40px rgba(245,197,66,.1));transition:filter .3s;}
-.emblem:hover .e-img{filter:drop-shadow(0 0 22px rgba(245,197,66,.35)) drop-shadow(0 0 50px rgba(245,197,66,.15));}
+.e-img{width:130px;height:130px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 20px rgba(245,197,66,.3)) drop-shadow(0 0 50px rgba(245,197,66,.15)) drop-shadow(0 0 80px rgba(245,197,66,.08));transition:filter .3s;}
+.emblem:hover .e-img{filter:drop-shadow(0 0 24px rgba(245,197,66,.4)) drop-shadow(0 0 60px rgba(245,197,66,.2)) drop-shadow(0 0 100px rgba(245,197,66,.1));}
 .cover-realm{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:36px;letter-spacing:4px;text-transform:uppercase;}
 .cover-realm em{font-style:normal;color:var(--gold);text-shadow:0 0 20px rgba(245,197,66,.15);}
 .cover-subrealm{font-family:'Rajdhani',sans-serif;font-weight:300;font-size:15px;letter-spacing:6px;color:var(--text-dim);text-transform:uppercase;margin-top:2px;}
