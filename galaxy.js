@@ -228,14 +228,49 @@ uniform vec4 uColor;
 void main(){ gl_FragColor=uColor; }`;
 
   /* ── World position from normalized coords ── */
+  /* Uses smooth spatial noise for Y so nearby systems have coherent heights.
+     This prevents lanes from zigzagging wildly between connected systems. */
+  function smoothNoise2D(x, y) {
+    /* Simple value noise with smooth interpolation */
+    function hash2(ix, iy) {
+      let h = ix * 374761393 + iy * 668265263;
+      h = (h ^ (h >> 13)) * 1274126177;
+      return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+    }
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    /* Smoothstep interpolation */
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const v00 = hash2(ix, iy), v10 = hash2(ix + 1, iy);
+    const v01 = hash2(ix, iy + 1), v11 = hash2(ix + 1, iy + 1);
+    const a = v00 + (v10 - v00) * sx;
+    const b = v01 + (v11 - v01) * sx;
+    return a + (b - a) * sy;
+  }
+
   function systemToWorld(sys){
-    const x=(sys.coords.x_norm-0.5)*GALAXY_SPREAD_X;
-    const z=(sys.coords.y_norm-0.5)*GALAXY_SPREAD_Z;
-    const dc=Math.sqrt(((sys.coords.x_norm-0.5)*2)**2+((sys.coords.y_norm-0.5)*2)**2);
-    const thick=Math.max(0,1.0-dc*0.8);
-    const rng=mulberry32(hashStr(sys.id)+77777);
-    const y=(rng()*2-1)*GALAXY_THICKNESS*thick;
-    return [x,y,z];
+    const x = (sys.coords.x_norm - 0.5) * GALAXY_SPREAD_X;
+    const z = (sys.coords.y_norm - 0.5) * GALAXY_SPREAD_Z;
+
+    /* Distance from center for disc taper (thicker core, thinner rim) */
+    const dc = Math.sqrt(((sys.coords.x_norm - 0.5) * 2) ** 2 + ((sys.coords.y_norm - 0.5) * 2) ** 2);
+    const thick = Math.max(0, 1.0 - dc * 0.7);
+
+    /* Smooth spatial noise: sample at a scale where nearby systems correlate.
+       Two octaves for subtle variation without the random zigzag. */
+    const nx = sys.coords.x_norm * 8;  /* ~8 cells across the galaxy */
+    const nz = sys.coords.y_norm * 8;
+    const n1 = smoothNoise2D(nx, nz);
+    const n2 = smoothNoise2D(nx * 2.3 + 5.7, nz * 2.3 + 3.1) * 0.4;
+    const noiseVal = (n1 + n2) / 1.4;  /* normalized 0-1 */
+
+    /* Small per-system jitter so co-located stars aren't perfectly flat */
+    const rng = mulberry32(hashStr(sys.id) + 77777);
+    const jitter = (rng() * 2 - 1) * 0.6;
+
+    const y = ((noiseVal * 2 - 1) * GALAXY_THICKNESS * 0.35 + jitter) * thick;
+    return [x, y, z];
   }
 
   /* ── Init WebGL ── */
