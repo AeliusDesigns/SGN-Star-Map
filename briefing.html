@@ -557,14 +557,18 @@ body.edit-mode .key-hint{display:block;}
     if(!content) return;
     var data = content.innerHTML;
 
-    // Save to localStorage
-    localStorage.setItem(STORE_KEY, data);
+    // Save to localStorage (may fail if quota exceeded)
+    try {
+      localStorage.setItem(STORE_KEY, data);
+    } catch(e) {
+      console.warn('localStorage quota exceeded for briefing state');
+    }
 
     // Save to GitHub via SGNGitHub if available
     if(typeof SGNGitHub !== 'undefined' && SGNGitHub.commitFile){
       SGNGitHub.commitFile('briefing-state.json', JSON.stringify({ html: data, updated: Date.now() }), 'Briefing: update state')
         .then(function(){ showToast('Saved to GitHub'); })
-        .catch(function(){ showToast('Saved locally (GitHub unavailable)'); });
+        .catch(function(){ showToast('GitHub save failed'); });
     } else {
       showToast('Changes saved locally');
     }
@@ -589,7 +593,7 @@ body.edit-mode .key-hint{display:block;}
         if(d && d.html){
           var content = document.querySelector('.content');
           if(content) content.innerHTML = d.html;
-          localStorage.setItem(STORE_KEY, d.html);
+          try { localStorage.setItem(STORE_KEY, d.html); } catch(e) {}
         }
       })
       .catch(function(){});
