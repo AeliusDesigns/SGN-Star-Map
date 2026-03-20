@@ -359,13 +359,13 @@
     const lineEls = overlay.querySelectorAll('.boot-line');
     const progressWrap = overlay.querySelector('#boot-progress');
     const progressFill = overlay.querySelector('#boot-progress-fill');
-    const delays = [100, 400, 800, 1150, 1500, 1850, 2100, 2400];
+    const delays = [200, 800, 1600, 2300, 3100, 3900, 4500, 5200];
     let progress = 0;
 
     /* Show progress bar early */
     setTimeout(() => {
       progressWrap.classList.add('visible');
-    }, 200);
+    }, 300);
 
     delays.forEach((delay, i) => {
       setTimeout(() => {
@@ -382,7 +382,7 @@
     });
 
     /* Fade out and remove */
-    const totalTime = delays[delays.length - 1] + 600;
+    const totalTime = delays[delays.length - 1] + 1200;
     setTimeout(() => {
       overlay.classList.add('fade-out');
       setTimeout(() => {
