@@ -425,14 +425,11 @@ void main(){
   gl_FragColor = vec4(col, alpha);
 }`;
 
-  /* Black hole positions (normalized coords from density analysis) */
-  const BLACK_HOLES = [
-    { xn: 0.335, yn: 0.387, size: 100.0 },   /* smaller western galaxy (1493 systems) */
-    { xn: 0.639, yn: 0.415, size: 160.0 },   /* larger eastern galaxy (3491 systems) */
-  ];
+  /* Black hole data — loaded from star_map.json black_holes[] array */
   let blackHoleWorldPos = [];
   let blackHoleSizes = [];
   let blackHoleVBO = null;
+  let bhData = []; /* raw from JSON */
 
   /* ── World position from normalized coords ── */
   /* Uses smooth spatial noise for Y so nearby systems have coherent heights.
@@ -1091,6 +1088,7 @@ void main(){
       const data=await resp.json();
       systems=data.systems;
       lanes=data.lanes||[];
+      bhData=data.black_holes||[];
       for(const sys of systems){
         if(!sys.starType) sys.starType=pickStarType(hashStr(sys.id)).id;
         if(!sys.tags) sys.tags=[];
@@ -1142,13 +1140,13 @@ void main(){
     haloVBO=gl.createBuffer();
     blackHoleVBO=gl.createBuffer();
 
-    /* Compute black hole world positions (at galactic plane Y=0) */
-    blackHoleWorldPos=BLACK_HOLES.map(bh=>[
-      (bh.xn-0.5)*GALAXY_SPREAD_X,
+    /* Compute black hole world positions from JSON data */
+    blackHoleWorldPos=bhData.map(bh=>[
+      (bh.coords.x_norm-0.5)*GALAXY_SPREAD_X,
       0,
-      (bh.yn-0.5)*GALAXY_SPREAD_Z
+      (bh.coords.y_norm-0.5)*GALAXY_SPREAD_Z
     ]);
-    blackHoleSizes=BLACK_HOLES.map(bh=>bh.size);
+    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*140.0);
 
     buildBGStars();
     rebuildStarsVBO();
