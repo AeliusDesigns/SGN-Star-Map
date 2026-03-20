@@ -22,17 +22,17 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 35%,rgba(2,5,12,.75) 100%);pointer-events:none;z-index:999;}
 *{cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g fill='none'><line x1='4' y1='2' x2='2' y2='24' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7'/><line x1='4' y1='2' x2='14' y2='20' stroke='%2338e8ff' stroke-width='1.2' stroke-opacity='0.7'/><circle cx='4' cy='2' r='1.5' fill='%2338e8ff' fill-opacity='0.8'/><circle cx='4' cy='2' r='.8' fill='%23fff'/></g></svg>") 4 2,auto !important;}
 
-.hud{position:fixed;top:0;left:0;right:0;height:50px;z-index:100;display:flex;align-items:center;padding:0 20px;background:linear-gradient(180deg,rgba(5,8,16,.97),rgba(5,8,16,.6));border-bottom:1px solid var(--border);backdrop-filter:blur(10px);}
-.hud::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan-dim) 20%,var(--cyan) 50%,var(--cyan-dim) 80%,transparent);opacity:.35;}
-.hud-logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;letter-spacing:6px;color:var(--cyan);text-shadow:0 0 16px rgba(56,232,255,.6);margin-right:16px;}
-.hud-sep{width:1px;height:16px;background:var(--border2);margin:0 12px;opacity:.5;}
-.hud-link{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;transition:color .15s;}
-.hud-link:hover{color:var(--cyan);}
-.hud-link.active{color:var(--cyan);text-shadow:0 0 8px rgba(56,232,255,.4);}
+#hud{position:fixed;top:0;left:0;right:0;height:52px;z-index:100;display:flex;align-items:center;gap:0;background:linear-gradient(180deg,rgba(5,8,16,.97) 0%,rgba(5,8,16,.7) 100%);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);padding:0 20px;}
+#hud::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,var(--cyan-dim) 15%,var(--cyan) 50%,var(--cyan-dim) 85%,transparent 100%);opacity:.4;}
+.hud-logo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;letter-spacing:6px;color:var(--cyan);text-transform:uppercase;white-space:nowrap;text-shadow:0 0 16px rgba(56,232,255,.7),0 0 32px rgba(56,232,255,.3);margin-right:20px;}
+.hud-sep{width:1px;height:18px;background:var(--border2);margin:0 14px;flex-shrink:0;opacity:.6;}
+.hud-item{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text-dim);white-space:nowrap;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;}
+.hud-nav{transition:color .12s;cursor:pointer;}
+.hud-nav:hover{color:var(--cyan) !important;}
+.hud-nav.active{color:var(--cyan) !important;text-shadow:0 0 8px rgba(56,232,255,.5);}
 .hud-spacer{flex:1;}
-.hud-date{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:2px;}
 
-.content{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:70px 32px 60px;}
+.content{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:72px 32px 60px;}
 
 /* Cover */
 .cover{text-align:center;padding:44px 0 36px;position:relative;}
@@ -170,20 +170,20 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 </head>
 <body>
 
-<div class="hud">
+<div id="hud">
   <div class="hud-logo">SGN</div>
   <div class="hud-sep"></div>
-  <a href="./briefing.html" class="hud-link hud-nav active">BRIEFING</a>
+  <a href="./briefing.html" class="hud-item hud-nav active">BRIEFING</a>
   <div class="hud-sep"></div>
-  <a href="./index.html" class="hud-link hud-nav">STAR CHART</a>
+  <a href="./index.html" class="hud-item hud-nav">STAR CHART</a>
   <div class="hud-sep"></div>
-  <a href="./wiki.html" class="hud-link hud-nav">CODEX</a>
+  <a href="./wiki.html" class="hud-item hud-nav">CODEX</a>
   <div class="hud-sep"></div>
-  <a href="./personnel.html" class="hud-link hud-nav">PERSONNEL</a>
+  <a href="./personnel.html" class="hud-item hud-nav">PERSONNEL</a>
   <div class="hud-sep"></div>
-  <a href="./orbat.html" class="hud-link hud-nav">ORBAT</a>
+  <a href="./orbat.html" class="hud-item hud-nav">ORBAT</a>
   <div class="hud-sep"></div>
-  <a href="./language.html" class="hud-link hud-nav">LANGUAGE</a>
+  <a href="./language.html" class="hud-item hud-nav">LANGUAGE</a>
   <div class="hud-spacer"></div>
 </div>
 
