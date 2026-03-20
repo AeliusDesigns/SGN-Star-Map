@@ -36,12 +36,14 @@
   let dirty = false;
 
   /* WebGL */
-  let progBG, progBGStars, progPoints, progTerritory, progLines;
-  let bgVBO, bgStarsVBO, starsVBO, territoryQuadVBO, linesVBO;
+  let progBG, progBGStars, progPoints, progTerritory, progLines, progHalo;
+  let bgVBO, bgStarsVBO, starsVBO, territoryQuadVBO, linesVBO, haloVBO;
   let starCount = 0, lineVertCount = 0;
   let territoryTexture = null;
   let lanes = []; // raw lane data from JSON
   let idToWorld = new Map();
+  let hoveredSystemId = null;
+  let selectedSystemId = null;
 
   /* Camera — spherical orbit */
   let yaw = 0, pitch = 0.6, camDist = 250;
@@ -226,6 +228,88 @@ void main(){ gl_Position=uMVP*vec4(position,1.0); }`;
 precision mediump float;
 uniform vec4 uColor;
 void main(){ gl_FragColor=uColor; }`;
+
+  /* Halo / targeting reticle — same as main.js */
+  const VS_HALO = `
+attribute vec3 position;
+uniform mat4 uMVP;
+uniform float uPixelSize;
+void main(){
+  gl_Position=uMVP*vec4(position,1.0);
+  gl_PointSize=uPixelSize;
+}`;
+
+  const FS_HALO = `
+precision highp float;
+uniform float uTime;
+uniform vec3 uColGlow;
+uniform vec3 uColCore;
+uniform float uMode;
+void main(){
+  vec2 uv=gl_PointCoord*2.0-1.0;
+  float r=length(uv);
+  float ang=atan(uv.y,uv.x);
+  float PI=3.14159265;
+  float alpha=0.0;
+  vec3 col=mix(uColGlow,uColCore,0.3);
+
+  float glow=exp(-r*r*3.5)*0.3;
+  alpha+=glow;
+
+  float outerR=0.78;
+  float outerW=0.05;
+  float outerBand=smoothstep(outerR-outerW,outerR-outerW*0.5,r)*(1.0-smoothstep(outerR+outerW*0.5,outerR+outerW,r));
+  float rotAng=ang+uTime*0.35;
+  float seg=mod(rotAng+PI,PI/3.0)/(PI/3.0);
+  float arcMask=smoothstep(0.06,0.14,seg)*(1.0-smoothstep(0.86,0.94,seg));
+  alpha+=outerBand*arcMask*1.0;
+  float outerGlow=exp(-pow(abs(r-outerR),2.0)*120.0)*0.5;
+  alpha+=outerGlow*arcMask;
+  col+=uColCore*outerGlow*arcMask*0.3;
+
+  float innerR=0.48;
+  float innerW=0.035;
+  float innerBand=smoothstep(innerR-innerW,innerR-innerW*0.3,r)*(1.0-smoothstep(innerR+innerW*0.3,innerR+innerW,r));
+  alpha+=innerBand*1.0;
+  float innerGlow=exp(-pow(abs(r-innerR),2.0)*80.0)*0.4;
+  alpha+=innerGlow;
+
+  float sweep=mod(ang+uTime*1.2,PI*2.0);
+  float sweepArc=exp(-pow(sweep-0.5,2.0)*8.0);
+  float sweepR=smoothstep(innerR-0.08,innerR,r)*(1.0-smoothstep(outerR,outerR+0.08,r));
+  alpha+=sweepArc*sweepR*0.5;
+  col+=uColCore*sweepArc*sweepR*0.4;
+
+  for(int i=0;i<4;i++){
+    float tickAng=float(i)*PI*0.5;
+    float da=abs(mod(ang-tickAng+PI,PI*2.0)-PI);
+    float tick=exp(-da*da*800.0);
+    float tickR=smoothstep(outerR+outerW*0.5,outerR+outerW,r)*(1.0-smoothstep(outerR+outerW+0.08,outerR+outerW+0.12,r));
+    alpha+=tick*tickR*1.2;
+    col+=uColCore*tick*tickR*0.3;
+  }
+
+  if(uMode>0.5){
+    for(int i=0;i<4;i++){
+      float dAng=float(i)*PI*0.5+PI*0.25;
+      float da=abs(mod(ang-dAng+PI,PI*2.0)-PI);
+      float bracket=exp(-da*da*400.0);
+      float bracketR=smoothstep(outerR+outerW,outerR+outerW+0.01,r)*(1.0-smoothstep(outerR+outerW+0.06,outerR+outerW+0.09,r));
+      alpha+=bracket*bracketR*1.0;
+      col+=uColCore*bracket*bracketR*0.2;
+    }
+    float fill=smoothstep(innerR+innerW,innerR+innerW+0.02,r)*(1.0-smoothstep(outerR-outerW-0.02,outerR-outerW,r));
+    float pulse=0.12+0.08*sin(uTime*2.5);
+    alpha+=fill*pulse;
+    alpha*=0.9+0.1*sin(uTime*2.0);
+  }
+
+  float pip=exp(-r*r*60.0)*0.5;
+  alpha+=pip;
+  col+=vec3(1.0)*pip*0.3;
+
+  gl_FragColor=vec4(col,clamp(alpha,0.0,1.0));
+}`;
 
   /* ── World position from normalized coords ── */
   /* Uses smooth spatial noise for Y so nearby systems have coherent heights.
@@ -674,8 +758,8 @@ void main(){ gl_FragColor=uColor; }`;
         updateBulkBar();
       } else if(!dragMoved&&e.button===0){
         const sys=findSystemAtScreen(e.clientX,e.clientY);
-        if(sys){ selectedSystemIds.clear(); selectedSystemIds.add(sys.id); openSystemPanel(sys.id); }
-        else { selectedSystemIds.clear(); closePanel(); }
+        if(sys){ selectedSystemIds.clear(); selectedSystemIds.add(sys.id); selectedSystemId=sys.id; openSystemPanel(sys.id); }
+        else { selectedSystemIds.clear(); selectedSystemId=null; closePanel(); }
         updateBulkBar();
       }
       dragging=false; panning=false; isDragSelecting=false;
@@ -691,6 +775,7 @@ void main(){ gl_FragColor=uColor; }`;
   /* ── Tooltip ── */
   function updateTooltip(){
     const sys=findSystemAtScreen(mouseX,mouseY,20);
+    hoveredSystemId=sys?sys.id:null;
     const tip=document.getElementById('tooltip');
     if(sys){
       document.getElementById('tip-name').textContent=sys.name||sys.id;
@@ -704,6 +789,28 @@ void main(){ gl_FragColor=uColor; }`;
       }).join('');
       tip.style.left=mouseX+'px'; tip.style.top=mouseY+'px'; tip.style.display='block';
     } else { tip.style.display='none'; }
+  }
+
+  /* ── Draw Halo (same as main.js drawHalo) ── */
+  function drawHalo(id, pix, ht, glow, core, mode) {
+    const p = idToWorld.get(id); if (!p) return;
+    gl.useProgram(progHalo);
+    gl.uniformMatrix4fv(gl.getUniformLocation(progHalo, 'uMVP'), false, buildMVP());
+    gl.uniform1f(gl.getUniformLocation(progHalo, 'uPixelSize'), pix);
+    gl.uniform1f(gl.getUniformLocation(progHalo, 'uTime'), ht);
+    gl.uniform3f(gl.getUniformLocation(progHalo, 'uColGlow'), glow[0], glow[1], glow[2]);
+    gl.uniform3f(gl.getUniformLocation(progHalo, 'uColCore'), core[0], core[1], core[2]);
+    gl.uniform1f(gl.getUniformLocation(progHalo, 'uMode'), mode || 0.0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, haloVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(p), gl.DYNAMIC_DRAW);
+    const aPos_h = gl.getAttribLocation(progHalo, 'position');
+    gl.enableVertexAttribArray(aPos_h);
+    gl.vertexAttribPointer(aPos_h, 3, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.drawArrays(gl.POINTS, 0, 1);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disableVertexAttribArray(aPos_h);
   }
 
   /* ── Render Loop ── */
@@ -809,13 +916,24 @@ void main(){ gl_FragColor=uColor; }`;
       gl.disableVertexAttribArray(sP); gl.disableVertexAttribArray(sC); gl.disableVertexAttribArray(sS);
     }
 
+    /* 6. Hover & Selection halos (same as main.js) */
+    const t=wallTime;
+    if(hoveredSystemId){
+      drawHalo(hoveredSystemId, 70.0, t, [0.20,0.60,0.70], [0.35,0.95,1.0], 0.0);
+      drawHalo(hoveredSystemId, 48.0, t, [0.35,0.95,1.0], [1.0,0.95,0.50], 0.0);
+    }
+    if(selectedSystemId){
+      drawHalo(selectedSystemId, 80.0, t, [0.50,0.40,0.15], [1.0,0.85,0.35], 1.0);
+      drawHalo(selectedSystemId, 56.0, t, [1.0,0.85,0.35],  [1.0,0.98,0.70], 1.0);
+    }
+
     updateTooltip();
     requestAnimationFrame(render);
   }
 
   /* ── Keyboard ── */
   addEventListener('keydown',e=>{
-    if(e.key==='Escape'){ selectedSystemIds.clear(); updateBulkBar(); closePanel(); document.getElementById('polity-modal').classList.remove('open'); }
+    if(e.key==='Escape'){ selectedSystemIds.clear(); selectedSystemId=null; updateBulkBar(); closePanel(); document.getElementById('polity-modal').classList.remove('open'); }
   });
 
   /* ── Load data & boot ── */
@@ -867,11 +985,13 @@ void main(){ gl_FragColor=uColor; }`;
     progPoints=makeProgram(VS_POINTS,FS_POINTS);
     progTerritory=makeProgram(VS_TERR,FS_TERR);
     progLines=makeProgram(VS_LINES,FS_LINES);
+    progHalo=makeProgram(VS_HALO,FS_HALO);
 
     /* Build geometry */
     bgVBO=gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER,bgVBO);
     gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+    haloVBO=gl.createBuffer();
 
     buildBGStars();
     rebuildStarsVBO();
