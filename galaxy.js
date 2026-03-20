@@ -36,10 +36,12 @@
   let dirty = false;
 
   /* WebGL */
-  let progBG, progBGStars, progPoints, progTerritory;
-  let bgVBO, bgStarsVBO, starsVBO, territoryQuadVBO;
-  let starCount = 0;
+  let progBG, progBGStars, progPoints, progTerritory, progLines;
+  let bgVBO, bgStarsVBO, starsVBO, territoryQuadVBO, linesVBO;
+  let starCount = 0, lineVertCount = 0;
   let territoryTexture = null;
+  let lanes = []; // raw lane data from JSON
+  let idToWorld = new Map();
 
   /* Camera — spherical orbit */
   let yaw = 0, pitch = 0.6, camDist = 250;
@@ -214,6 +216,17 @@ void main(){
   gl_FragColor=vec4(t.rgb,alpha);
 }`;
 
+  /* Lane lines — same as main.js */
+  const VS_LINES = `
+attribute vec3 position;
+uniform mat4 uMVP;
+void main(){ gl_Position=uMVP*vec4(position,1.0); }`;
+
+  const FS_LINES = `
+precision mediump float;
+uniform vec4 uColor;
+void main(){ gl_FragColor=uColor; }`;
+
   /* ── World position from normalized coords ── */
   function systemToWorld(sys){
     const x=(sys.coords.x_norm-0.5)*GALAXY_SPREAD_X;
@@ -278,6 +291,20 @@ void main(){
     starCount=verts.length/7;
     if(!starsVBO) starsVBO=gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER,starsVBO);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
+  }
+
+  /* ── Build lane lines VBO ── */
+  function rebuildLinesVBO(){
+    const verts=[];
+    for(const lane of lanes){
+      const sysA=idToWorld.get(lane.from), sysB=idToWorld.get(lane.to);
+      if(!sysA||!sysB) continue;
+      verts.push(sysA[0],sysA[1],sysA[2], sysB[0],sysB[1],sysB[2]);
+    }
+    lineVertCount=verts.length/3;
+    if(!linesVBO) linesVBO=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,linesVBO);
     gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
   }
 
@@ -703,7 +730,36 @@ void main(){
       gl.disableVertexAttribArray(tP); gl.disableVertexAttribArray(tU);
     }
 
-    /* 4. Galaxy stars */
+    /* 4. Lanes — multi-pass glow (same as main.js) */
+    if(linesVBO&&lineVertCount>0){
+      gl.useProgram(progLines);
+      gl.uniformMatrix4fv(gl.getUniformLocation(progLines,'uMVP'),false,mvp);
+      const aPos_l=gl.getAttribLocation(progLines,'position');
+      gl.bindBuffer(gl.ARRAY_BUFFER,linesVBO);
+      gl.enableVertexAttribArray(aPos_l);
+      gl.vertexAttribPointer(aPos_l,3,gl.FLOAT,false,0,0);
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+
+      /* outer glow (dim, wide) */
+      gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),0.10,0.50,0.65,0.12);
+      gl.lineWidth(3.0);
+      gl.drawArrays(gl.LINES,0,lineVertCount);
+
+      /* mid glow */
+      gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),0.15,0.60,0.75,0.30);
+      gl.lineWidth(2.0);
+      gl.drawArrays(gl.LINES,0,lineVertCount);
+
+      /* core line (bright) */
+      gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),0.25,0.80,0.95,0.65);
+      gl.lineWidth(1.0);
+      gl.drawArrays(gl.LINES,0,lineVertCount);
+
+      gl.disableVertexAttribArray(aPos_l);
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    }
+
+    /* 5. Galaxy stars */
     if(starsVBO&&starCount>0){
       gl.useProgram(progPoints);
       gl.uniformMatrix4fv(gl.getUniformLocation(progPoints,'uMVP'),false,mvp);
@@ -734,11 +790,13 @@ void main(){
       const resp=await fetch('star_map.json');
       const data=await resp.json();
       systems=data.systems;
+      lanes=data.lanes||[];
       for(const sys of systems){
         if(!sys.starType) sys.starType=pickStarType(hashStr(sys.id)).id;
         if(!sys.tags) sys.tags=[];
         if(!sys.owner) sys.owner='unassigned';
         sys._worldPos=systemToWorld(sys);
+        idToWorld.set(sys.id, sys._worldPos);
       }
     }catch(e){ console.error('Failed to load star_map.json:',e); return; }
 
@@ -759,9 +817,9 @@ void main(){
     }catch{}
 
     /* Recompute world positions in case star types changed */
-    for(const sys of systems) sys._worldPos=systemToWorld(sys);
+    for(const sys of systems){ sys._worldPos=systemToWorld(sys); idToWorld.set(sys.id, sys._worldPos); }
 
-    document.getElementById('sb-sys').textContent=`${systems.length} SYSTEMS LOADED`;
+    document.getElementById('sb-sys').textContent=`${systems.length} SYSTEMS · ${lanes.length} LANES`;
 
     /* Init WebGL */
     if(!initGL()) return;
@@ -773,6 +831,7 @@ void main(){
     progBGStars=makeProgram(VS_BGSTARS,FS_BGSTARS);
     progPoints=makeProgram(VS_POINTS,FS_POINTS);
     progTerritory=makeProgram(VS_TERR,FS_TERR);
+    progLines=makeProgram(VS_LINES,FS_LINES);
 
     /* Build geometry */
     bgVBO=gl.createBuffer();
@@ -781,6 +840,7 @@ void main(){
 
     buildBGStars();
     rebuildStarsVBO();
+    rebuildLinesVBO();
     buildTerritoryQuad();
     buildTerritoryTexture();
 
