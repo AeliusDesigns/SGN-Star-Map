@@ -95,7 +95,7 @@ function makeProgram(vsSrc, fsSrc) {
    SHADERS
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Background nebula + star dust ── */
+/* ── Background nebula + 3D parallax starfield ── */
 const VS_BG = `
 attribute vec2 position;
 varying vec2 vUV;
@@ -111,6 +111,7 @@ uniform vec2 uRes;
 uniform vec3 uPan;
 uniform float uZoom;
 float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float hash2(vec2 p){ return fract(sin(dot(p,vec2(269.5,183.3)))*43758.5453); }
 float noise(vec2 p){
   vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
@@ -122,34 +123,87 @@ float fbm(vec2 p){
   for(int i=0;i<6;i++){ v+=a*noise(p); p=rot*p*2.0; a*=0.5; }
   return v;
 }
+
+// Single star layer at a given depth (parallax factor)
+float starLayer(vec2 uv, vec2 offset, float scale, float density, float seed){
+  vec2 gv = uv * scale + offset;
+  vec2 id = floor(gv);
+  vec2 fv = fract(gv) - 0.5;
+
+  float star = 0.0;
+  // Check 3x3 neighborhood for smooth stars near cell edges
+  for(int y=-1; y<=1; y++){
+    for(int x=-1; x<=1; x++){
+      vec2 neighbor = vec2(float(x), float(y));
+      vec2 cellId = id + neighbor;
+      float rnd = hash(cellId + seed);
+      float rnd2 = hash2(cellId + seed);
+      if(rnd < density){
+        vec2 starPos = neighbor + vec2(hash(cellId * 1.3 + seed) - 0.5, hash(cellId * 2.7 + seed + 50.0) - 0.5) * 0.8;
+        float d = length(fv - starPos);
+        float brightness = smoothstep(0.04, 0.0, d);
+        // Twinkle
+        float twinkle = 0.6 + 0.4 * sin(uTime * (0.8 + rnd2 * 3.0) + rnd * 6.2831);
+        star += brightness * twinkle * (0.3 + rnd2 * 0.7);
+      }
+    }
+  }
+  return star;
+}
+
 void main(){
   vec2 uv = vUV;
   vec2 aspect = vec2(uRes.x/uRes.y, 1.0);
   vec2 off = uPan.xy * 0.0002;
   vec2 p = (uv - 0.5) * aspect * 2.5 + off;
 
-  // subtle nebula — dark blues and teals, very subdued
-  float n1 = fbm(p * 0.7 + uTime * 0.004);
-  float n2 = fbm(p * 1.4 + vec2(5.0,3.0) + uTime * 0.006);
+  // Nebula clouds (subtle, dark)
+  float n1 = fbm(p * 0.7 + uTime * 0.003);
+  float n2 = fbm(p * 1.4 + vec2(5.0,3.0) + uTime * 0.005);
   float n3 = fbm(p * 2.8 + vec2(10.0,7.0));
+  float n4 = fbm(p * 0.4 + vec2(-3.0,8.0) + uTime * 0.002);
 
-  vec3 col = vec3(0.018, 0.028, 0.06);                    // base void
-  col += vec3(0.01, 0.04, 0.08) * smoothstep(0.3,0.7,n1); // blue clouds
-  col += vec3(0.02, 0.05, 0.06) * smoothstep(0.4,0.8,n2) * 0.5; // teal wisps
-  col += vec3(0.04, 0.01, 0.06) * smoothstep(0.5,0.9,n3) * 0.3; // faint violet
+  vec3 col = vec3(0.015, 0.022, 0.055);                         // deep void base
+  col += vec3(0.008, 0.035, 0.07) * smoothstep(0.3,0.7,n1);    // blue clouds
+  col += vec3(0.015, 0.045, 0.055) * smoothstep(0.4,0.8,n2) * 0.5; // teal wisps
+  col += vec3(0.035, 0.008, 0.055) * smoothstep(0.5,0.9,n3) * 0.3; // faint violet
+  col += vec3(0.005, 0.015, 0.04) * smoothstep(0.2,0.6,n4) * 0.4;  // deep blue haze
 
-  // vignette
-  col *= 1.0 - 0.4 * length((uv - 0.5) * 1.4);
+  // 3D parallax star layers: each layer scrolls at a different rate with camera pan
+  // Far layer: barely moves (deep background)
+  vec2 farOff = off * 0.15;
+  float farStars = starLayer(uv * aspect, farOff, 180.0, 0.06, 0.0);
+  col += farStars * vec3(0.3, 0.35, 0.5) * 0.15;
 
-  // star dust — tiny static dots
-  vec2 grid = floor(uv * 220.0 + off * 60.0);
-  float rnd = hash(grid);
-  float rnd2 = hash(grid + 99.0);
-  vec2 cell = fract(uv * 220.0 + off * 60.0);
-  float d = length(cell - 0.5);
-  float star = smoothstep(0.02, 0.0, d - 0.005) * step(0.94, rnd);
-  float twinkle = 0.5 + 0.5 * sin(uTime * (1.0 + rnd2 * 4.0) + rnd * 6.28);
-  col += star * twinkle * vec3(0.4 + rnd2*0.3, 0.5 + rnd*0.3, 0.7) * 0.25;
+  // Mid-far layer
+  vec2 midFarOff = off * 0.35;
+  float midFarStars = starLayer(uv * aspect, midFarOff, 140.0, 0.05, 100.0);
+  col += midFarStars * vec3(0.35, 0.4, 0.6) * 0.2;
+
+  // Mid layer
+  vec2 midOff = off * 0.6;
+  float midStars = starLayer(uv * aspect, midOff, 100.0, 0.04, 200.0);
+  col += midStars * vec3(0.4, 0.5, 0.7) * 0.25;
+
+  // Near-mid layer
+  vec2 nearMidOff = off * 0.85;
+  float nearMidStars = starLayer(uv * aspect, nearMidOff, 70.0, 0.03, 300.0);
+  col += nearMidStars * vec3(0.5, 0.55, 0.75) * 0.3;
+
+  // Near layer: moves most with camera (foreground stars)
+  vec2 nearOff = off * 1.2;
+  float nearStars = starLayer(uv * aspect, nearOff, 45.0, 0.025, 400.0);
+  col += nearStars * vec3(0.6, 0.65, 0.85) * 0.35;
+
+  // Zoom affects parallax spread: when zoomed in, layers separate more
+  // (already handled via uPan scaling since zoom changes pan range)
+
+  // Fog/depth fade at edges
+  float fog = 1.0 - 0.35 * length((uv - 0.5) * 1.3);
+  col *= fog;
+
+  // Very subtle color variation drift over time
+  col += vec3(0.003, 0.001, 0.005) * sin(uTime * 0.1 + uv.x * 3.0) * 0.5;
 
   gl_FragColor = vec4(col, 1.0);
 }`;
