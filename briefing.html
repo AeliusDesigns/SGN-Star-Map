@@ -458,20 +458,53 @@ body.edit-mode .key-hint{display:block;}
 <script>
 (function(){
   var STORE_KEY = 'sgn_diplo_brief_v1';
+  var PW_SESSION = 'starmap_editor_ok';
   var editMode = false;
+  var _editorPW = null;
+  var editorOK = sessionStorage.getItem(PW_SESSION) === '1';
   var emblem = document.querySelector('.emblem');
   var indicator = document.getElementById('editIndicator');
   var toast = document.getElementById('saveToast');
   var clickCount = 0;
   var clickTimer = null;
 
-  // Secret trigger: triple-click the AEN emblem
+  // Ensure edit mode is OFF on page load (clean up any stale state)
+  document.body.classList.remove('edit-mode');
+  document.querySelectorAll('.editable').forEach(function(el){
+    el.removeAttribute('contenteditable');
+    el.classList.remove('editable');
+  });
+
+  // Load editor password
+  (function loadPW(){
+    try {
+      fetch('./editor.json', { cache: 'no-store' }).then(function(r){
+        if(r.ok) return r.json(); return null;
+      }).then(function(d){
+        if(d && typeof d.pw === 'string' && d.pw.length) _editorPW = d.pw;
+      });
+    } catch(e){}
+  })();
+
+  function requireEditor(){
+    if(editorOK) return true;
+    if(_editorPW === null){ alert('Editor not available.'); return false; }
+    var pw = prompt('Enter editor password:');
+    if(pw === _editorPW){ editorOK = true; sessionStorage.setItem(PW_SESSION, '1'); return true; }
+    alert('Incorrect password.');
+    return false;
+  }
+
+  // Secret trigger: triple-click the emblem
   emblem.addEventListener('click', function(){
     clickCount++;
     if(clickTimer) clearTimeout(clickTimer);
     clickTimer = setTimeout(function(){ clickCount = 0; }, 500);
     if(clickCount >= 3){
       clickCount = 0;
+      if(!editMode){
+        if(!requireEditor()) return;
+      }
       toggleEdit();
     }
   });
@@ -595,6 +628,11 @@ body.edit-mode .key-hint{display:block;}
     try { localStorage.setItem(STORE_KEY + '_ver', STATE_VERSION); } catch(e) {}
   }
 
+  function cleanRestoredHTML(html) {
+    // Strip any contenteditable attributes and editable classes from saved state
+    return html.replace(/\s*contenteditable="true"/g, '').replace(/\s*class="([^"]*)\beditable\b([^"]*)"/g, 'class="$1$2"');
+  }
+
   function stripCoverFromHTML(html) {
     // Remove any old cover section that might be baked into saved state
     var tmp = document.createElement('div');
@@ -607,14 +645,14 @@ body.edit-mode .key-hint{display:block;}
   var saved = localStorage.getItem(STORE_KEY);
   if(saved){
     var content = document.querySelector('.content');
-    if(content) content.innerHTML = stripCoverFromHTML(saved);
+    if(content) content.innerHTML = cleanRestoredHTML(stripCoverFromHTML(saved));
   } else {
     // Try loading from repo file
     fetch('./briefing-state.json', { cache: 'no-store' })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(d && d.html){
-          var clean = stripCoverFromHTML(d.html);
+          var clean = cleanRestoredHTML(stripCoverFromHTML(d.html));
           var content = document.querySelector('.content');
           if(content) content.innerHTML = clean;
           try { localStorage.setItem(STORE_KEY, clean); } catch(e) {}
