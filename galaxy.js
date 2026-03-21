@@ -751,10 +751,12 @@ void main(){
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
     const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
+    const unownedSystems=systems.filter(s=>!s.owner||s.owner==='unassigned'||hiddenPolities.has(s.owner));
 
-    /* Spatial hash for fast lookup */
+    /* Spatial hashes */
     const cellSize=Math.max(CLAIM_R*2, 4);
     const hashOwned=new Map();
+    const hashUnowned=new Map();
     function cellKey(wx,wz){ return Math.floor(wx/cellSize)+','+Math.floor(wz/cellSize); }
     function insertHash(hash,sys){
       const k=cellKey(sys._worldPos[0],sys._worldPos[2]);
@@ -762,8 +764,9 @@ void main(){
       hash.get(k).push(sys);
     }
     for(const sys of ownedSystems) insertHash(hashOwned,sys);
+    for(const sys of unownedSystems) insertHash(hashUnowned,sys);
 
-    function nearbySystems(hash,wx,wz,maxR){
+    function nearbyFromHash(hash,wx,wz,maxR){
       const cx=Math.floor(wx/cellSize), cz=Math.floor(wz/cellSize);
       const searchR=Math.ceil(maxR/cellSize);
       const result=[];
@@ -776,32 +779,36 @@ void main(){
       return result;
     }
 
-    /* Smooth-union SDF (metaball blending).
-       Instead of min(d1, d2), we use a smooth minimum so nearby circles
-       merge into organic rounded shapes without visible individual bubbles. */
+    function nearestFromHash(hash,wx,wz,maxR){
+      const nearby=nearbyFromHash(hash,wx,wz,maxR);
+      let best=1e9, bestSys=null;
+      for(const sys of nearby){
+        const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
+        const d=dx*dx+dz*dz;
+        if(d<best){ best=d; bestSys=sys; }
+      }
+      return bestSys?{sys:bestSys,dist:Math.sqrt(best)}:null;
+    }
+
     function smoothMin(a, b, k){
       const h=Math.max(0, Math.min(1, 0.5 + 0.5*(b-a)/k));
       return b*(1-h) + a*h - k*h*(1-h);
     }
 
-    /* SDF ownership grid */
+    /* Pass 1: Smooth-union SDF for owned systems (metaballs) */
     const ownerGrid=new Array(res*res);
     const sdfGrid=new Float32Array(res*res);
+    const searchMaxR=CLAIM_R+cellSize;
+    const smoothK=CLAIM_R*0.8;
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
+        const nearby=nearbyFromHash(hashOwned,wx,wz,searchMaxR);
 
-        const nearby=nearbySystems(hashOwned,wx,wz,CLAIM_R+cellSize);
-
-        /* Compute smooth-union SDF across all nearby owned systems.
-           Each system contributes a circle of radius CLAIM_R.
-           The smooth minimum merges overlapping circles into rounded blobs. */
         let sdf=999;
         let bestOwner=null, bestDist=1e9;
-        const smoothK=CLAIM_R*0.8; /* blending radius - larger = smoother merges */
-
         for(const sys of nearby){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
@@ -817,6 +824,40 @@ void main(){
         } else {
           ownerGrid[gi]=null;
           sdfGrid[gi]=Math.max(sdf,0);
+        }
+      }
+    }
+
+    /* Pass 2: Carve out territory near unowned systems.
+       For each territory pixel, check if the nearest ALL system (owned or unowned)
+       is actually unowned. If so, this pixel is too close to an unowned star
+       and should be carved out. This preserves the smooth contiguous shape
+       but creates clean cutouts around neutral systems at the frontier. */
+    const CARVE_R=CLAIM_R*0.6; /* how close to an unowned system triggers carving */
+    for(let gy=0;gy<res;gy++){
+      for(let gx=0;gx<res;gx++){
+        const gi=gy*res+gx;
+        if(!ownerGrid[gi]) continue;
+
+        const wx=(gx/(res-1))*worldW - extX;
+        const wz=(gy/(res-1))*worldH - extZ;
+
+        const nearUn=nearestFromHash(hashUnowned,wx,wz,CLAIM_R*2);
+        if(!nearUn) continue;
+
+        /* Only carve if the unowned system is genuinely close */
+        if(nearUn.dist>CARVE_R) continue;
+
+        /* Check if there's an owned system even closer - if so, don't carve */
+        const nearOwn=nearestFromHash(hashOwned,wx,wz,CLAIM_R*2);
+        if(nearOwn&&nearOwn.dist<nearUn.dist) continue;
+
+        /* This pixel is closer to an unowned system than any owned one: carve it out.
+           Use a smooth falloff so the cutout has rounded edges too. */
+        const carveDepth=1.0 - nearUn.dist/CARVE_R;
+        if(carveDepth>0.3){
+          ownerGrid[gi]=null;
+          sdfGrid[gi]=0;
         }
       }
     }
@@ -844,7 +885,7 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Stroke texture — just stroke color, border drawn by shader */
+    /* Stroke texture */
     const strokeData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
