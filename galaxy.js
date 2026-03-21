@@ -1313,11 +1313,10 @@ void main(){
       const y=((noiseVal*2-1)*GALAXY_THICKNESS*0.35)*thick;
       return [x,y,z];
     });
-    /* BH size: direct 1:1 mapping from editor image-space to world-space.
-       Editor: base 40px radius on 6000px image. World: 300 units wide.
-       So world radius = size * 40 * (300/6000) = size * 2.0 world units.
-       This is the visual core size. The quad renders larger to show the disc. */
-    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*2.0);
+    /* BH size: JSON "size" is a scale multiplier. Rs (Schwarzschild radius) controls
+       the core shadow size. The visible disc extends to Rs*14 in the shader.
+       size=1.0 -> Rs=0.5 -> disc radius ~7 world units (~2.3% of 300-unit galaxy) */
+    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*0.5);
 
     buildBGStars();
     rebuildStarsVBO();
