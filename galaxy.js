@@ -322,14 +322,14 @@ void main(){
 attribute vec2 aQuadPos;
 uniform mat4 uMVP;
 uniform vec3 uBHPos;
-uniform vec3 uBillR;
-uniform vec3 uBillU;
 uniform float uExtent;
 varying vec2 vUV;
 void main(){
   vUV = aQuadPos;
-  /* Build billboard vertex in world space: BH center + quad offset along camera axes */
-  vec3 worldPos = uBHPos + uBillR * aQuadPos.x * uExtent + uBillU * aQuadPos.y * uExtent;
+  /* Fixed world-space quad on the XZ plane centered on the BH.
+     Large enough for the ray tracer to render disc + lensing from any angle.
+     Y is offset slightly so the quad has some vertical extent too. */
+  vec3 worldPos = uBHPos + vec3(aQuadPos.x * uExtent, aQuadPos.y * uExtent * 0.6, aQuadPos.y * uExtent);
   gl_Position = uMVP * vec4(worldPos, 1.0);
 }`;
 
@@ -1046,8 +1046,8 @@ void main(){
   function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
     if (!progBlackHole) return;
 
-    /* Billboard extent in world units: core radius * multiplier for disc/lensing */
-    const extent = bhRadius * 3.0;
+    /* World-space extent for the quad (must be large enough to contain full disc from any view) */
+    const extent = bhRadius * 4.0;
 
     /* Camera-relative position for the ray tracer (normalized to shader scale) */
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
@@ -1056,11 +1056,10 @@ void main(){
     const sc=4.0/dist;
     const scaledCam=[relCam[0]*sc,relCam[1]*sc,relCam[2]*sc];
 
-    /* Pixel size of the quad for aspect correction in shader */
-    /* Project extent to screen to get approximate pixel size */
+    /* Approximate pixel size for aspect correction */
     const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
     if(cw<=0) return;
-    const screenPx = (extent * mvp[5] / cw) * canvas.height * 0.5;
+    const screenPx = Math.abs((extent * mvp[5] / cw) * canvas.height * 0.5);
 
     gl.useProgram(progBlackHole);
     gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
@@ -1068,14 +1067,9 @@ void main(){
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 
-    /* Billboard uniforms */
     gl.uniformMatrix4fv(gl.getUniformLocation(progBlackHole,'uMVP'),false,mvp);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBHPos'),bhWorldPos);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBillR'),camRight);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBillU'),camUp);
     gl.uniform1f(gl.getUniformLocation(progBlackHole,'uExtent'),extent);
-
-    /* Ray tracer uniforms */
     gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenPx*2,screenPx*2);
     gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
