@@ -326,10 +326,10 @@ uniform float uExtent;
 varying vec2 vUV;
 void main(){
   vUV = aQuadPos;
-  /* Fixed world-space quad on the XZ plane centered on the BH.
-     Large enough for the ray tracer to render disc + lensing from any angle.
-     Y is offset slightly so the quad has some vertical extent too. */
-  vec3 worldPos = uBHPos + vec3(aQuadPos.x * uExtent, aQuadPos.y * uExtent * 0.6, aQuadPos.y * uExtent);
+  /* Simple fixed quad on the XZ plane in world space.
+     Sits flat in the galactic disc. The ray tracer in the
+     fragment shader handles all 3D, lensing, and perspective. */
+  vec3 worldPos = uBHPos + vec3(aQuadPos.x * uExtent, 0.0, aQuadPos.y * uExtent);
   gl_Position = uMVP * vec4(worldPos, 1.0);
 }`;
 
@@ -1046,8 +1046,8 @@ void main(){
   function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
     if (!progBlackHole) return;
 
-    /* World-space extent for the quad (must be large enough to contain full disc from any view) */
-    const extent = bhRadius * 4.0;
+    /* World-space extent for the quad - generous so shader never clips */
+    const extent = bhRadius * 6.0;
 
     /* Camera-relative position for the ray tracer (normalized to shader scale) */
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
