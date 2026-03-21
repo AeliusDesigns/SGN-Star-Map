@@ -11,8 +11,8 @@
   const GALAXY_SPREAD_Z = 140;
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
-  const TERRITORY_RES = 256;
-  const TERRITORY_RADIUS = 8;
+  const TERRITORY_RES = 512;
+  const TERRITORY_RADIUS = 12;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
   const STAR_TYPES = [
@@ -735,17 +735,22 @@ void main(){
 
   function buildTerritoryTexture(){
     const res=TERRITORY_RES;
+    /* The territory quad extends 20 units beyond the galaxy spread on each side.
+       The texture must cover the same world extent for UV alignment. */
+    const extX=GALAXY_SPREAD_X/2+20;
+    const extZ=GALAXY_SPREAD_Z/2+20;
+    const worldW=extX*2, worldH=extZ*2;
 
-    /* Pass 1: Build ownership grid — which polity owns each pixel, and how strong */
-    const ownerGrid=new Array(res*res);  /* polity id or null */
-    const infGrid=new Float32Array(res*res); /* influence strength 0-1 */
-    const secGrid=new Array(res*res);  /* secondary polity (contested) */
+    /* Pass 1: Build ownership grid */
+    const ownerGrid=new Array(res*res);
+    const infGrid=new Float32Array(res*res);
+    const secGrid=new Array(res*res);
     const secInfGrid=new Float32Array(res*res);
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
-        const wx=(gx/res-0.5)*GALAXY_SPREAD_X;
-        const wz=(gy/res-0.5)*GALAXY_SPREAD_Z;
+        const wx=(gx/(res-1))*worldW - extX;
+        const wz=(gy/(res-1))*worldH - extZ;
         const influence={};
         for(const sys of systems){
           if(!sys.owner||sys.owner==='unassigned') continue;
@@ -773,34 +778,29 @@ void main(){
       }
     }
 
-    /* Pass 2: Detect borders. A pixel is a border if any of its 8 neighbors
-       has a different owner (including null=empty). Multiple radii for thickness. */
-    const borderGrid=new Uint8Array(res*res); /* 0=interior, 1=border, 2=outer border */
+    /* Pass 2: Detect borders (8-neighbor check + outer ring) */
+    const borderGrid=new Uint8Array(res*res);
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const gi=gy*res+gx;
         const me=ownerGrid[gi];
         if(!me) continue;
         let isBorder=false, isOuter=false;
-        /* Inner ring (1px) */
         for(let dy=-1;dy<=1&&!isBorder;dy++){
           for(let dx=-1;dx<=1&&!isBorder;dx++){
             if(dx===0&&dy===0) continue;
             const nx=gx+dx, ny=gy+dy;
             if(nx<0||nx>=res||ny<0||ny>=res){ isBorder=true; break; }
-            const ni=ny*res+nx;
-            if(ownerGrid[ni]!==me) isBorder=true;
+            if(ownerGrid[ny*res+nx]!==me) isBorder=true;
           }
         }
-        /* Outer ring (2px) for a softer outer glow */
         if(!isBorder){
           for(let dy=-2;dy<=2&&!isOuter;dy++){
             for(let dx=-2;dx<=2&&!isOuter;dx++){
               if(Math.abs(dx)<=1&&Math.abs(dy)<=1) continue;
               const nx=gx+dx, ny=gy+dy;
               if(nx<0||nx>=res||ny<0||ny>=res){ isOuter=true; break; }
-              const ni=ny*res+nx;
-              if(ownerGrid[ni]!==me) isOuter=true;
+              if(ownerGrid[ny*res+nx]!==me) isOuter=true;
             }
           }
         }
@@ -808,34 +808,31 @@ void main(){
       }
     }
 
-    /* Pass 3: Build fill texture (RGBA) */
+    /* Pass 3: Build fill texture */
     const fillData=new Uint8Array(res*res*4);
-    for(let gy=0;gy<res;gy++){
-      for(let gx=0;gx<res;gx++){
-        const gi=gy*res+gx;
-        const pid=ownerGrid[gi];
-        if(!pid) continue;
-        const pol=polities.find(p=>p.id===pid);
-        if(!pol) continue;
-        const contested=secGrid[gi]&&secInfGrid[gi]>infGrid[gi]*0.5;
-        const idx=gi*4;
-        if(contested){
-          const pol2=polities.find(p=>p.id===secGrid[gi]);
-          if(pol2){
-            const c=hexToRgb(pol.color),c2=hexToRgb(pol2.color);
-            fillData[idx]=Math.round((c[0]+c2[0])/2);
-            fillData[idx+1]=Math.round((c[1]+c2[1])/2);
-            fillData[idx+2]=Math.round((c[2]+c2[2])/2);
-            fillData[idx+3]=Math.round(infGrid[gi]*120);
-          }
-        } else {
-          const c=hexToRgb(pol.color);
-          fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-          fillData[idx+3]=Math.round(infGrid[gi]*200+55);
+    for(let gi=0;gi<res*res;gi++){
+      const pid=ownerGrid[gi];
+      if(!pid) continue;
+      const pol=polities.find(p=>p.id===pid);
+      if(!pol) continue;
+      const contested=secGrid[gi]&&secInfGrid[gi]>infGrid[gi]*0.5;
+      const idx=gi*4;
+      if(contested){
+        const pol2=polities.find(p=>p.id===secGrid[gi]);
+        if(pol2){
+          const c=hexToRgb(pol.color),c2=hexToRgb(pol2.color);
+          fillData[idx]=Math.round((c[0]+c2[0])/2);
+          fillData[idx+1]=Math.round((c[1]+c2[1])/2);
+          fillData[idx+2]=Math.round((c[2]+c2[2])/2);
+          fillData[idx+3]=Math.round(infGrid[gi]*120);
         }
+      } else {
+        const c=hexToRgb(pol.color);
+        fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
+        fillData[idx+3]=Math.round(infGrid[gi]*200+55);
       }
     }
-    /* Light blur on fill only */
+    /* Gaussian blur on fill */
     const kernel=[1,4,6,4,1], kSum=16, kR=2;
     const temp=new Uint8Array(fillData.length);
     for(let y=0;y<res;y++) for(let x=0;x<res;x++){
@@ -858,22 +855,18 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Pass 4: Build stroke texture — only border pixels get the stroke color.
-       Inner border (borderGrid=2) is fully opaque, outer (borderGrid=1) is softer. */
+    /* Pass 4: Build stroke texture — border pixels only */
     const strokeData=new Uint8Array(res*res*4);
-    for(let gy=0;gy<res;gy++){
-      for(let gx=0;gx<res;gx++){
-        const gi=gy*res+gx;
-        if(borderGrid[gi]===0) continue;
-        const pid=ownerGrid[gi];
-        if(!pid) continue;
-        const pol=polities.find(p=>p.id===pid);
-        if(!pol) continue;
-        const sc=hexToRgb(pol.strokeColor||pol.color);
-        const idx=gi*4;
-        strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
-        strokeData[idx+3]=borderGrid[gi]===2?255:140;
-      }
+    for(let gi=0;gi<res*res;gi++){
+      if(borderGrid[gi]===0) continue;
+      const pid=ownerGrid[gi];
+      if(!pid) continue;
+      const pol=polities.find(p=>p.id===pid);
+      if(!pol) continue;
+      const sc=hexToRgb(pol.strokeColor||pol.color);
+      const idx=gi*4;
+      strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
+      strokeData[idx+3]=borderGrid[gi]===2?255:140;
     }
     if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
