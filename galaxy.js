@@ -339,86 +339,137 @@ void main(){
   float ang = atan(uv.y, uv.x);
   float PI = 3.14159265;
 
-  /* ── Radii (normalized to point size) ── */
-  float shadowR = 0.12;       /* event horizon */
-  float photonR = 0.16;       /* photon sphere */
-  float iscoR   = 0.24;       /* innermost stable orbit */
-  float discOuter = 0.55;     /* accretion disc outer edge */
+  /* ── Key radii ── */
+  float shadowR  = 0.10;   /* event horizon shadow */
+  float photonR  = 0.135;  /* photon sphere */
+  float iscoR    = 0.19;   /* innermost stable circular orbit */
+  float discOut  = 0.52;   /* accretion disc outer edge */
+  float tiltAngle = 0.28;  /* disc inclination (radians) — ~16 degrees */
 
-  /* ── Event horizon: pure black ── */
-  float shadow = 1.0 - smoothstep(shadowR - 0.01, shadowR + 0.01, r);
+  /* ═══════════════════════════════════════════
+     EVENT HORIZON — true black with sharp edge
+     ═══════════════════════════════════════════ */
+  float shadow = 1.0 - smoothstep(shadowR - 0.005, shadowR + 0.005, r);
 
-  /* ── Photon ring: thin bright ring of lensed light ── */
-  float photonRing = exp(-pow((r - photonR) / 0.012, 2.0)) * 1.8;
-  /* Slight flicker from turbulent lensing */
-  photonRing *= 0.9 + 0.1 * sin(ang * 6.0 + uTime * 3.0);
+  /* ═══════════════════════════════════════════
+     PHOTON RING — extremely thin, bright
+     Light orbiting at the photon sphere.
+     In reality this is sub-pixel thin; we render
+     it as a very narrow gaussian with high peak.
+     ═══════════════════════════════════════════ */
+  float photonDist = abs(r - photonR);
+  float photonRing = exp(-photonDist * photonDist / (0.0003)) * 2.5;
+  /* Slight turbulent variation */
+  photonRing *= 0.92 + 0.08 * sin(ang * 8.0 + uTime * 4.0);
+  /* Secondary (inner) photon ring from light that orbited 1.5x */
+  float photon2 = exp(-pow(r - photonR * 0.88, 2.0) / 0.0002) * 0.8;
 
-  /* ── Accretion disc: hot material with doppler shift ── */
-  /* Disc is viewed at an angle, so it appears as an elliptical band.
-     We fake this with a vertically compressed coordinate. */
-  vec2 discUV = vec2(uv.x, uv.y * 2.2); /* tilt compression */
-  float discR = length(discUV);
-  float discAng = atan(discUV.y, discUV.x);
+  /* ═══════════════════════════════════════════
+     ACCRETION DISC — tilted thin disc
+     We create TWO disc images:
+     1. The "front" disc (below the BH from our viewing angle)
+     2. The "back" disc (above, lensed over the top of the shadow)
+     This creates the characteristic Interstellar cross pattern.
+     ═══════════════════════════════════════════ */
 
-  /* Disc band: between ISCO and outer edge */
-  float discMask = smoothstep(iscoR - 0.02, iscoR + 0.02, discR)
-                 * (1.0 - smoothstep(discOuter - 0.04, discOuter + 0.02, discR));
+  /* Front disc: compressed vertically + shifted down by tilt */
+  vec2 frontUV = vec2(uv.x, (uv.y + tiltAngle * 0.3) / (0.18 + abs(uv.y) * 0.3));
+  float frontR = length(vec2(uv.x, frontUV.y * 0.35));
+  float frontAng = atan(uv.x, uv.y);
+  float frontDisc = smoothstep(iscoR, iscoR + 0.03, frontR)
+                  * (1.0 - smoothstep(discOut - 0.06, discOut, frontR));
+  /* Only visible below the midplane (front side) */
+  frontDisc *= smoothstep(-0.02, 0.04, uv.y + tiltAngle * 0.15);
+  /* Fade where disc passes behind shadow */
+  frontDisc *= (1.0 - shadow);
 
-  /* Temperature gradient: hotter near center (bluer white), cooler outside (orange) */
-  float tempT = smoothstep(iscoR, discOuter, discR);
-  vec3 hotColor  = vec3(0.85, 0.9, 1.0);    /* blue-white near ISCO */
-  vec3 warmColor = vec3(1.0, 0.65, 0.25);    /* orange at outer disc */
-  vec3 coolColor = vec3(0.6, 0.2, 0.05);     /* dim red at very edge */
-  vec3 discColor = mix(hotColor, warmColor, smoothstep(0.0, 0.6, tempT));
-  discColor = mix(discColor, coolColor, smoothstep(0.6, 1.0, tempT));
+  /* Back disc: lensed image appearing above the BH */
+  vec2 backUV = vec2(uv.x, (-uv.y + tiltAngle * 0.3) / (0.18 + abs(uv.y) * 0.3));
+  float backR = length(vec2(uv.x, backUV.y * 0.35));
+  float backDisc = smoothstep(iscoR, iscoR + 0.03, backR)
+                 * (1.0 - smoothstep(discOut * 0.7, discOut * 0.8, backR));
+  /* Only above midplane */
+  backDisc *= smoothstep(-0.02, 0.04, -uv.y + tiltAngle * 0.15);
+  /* Lensed image is dimmer and compressed */
+  backDisc *= 0.55;
+  backDisc *= (1.0 - shadow);
 
-  /* Orbital structure: spiral arms in the disc */
-  float spiral = sin(discAng * 3.0 - discR * 25.0 + uTime * 1.2) * 0.5 + 0.5;
-  float turbulence = sin(discAng * 7.0 + discR * 40.0 - uTime * 2.5) * 0.3 + 0.7;
-  float discBright = discMask * (0.5 + spiral * 0.3) * turbulence;
+  float totalDisc = max(frontDisc, backDisc);
 
-  /* Doppler beaming: approaching side brighter, receding dimmer */
-  float doppler = 0.7 + 0.3 * sin(discAng - uTime * 0.8);
-  discBright *= doppler;
+  /* Temperature gradient: blisteringly hot near ISCO, cooler outward */
+  float discRForTemp = min(frontR, backR);
+  float tempT = smoothstep(iscoR, discOut, discRForTemp);
+  vec3 blazeWhite = vec3(1.0, 0.97, 0.95);  /* near-white at ISCO */
+  vec3 hotYellow  = vec3(1.0, 0.82, 0.4);   /* yellow */
+  vec3 warmOrange = vec3(0.95, 0.5, 0.15);  /* deep orange */
+  vec3 dimRed     = vec3(0.5, 0.15, 0.04);  /* cooling at edge */
 
-  /* Disc should be BEHIND the shadow */
-  discBright *= (1.0 - shadow);
+  vec3 discCol = mix(blazeWhite, hotYellow, smoothstep(0.0, 0.25, tempT));
+  discCol = mix(discCol, warmOrange, smoothstep(0.25, 0.6, tempT));
+  discCol = mix(discCol, dimRed, smoothstep(0.6, 1.0, tempT));
 
-  /* ── Gravitational lensing glow: light bent around the hole ── */
-  /* Creates a soft bright halo just outside the photon ring */
-  float lensGlow = exp(-pow((r - photonR * 1.5) / 0.08, 2.0)) * 0.35;
-  lensGlow += exp(-pow((r - photonR * 2.5) / 0.15, 2.0)) * 0.12;
-  /* The lensing also creates a secondary image (Einstein ring) at ~2x photon radius */
-  float einsteinRing = exp(-pow((r - photonR * 2.0) / 0.018, 2.0)) * 0.5;
-  einsteinRing *= 0.85 + 0.15 * sin(ang * 4.0 - uTime * 1.5);
+  /* Turbulent structure in the disc */
+  float turb1 = sin(ang * 5.0 - discRForTemp * 35.0 + uTime * 1.5) * 0.5 + 0.5;
+  float turb2 = sin(ang * 11.0 + discRForTemp * 60.0 - uTime * 2.8) * 0.25 + 0.75;
+  float turb3 = sin(ang * 3.0 - discRForTemp * 18.0 + uTime * 0.7) * 0.3 + 0.7;
+  totalDisc *= (0.55 + turb1 * 0.25 + turb3 * 0.2) * turb2;
 
-  /* ── Compose ── */
+  /* Relativistic Doppler beaming: approaching side (left) much brighter */
+  float dopplerV = 0.45;  /* orbital velocity as fraction of c */
+  float cosTheta = -sin(ang);  /* angle relative to line of sight */
+  float dopplerFactor = 1.0 / (1.0 - dopplerV * cosTheta * 0.6);
+  dopplerFactor = clamp(dopplerFactor * dopplerFactor, 0.3, 3.0);
+  totalDisc *= dopplerFactor * 0.7;
+
+  /* ═══════════════════════════════════════════
+     GRAVITATIONAL LENSING — light bending
+     Creates the characteristic brightening ring
+     just outside the shadow where background
+     starlight gets focused.
+     ═══════════════════════════════════════════ */
+  float lensR = photonR * 1.6;
+  float lensRing = exp(-pow((r - lensR) / 0.04, 2.0)) * 0.2;
+  /* Broader outer lens glow from deflected starlight */
+  float outerLens = exp(-pow((r - photonR * 2.5) / 0.12, 2.0)) * 0.08;
+
+  /* ═══════════════════════════════════════════
+     COMPOSE
+     ═══════════════════════════════════════════ */
   vec3 col = vec3(0.0);
 
   /* Accretion disc */
-  col += discColor * discBright * 0.9;
+  col += discCol * totalDisc;
 
-  /* Photon ring (white-blue) */
-  col += vec3(0.8, 0.88, 1.0) * photonRing * (1.0 - shadow);
+  /* Photon ring: blazing white-blue */
+  vec3 photonCol = vec3(0.9, 0.93, 1.0);
+  col += photonCol * photonRing * (1.0 - shadow);
+  col += photonCol * 0.7 * photon2 * (1.0 - shadow);
 
-  /* Einstein ring (subtle warm from lensed disc light) */
-  col += vec3(0.9, 0.75, 0.5) * einsteinRing * (1.0 - shadow);
+  /* Lensing glow (subtle blue-white from deflected starlight) */
+  col += vec3(0.5, 0.6, 0.8) * lensRing * (1.0 - shadow);
+  col += vec3(0.3, 0.35, 0.5) * outerLens * (1.0 - shadow);
 
-  /* Lensing glow (very subtle blue) */
-  col += vec3(0.3, 0.45, 0.7) * lensGlow * (1.0 - shadow);
+  /* Very subtle warm glow from scattered disc light around the BH */
+  float scatter = exp(-r * r * 4.0) * 0.04;
+  col += vec3(0.6, 0.4, 0.2) * scatter * (1.0 - shadow);
 
-  /* Very faint outer gravitational influence halo */
-  float outerHalo = exp(-r * r * 2.0) * 0.06;
-  col += vec3(0.2, 0.3, 0.5) * outerHalo;
-
-  /* Event horizon kills everything inside */
+  /* Event horizon eats all light inside */
   col *= (1.0 - shadow);
 
-  /* Alpha: visible where there's any light, plus the black shadow region */
-  float alpha = clamp(shadow * 0.95 + discBright + photonRing + einsteinRing * 0.8 + lensGlow + outerHalo, 0.0, 1.0);
+  /* ═══════════════════════════════════════════
+     ALPHA
+     ═══════════════════════════════════════════ */
+  float alpha = shadow * 0.97
+              + totalDisc
+              + photonRing * 0.9
+              + photon2 * 0.5
+              + lensRing
+              + outerLens
+              + scatter;
+  alpha = clamp(alpha, 0.0, 1.0);
 
-  /* Fade out at edges of point */
-  alpha *= 1.0 - smoothstep(0.7, 1.0, r);
+  /* Soft fade at point edges */
+  alpha *= 1.0 - smoothstep(0.65, 0.98, r);
 
   if(alpha < 0.003) discard;
 
@@ -1140,13 +1191,20 @@ void main(){
     haloVBO=gl.createBuffer();
     blackHoleVBO=gl.createBuffer();
 
-    /* Compute black hole world positions from JSON data */
-    blackHoleWorldPos=bhData.map(bh=>[
-      (bh.coords.x_norm-0.5)*GALAXY_SPREAD_X,
-      0,
-      (bh.coords.y_norm-0.5)*GALAXY_SPREAD_Z
-    ]);
-    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*140.0);
+    /* Compute black hole world positions — use same height noise as stars */
+    blackHoleWorldPos=bhData.map(bh=>{
+      const x=(bh.coords.x_norm-0.5)*GALAXY_SPREAD_X;
+      const z=(bh.coords.y_norm-0.5)*GALAXY_SPREAD_Z;
+      const dc=Math.sqrt(((bh.coords.x_norm-0.5)*2)**2+((bh.coords.y_norm-0.5)*2)**2);
+      const thick=Math.max(0,1.0-dc*0.7);
+      const nx=bh.coords.x_norm*8, nz=bh.coords.y_norm*8;
+      const n1=smoothNoise2D(nx,nz);
+      const n2=smoothNoise2D(nx*2.3+5.7,nz*2.3+3.1)*0.4;
+      const noiseVal=(n1+n2)/1.4;
+      const y=((noiseVal*2-1)*GALAXY_THICKNESS*0.35)*thick;
+      return [x,y,z];
+    });
+    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*180.0);
 
     buildBGStars();
     rebuildStarsVBO();
