@@ -12,7 +12,7 @@
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
   const TERRITORY_RES = 512;
-  const TERRITORY_RADIUS = 12;
+  const TERRITORY_RADIUS = 6;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
   const STAR_TYPES = [
@@ -769,7 +769,7 @@ void main(){
           else if(inf>secInf){ secPol=pid; secInf=inf; }
         }
         const gi=gy*res+gx;
-        if(maxPol&&maxInf>0.05){
+        if(maxPol&&maxInf>0.15){
           ownerGrid[gi]=maxPol; infGrid[gi]=Math.min(maxInf,1);
           if(secPol&&secInf>maxInf*0.5){ secGrid[gi]=secPol; secInfGrid[gi]=secInf; }
         } else {
