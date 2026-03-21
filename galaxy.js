@@ -320,19 +320,12 @@ void main(){
 
   const VS_BLACKHOLE = `
 attribute vec2 aQuadPos;
-uniform mat4 uMVP;
-uniform vec3 uBHPos;
-uniform float uExtent;
-uniform int uAxis;  /* 0=XZ, 1=XY, 2=YZ */
+uniform vec2 uCenter;
+uniform vec2 uSize;
 varying vec2 vUV;
 void main(){
   vUV = aQuadPos;
-  vec3 offset;
-  /* Three intersecting planes so the BH has geometry on all axes */
-  if(uAxis == 0)      offset = vec3(aQuadPos.x, 0.0,        aQuadPos.y) * uExtent;  /* XZ */
-  else if(uAxis == 1) offset = vec3(aQuadPos.x, aQuadPos.y, 0.0       ) * uExtent;  /* XY */
-  else                offset = vec3(0.0,        aQuadPos.y, aQuadPos.x) * uExtent;  /* YZ */
-  gl_Position = uMVP * vec4(uBHPos + offset, 1.0);
+  gl_Position = vec4(uCenter + aQuadPos * uSize, 0.0, 1.0);
 }`;
 
   const FS_BLACKHOLE = `
@@ -1048,17 +1041,27 @@ void main(){
   function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
     if (!progBlackHole) return;
 
-    const extent = bhRadius * 6.0;
+    /* Project BH center to NDC */
+    const cx=bhWorldPos[0]*mvp[0]+bhWorldPos[1]*mvp[4]+bhWorldPos[2]*mvp[8]+mvp[12];
+    const cy=bhWorldPos[0]*mvp[1]+bhWorldPos[1]*mvp[5]+bhWorldPos[2]*mvp[9]+mvp[13];
+    const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
+    if(cw<=0) return;
+    const ndcX=cx/cw, ndcY=cy/cw;
 
+    /* Fixed screen-space size: large enough to show the full disc + lensing.
+       Use a generous fixed NDC size that won't clip. */
+    const ndcSize = 0.35 * bhRadius;
+
+    /* Camera position relative to BH, normalized to shader scale (Rs=0.33) */
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
     const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
-    if(dist < 0.01) return;
+    if(dist<0.01) return;
     const sc=4.0/dist;
     const scaledCam=[relCam[0]*sc,relCam[1]*sc,relCam[2]*sc];
 
-    const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
-    if(cw<=0) return;
-    const screenPx = Math.abs((extent * mvp[5] / cw) * canvas.height * 0.5);
+    /* Pixel size for aspect correction */
+    const pxW = ndcSize * canvas.width;
+    const pxH = ndcSize * canvas.height;
 
     gl.useProgram(progBlackHole);
     gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
@@ -1066,10 +1069,9 @@ void main(){
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 
-    gl.uniformMatrix4fv(gl.getUniformLocation(progBlackHole,'uMVP'),false,mvp);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBHPos'),bhWorldPos);
-    gl.uniform1f(gl.getUniformLocation(progBlackHole,'uExtent'),extent);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenPx*2,screenPx*2);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSize,ndcSize);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),pxW,pxH);
     gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),camRight);
@@ -1079,14 +1081,7 @@ void main(){
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-
-    const uAxis=gl.getUniformLocation(progBlackHole,'uAxis');
-    /* Draw three intersecting quads: XZ, XY, YZ */
-    for(let axis=0; axis<3; axis++){
-      gl.uniform1i(uAxis,axis);
-      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-    }
-
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     gl.disableVertexAttribArray(aPos);
   }
 
