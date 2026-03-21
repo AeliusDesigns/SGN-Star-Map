@@ -738,76 +738,61 @@ void main(){
     const extX=GALAXY_SPREAD_X/2+20;
     const extZ=GALAXY_SPREAD_Z/2+20;
     const worldW=extX*2, worldH=extZ*2;
-    const MAX_CLAIM_DIST=TERRITORY_RADIUS;
+    const CLAIM_R=TERRITORY_RADIUS; /* radius of each system's circular claim bubble */
 
-    /* Cache polity lookup */
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
 
-    /* Pass 1: Voronoi ownership. Each pixel finds its nearest system.
-       If that system is owned AND closer than any unowned system, the pixel is claimed.
-       Territory is capped at MAX_CLAIM_DIST from the nearest owned system. */
+    /* Collect only owned systems for speed */
+    const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
+
+    /* Pass 1: Distance-field ownership.
+       For each pixel, find the distance to the nearest owned system.
+       If within CLAIM_R, check that no closer unowned system "blocks" the claim.
+       The result is smooth circular bubbles that merge organically. */
     const ownerGrid=new Array(res*res);
-    const distGrid=new Float32Array(res*res);
+    const sdfGrid=new Float32Array(res*res); /* signed distance: negative=inside, positive=outside */
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
-        let nearOwnedDist=1e9, nearOwner=null;
-        let nearUnownedDist=1e9;
-        for(const sys of systems){
+
+        /* Find the minimum distance to any owned system, tracking which polity */
+        let minDist=1e9, bestOwner=null;
+        for(const sys of ownedSystems){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
-          if(sys.owner&&sys.owner!=='unassigned'&&!hiddenPolities.has(sys.owner)){
-            if(d<nearOwnedDist){ nearOwnedDist=d; nearOwner=sys.owner; }
-          } else {
-            if(d<nearUnownedDist) nearUnownedDist=d;
-          }
+          if(d<minDist){ minDist=d; bestOwner=sys.owner; }
         }
+
         const gi=gy*res+gx;
-        /* Claim this pixel only if:
-           1. There is a nearby owned system
-           2. It's within the max claim distance
-           3. The nearest owned system is closer than (or very close to) the nearest unowned system */
-        if(nearOwner&&nearOwnedDist<MAX_CLAIM_DIST&&nearOwnedDist<nearUnownedDist*1.1){
-          ownerGrid[gi]=nearOwner;
-          distGrid[gi]=nearOwnedDist;
+        /* Signed distance from the claim boundary (negative = inside territory) */
+        const sdf=minDist-CLAIM_R;
+
+        if(bestOwner&&sdf<0){
+          ownerGrid[gi]=bestOwner;
+          sdfGrid[gi]=sdf; /* negative = how deep inside */
         } else {
           ownerGrid[gi]=null;
-          distGrid[gi]=nearOwnedDist;
+          sdfGrid[gi]=sdf>0?sdf:0;
         }
       }
     }
 
-    /* Pass 2: Detect borders */
+    /* Pass 2: Build border from SDF.
+       Border pixels are those near the zero-crossing of the SDF.
+       This produces perfectly smooth curves since the SDF is based on
+       Euclidean distance to circles, not grid cells. */
     const borderGrid=new Uint8Array(res*res);
-    for(let gy=0;gy<res;gy++){
-      for(let gx=0;gx<res;gx++){
-        const gi=gy*res+gx;
-        const me=ownerGrid[gi];
-        if(!me) continue;
-        let isBorder=false, isOuter=false;
-        for(let dy=-1;dy<=1&&!isBorder;dy++){
-          for(let dx=-1;dx<=1&&!isBorder;dx++){
-            if(dx===0&&dy===0) continue;
-            const nx=gx+dx, ny=gy+dy;
-            if(nx<0||nx>=res||ny<0||ny>=res){ isBorder=true; break; }
-            if(ownerGrid[ny*res+nx]!==me) isBorder=true;
-          }
-        }
-        if(!isBorder){
-          for(let dy=-2;dy<=2&&!isOuter;dy++){
-            for(let dx=-2;dx<=2&&!isOuter;dx++){
-              if(Math.abs(dx)<=1&&Math.abs(dy)<=1) continue;
-              const nx=gx+dx, ny=gy+dy;
-              if(nx<0||nx>=res||ny<0||ny>=res){ isOuter=true; break; }
-              if(ownerGrid[ny*res+nx]!==me) isOuter=true;
-            }
-          }
-        }
-        borderGrid[gi]=isBorder?2:isOuter?1:0;
-      }
+    const pxSize=worldW/res; /* world units per pixel */
+    const borderW=pxSize*2.5; /* border thickness in world units (~2.5 pixels wide) */
+
+    for(let gi=0;gi<res*res;gi++){
+      if(!ownerGrid[gi]) continue;
+      const d=Math.abs(sdfGrid[gi]); /* distance from boundary */
+      if(d<borderW) borderGrid[gi]=2; /* inner border */
+      else if(d<borderW*2) borderGrid[gi]=1; /* outer glow */
     }
 
     /* Pass 3: Build fill texture */
@@ -819,11 +804,13 @@ void main(){
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
-      const edgeFade=1.0-Math.max(0,distGrid[gi]/MAX_CLAIM_DIST)*0.3;
+      /* Smooth alpha fade near the edge using SDF */
+      const depth=-sdfGrid[gi]; /* positive = how deep inside */
+      const edgeSmooth=Math.min(1.0, depth/(pxSize*3)); /* fade over ~3 pixels at edge */
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-      fillData[idx+3]=Math.round(edgeFade*200);
+      fillData[idx+3]=Math.round(edgeSmooth*180);
     }
-    /* Gaussian blur on fill */
+    /* Gaussian blur on fill for soft interior */
     const kernel=[1,4,6,4,1], kSum=16, kR=2;
     const temp=new Uint8Array(fillData.length);
     for(let y=0;y<res;y++) for(let x=0;x<res;x++){
@@ -846,8 +833,9 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Pass 4: Stroke texture — wider border detection for smoother lines */
-    const strokeRaw=new Uint8Array(res*res*4);
+    /* Pass 4: Stroke texture from SDF border.
+       The SDF gives sub-pixel smooth borders inherently. */
+    const strokeData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       if(borderGrid[gi]===0) continue;
       const pid=ownerGrid[gi];
@@ -856,22 +844,11 @@ void main(){
       if(!pol) continue;
       const sc=hexToRgb(pol.strokeColor||pol.color);
       const idx=gi*4;
-      strokeRaw[idx]=sc[0]; strokeRaw[idx+1]=sc[1]; strokeRaw[idx+2]=sc[2];
-      strokeRaw[idx+3]=borderGrid[gi]===2?255:180;
-    }
-    /* Blur stroke for smooth, anti-aliased borders */
-    const sKernel=[1,3,5,3,1], sKSum=13, sKR=2;
-    const sTemp=new Uint8Array(strokeRaw.length);
-    for(let y=0;y<res;y++) for(let x=0;x<res;x++){
-      let r=0,g=0,b=0,a=0;
-      for(let k=-sKR;k<=sKR;k++){ const sx=Math.max(0,Math.min(res-1,x+k)); const i=(y*res+sx)*4; const w=sKernel[k+sKR]; r+=strokeRaw[i]*w; g+=strokeRaw[i+1]*w; b+=strokeRaw[i+2]*w; a+=strokeRaw[i+3]*w; }
-      const i=(y*res+x)*4; sTemp[i]=r/sKSum; sTemp[i+1]=g/sKSum; sTemp[i+2]=b/sKSum; sTemp[i+3]=a/sKSum;
-    }
-    const strokeData=new Uint8Array(strokeRaw.length);
-    for(let y=0;y<res;y++) for(let x=0;x<res;x++){
-      let r=0,g=0,b=0,a=0;
-      for(let k=-sKR;k<=sKR;k++){ const sy=Math.max(0,Math.min(res-1,y+k)); const i=(sy*res+x)*4; const w=sKernel[k+sKR]; r+=sTemp[i]*w; g+=sTemp[i+1]*w; b+=sTemp[i+2]*w; a+=sTemp[i+3]*w; }
-      const i=(y*res+x)*4; strokeData[i]=r/sKSum; strokeData[i+1]=g/sKSum; strokeData[i+2]=b/sKSum; strokeData[i+3]=a/sKSum;
+      /* Smooth alpha from SDF distance to boundary */
+      const d=Math.abs(sdfGrid[gi]);
+      const smoothA=Math.max(0, 1.0 - d/borderW);
+      strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
+      strokeData[idx+3]=Math.round(smoothA*255);
     }
     if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
