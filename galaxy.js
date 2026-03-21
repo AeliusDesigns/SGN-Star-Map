@@ -1048,9 +1048,12 @@ void main(){
     if(cw<=0) return;
     const ndcX=cx/cw, ndcY=cy/cw;
 
-    /* Fixed screen-space size: large enough to show the full disc + lensing.
-       Use a generous fixed NDC size that won't clip. */
-    const ndcSize = 0.35 * bhRadius;
+    /* Perspective-correct NDC size from world radius.
+       mvp[5] = 1/tan(fov/2), the projection's Y scale factor.
+       This gives the same perspective as every other object in the scene.
+       Multiply by 4 for disc + lensing extent beyond the core. */
+    const ndcCore = (bhRadius * mvp[5]) / cw;
+    const ndcSize = ndcCore * 4.0;
 
     /* Camera position relative to BH, normalized to shader scale (Rs=0.33) */
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
