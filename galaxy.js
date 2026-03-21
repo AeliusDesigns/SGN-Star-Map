@@ -846,8 +846,8 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Pass 4: Stroke texture */
-    const strokeData=new Uint8Array(res*res*4);
+    /* Pass 4: Stroke texture — wider border detection for smoother lines */
+    const strokeRaw=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       if(borderGrid[gi]===0) continue;
       const pid=ownerGrid[gi];
@@ -856,8 +856,22 @@ void main(){
       if(!pol) continue;
       const sc=hexToRgb(pol.strokeColor||pol.color);
       const idx=gi*4;
-      strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
-      strokeData[idx+3]=borderGrid[gi]===2?255:140;
+      strokeRaw[idx]=sc[0]; strokeRaw[idx+1]=sc[1]; strokeRaw[idx+2]=sc[2];
+      strokeRaw[idx+3]=borderGrid[gi]===2?255:180;
+    }
+    /* Blur stroke for smooth, anti-aliased borders */
+    const sKernel=[1,3,5,3,1], sKSum=13, sKR=2;
+    const sTemp=new Uint8Array(strokeRaw.length);
+    for(let y=0;y<res;y++) for(let x=0;x<res;x++){
+      let r=0,g=0,b=0,a=0;
+      for(let k=-sKR;k<=sKR;k++){ const sx=Math.max(0,Math.min(res-1,x+k)); const i=(y*res+sx)*4; const w=sKernel[k+sKR]; r+=strokeRaw[i]*w; g+=strokeRaw[i+1]*w; b+=strokeRaw[i+2]*w; a+=strokeRaw[i+3]*w; }
+      const i=(y*res+x)*4; sTemp[i]=r/sKSum; sTemp[i+1]=g/sKSum; sTemp[i+2]=b/sKSum; sTemp[i+3]=a/sKSum;
+    }
+    const strokeData=new Uint8Array(strokeRaw.length);
+    for(let y=0;y<res;y++) for(let x=0;x<res;x++){
+      let r=0,g=0,b=0,a=0;
+      for(let k=-sKR;k<=sKR;k++){ const sy=Math.max(0,Math.min(res-1,y+k)); const i=(sy*res+x)*4; const w=sKernel[k+sKR]; r+=sTemp[i]*w; g+=sTemp[i+1]*w; b+=sTemp[i+2]*w; a+=sTemp[i+3]*w; }
+      const i=(y*res+x)*4; strokeData[i]=r/sKSum; strokeData[i+1]=g/sKSum; strokeData[i+2]=b/sKSum; strokeData[i+3]=a/sKSum;
     }
     if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
