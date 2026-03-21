@@ -1046,7 +1046,7 @@ void main(){
     const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
     if(cw<=0) return;
     const ndcX=cx/cw, ndcY=cy/cw;
-    const screenRadius=(bhRadius*canvas.height*3.0)/cw;
+    const screenRadius=(bhRadius*canvas.height*2.5)/cw;
     const ndcSizeX=screenRadius/canvas.width*2.0, ndcSizeY=screenRadius/canvas.height*2.0;
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
     const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
@@ -1294,10 +1294,9 @@ void main(){
       return [x,y,z];
     });
     /* BH size: JSON "size" field is a scale multiplier.
-       1.0 = standard SMBH (~8 world units radius).
-       For the larger eastern galaxy, use size ~1.6-2.0 in the editor.
-       The quad is rendered at 3x this radius for lensing extent. */
-    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*8.0);
+       1.0 = standard SMBH (~3 world units radius).
+       The quad renders at 2.5x this for lensing extent. */
+    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*3.0);
 
     buildBGStars();
     rebuildStarsVBO();
