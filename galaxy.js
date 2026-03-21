@@ -323,14 +323,16 @@ attribute vec2 aQuadPos;
 uniform mat4 uMVP;
 uniform vec3 uBHPos;
 uniform float uExtent;
+uniform int uAxis;  /* 0=XZ, 1=XY, 2=YZ */
 varying vec2 vUV;
 void main(){
   vUV = aQuadPos;
-  /* Simple fixed quad on the XZ plane in world space.
-     Sits flat in the galactic disc. The ray tracer in the
-     fragment shader handles all 3D, lensing, and perspective. */
-  vec3 worldPos = uBHPos + vec3(aQuadPos.x * uExtent, 0.0, aQuadPos.y * uExtent);
-  gl_Position = uMVP * vec4(worldPos, 1.0);
+  vec3 offset;
+  /* Three intersecting planes so the BH has geometry on all axes */
+  if(uAxis == 0)      offset = vec3(aQuadPos.x, 0.0,        aQuadPos.y) * uExtent;  /* XZ */
+  else if(uAxis == 1) offset = vec3(aQuadPos.x, aQuadPos.y, 0.0       ) * uExtent;  /* XY */
+  else                offset = vec3(0.0,        aQuadPos.y, aQuadPos.x) * uExtent;  /* YZ */
+  gl_Position = uMVP * vec4(uBHPos + offset, 1.0);
 }`;
 
   const FS_BLACKHOLE = `
@@ -1046,17 +1048,14 @@ void main(){
   function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
     if (!progBlackHole) return;
 
-    /* World-space extent for the quad - generous so shader never clips */
     const extent = bhRadius * 6.0;
 
-    /* Camera-relative position for the ray tracer (normalized to shader scale) */
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
     const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
     if(dist < 0.01) return;
     const sc=4.0/dist;
     const scaledCam=[relCam[0]*sc,relCam[1]*sc,relCam[2]*sc];
 
-    /* Approximate pixel size for aspect correction */
     const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
     if(cw<=0) return;
     const screenPx = Math.abs((extent * mvp[5] / cw) * canvas.height * 0.5);
@@ -1080,7 +1079,14 @@ void main(){
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+
+    const uAxis=gl.getUniformLocation(progBlackHole,'uAxis');
+    /* Draw three intersecting quads: XZ, XY, YZ */
+    for(let axis=0; axis<3; axis++){
+      gl.uniform1i(uAxis,axis);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    }
+
     gl.disableVertexAttribArray(aPos);
   }
 
