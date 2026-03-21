@@ -1046,8 +1046,18 @@ void main(){
     const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
     if(cw<=0) return;
     const ndcX=cx/cw, ndcY=cy/cw;
-    const screenRadius=(bhRadius*canvas.height*2.5)/cw;
-    const ndcSizeX=screenRadius/canvas.width*2.0, ndcSizeY=screenRadius/canvas.height*2.0;
+
+    /* Correct perspective projection: use mvp[5] (Y focal length = 1/tan(fov/2))
+       to project the world-space radius to NDC, same as the rest of the scene.
+       Multiply by 3 to cover full disc + lensing halo extent. */
+    const coreNDC = (bhRadius * mvp[5]) / cw;
+    const extentMul = 3.0;
+    const ndcSizeX = coreNDC * extentMul;
+    const ndcSizeY = coreNDC * extentMul;
+    /* Pixel size for aspect correction uniform */
+    const screenPxX = ndcSizeX * canvas.width * 0.5;
+    const screenPxY = ndcSizeY * canvas.height * 0.5;
+
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
     const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
     const sc=4.0/dist;
@@ -1060,7 +1070,7 @@ void main(){
     gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
     gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
     gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSizeX,ndcSizeY);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenRadius*2,screenRadius*2);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenPxX*2,screenPxY*2);
     gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),camRight);
@@ -1293,10 +1303,11 @@ void main(){
       const y=((noiseVal*2-1)*GALAXY_THICKNESS*0.35)*thick;
       return [x,y,z];
     });
-    /* BH size: JSON "size" field is a scale multiplier.
-       1.0 = standard SMBH (~3 world units radius).
-       The quad renders at 2.5x this for lensing extent. */
-    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*3.0);
+    /* BH size: direct 1:1 mapping from editor image-space to world-space.
+       Editor: base 40px radius on 6000px image. World: 300 units wide.
+       So world radius = size * 40 * (300/6000) = size * 2.0 world units.
+       This is the visual core size. The quad renders larger to show the disc. */
+    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*2.0);
 
     buildBGStars();
     rebuildStarsVBO();
