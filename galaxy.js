@@ -215,7 +215,7 @@ void main(){
   float breathe=0.6+0.4*sin(uTime*1.8);
 
   /* Fill: soft interior wash */
-  float fillA=fill.a*0.12;
+  float fillA=fill.a*0.15;
 
   /* Contested hatching */
   if(fill.a>0.01&&fill.a<0.50){
@@ -223,9 +223,9 @@ void main(){
     fillA*=0.5+hatch*0.5;
   }
 
-  /* Stroke: crisp border with breathing pulse */
-  float strokeA=stroke.a/255.0*breathe*0.85;
-  if(stroke.a>200.0/255.0) strokeA=stroke.a/255.0*breathe;
+  /* Stroke: crisp border with breathing pulse.
+     stroke.a is already 0-1 (GPU normalizes Uint8 automatically). */
+  float strokeA=stroke.a*breathe*0.9;
 
   /* Composite: stroke on top of fill */
   vec3 col=fill.rgb*fillA*(1.0-strokeA)+stroke.rgb*strokeA;
