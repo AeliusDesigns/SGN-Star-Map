@@ -312,27 +312,25 @@ void main(){
   gl_FragColor=vec4(col,clamp(alpha,0.0,1.0));
 }`;
 
-  /* ══════════════════════════════════════════════════════════════
-     SUPERMASSIVE BLACK HOLE — Gargantua Geodesic Ray Tracer
-     Schwarzschild geodesic ray march with two-layer disc shading
-     Adapted from sgn_blackhole_gargantua.js
-     ══════════════════════════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════════════════
+     GARGANTUA BLACK HOLE — from blackhole_gargantua_integration.js
+     ══════════════════════════════════════════════════════════════════ */
 
   const VS_BLACKHOLE = `
-attribute vec2 aQuadPos;
+attribute vec2 aPos;
 uniform vec2 uCenter;
 uniform vec2 uSize;
 varying vec2 vUV;
 void main(){
-  vUV = aQuadPos;
-  gl_Position = vec4(uCenter + aQuadPos * uSize, 0.0, 1.0);
+  vUV = aPos;
+  gl_Position = vec4(uCenter + aPos * uSize, 0.0, 1.0);
 }`;
 
   const FS_BLACKHOLE = `
 precision highp float;
 uniform float uTime;
-uniform vec2 uQuadPixelSize;
-uniform vec3 uCamPos,uCamR,uCamU,uCamF,uDN;
+uniform vec2 uQuadPx;
+uniform vec3 uCamPos, uCamR, uCamU, uCamF, uDN;
 varying vec2 vUV;
 
 float h22(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -341,52 +339,44 @@ float n22(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
 float fb3(vec2 p){float v=0.0,a=0.5;mat2 rot=mat2(0.8,-0.6,0.6,0.8);
   for(int i=0;i<5;i++){v+=a*n22(p);p=rot*p*2.1+vec2(1.7,3.1);a*=0.48;}return v;}
 
-vec2 dp(vec3 p){vec3 ref=abs(uDN.y)<0.99?vec3(0,1,0):vec3(1,0,0);
-  vec3 tx=normalize(cross(uDN,ref));vec3 tz=cross(tx,uDN);
-  return vec2(length(p),atan(dot(p,tz),dot(p,tx)));}
+vec2 dp(vec3 p, vec3 dn){
+  vec3 ref=abs(dn.y)<0.99?vec3(0,1,0):vec3(1,0,0);
+  vec3 tx=normalize(cross(dn,ref));vec3 tz=cross(tx,dn);
+  return vec2(length(p),atan(dot(p,tz),dot(p,tx)));
+}
 
-vec3 shadeDiscVol(float dr,float da,float Rs,float density){
+vec3 shadeDisc(float dr,float da,float Rs,float density,float t){
   float iR=Rs*1.8,oR=Rs*14.0;
   if(dr<iR||dr>oR)return vec3(0);
   float tr=smoothstep(iR,oR,dr);
   float rf=smoothstep(iR,iR+Rs*0.1,dr)*(1.0-smoothstep(oR-Rs*2.0,oR,dr));
-  float wispFade=fb3(vec2(da*4.0,dr*3.0/Rs))*0.4+0.6;
-  rf*=mix(1.0,wispFade,smoothstep(0.5,0.9,tr));
+  rf*=mix(1.0,fb3(vec2(da*4.0,dr*3.0/Rs))*0.4+0.6,smoothstep(0.5,0.9,tr));
   vec3 col=mix(vec3(1.0,0.98,0.95),vec3(0.95,0.88,0.72),smoothstep(0.0,0.25,tr));
   col=mix(col,vec3(0.72,0.57,0.37),smoothstep(0.25,0.6,tr));
   col=mix(col,vec3(0.45,0.33,0.19),smoothstep(0.6,1.0,tr));
   float radBright=mix(1.5,0.3,tr*tr);
   float logR=log(max(dr/Rs,0.1));
-  float band1=sin(logR*28.0)*0.12;
-  float band2=sin(logR*56.0)*0.06;
-  float band3=sin(logR*112.0)*0.03;
-  float band4=sin(dr*200.0/Rs)*0.02*smoothstep(0.3,0.0,tr);
-  float banding=0.8+band1+band2+band3+band4;
+  float banding=0.8+sin(logR*28.0)*0.12+sin(logR*56.0)*0.06+sin(logR*112.0)*0.03;
+  banding+=sin(dr*200.0/Rs)*0.02*smoothstep(0.3,0.0,tr);
   float clouds=fb3(vec2(da*3.0,dr*10.0/Rs))*0.15+0.85;
-  float wisps=fb3(vec2(da*7.0+dr*2.0/Rs,dr*20.0/Rs))*0.12+0.88;
-  wisps=mix(1.0,wisps,smoothstep(0.3,0.7,tr));
+  float wisps=mix(1.0,fb3(vec2(da*7.0+dr*2.0/Rs,dr*20.0/Rs))*0.12+0.88,smoothstep(0.3,0.7,tr));
   vec3 ambient=col*rf*radBright*banding*clouds*wisps*density;
-  float t=uTime*0.15;
-  float turb=fb3(vec2(da*2.5+t*0.8,dr*8.0/Rs))*0.4+0.6;
-  float gStreaks=fb3(vec2(da*5.0-dr*2.0/Rs+t*1.3,dr*14.0/Rs))*0.3+0.7;
-  float doppler=0.4+0.6*cos(da-t*2.3);
-  float pulse=0.92+0.08*sin(t*6.5+dr*6.0/Rs);
+  float turb=fb3(vec2(da*2.5+t*0.12,dr*8.0/Rs))*0.4+0.6;
+  float gStr=fb3(vec2(da*5.0-dr*2.0/Rs+t*0.2,dr*14.0/Rs))*0.3+0.7;
+  float doppler=0.4+0.6*cos(da-t*0.35);
+  float pulse=0.92+0.08*sin(t*1.0+dr*6.0/Rs);
   vec3 glowCol=mix(vec3(1.0,0.95,0.85),vec3(0.78,0.58,0.3),tr);
-  vec3 glow=glowCol*rf*turb*gStreaks*doppler*pulse*mix(0.85,0.2,tr)*density*0.65;
-  float hotspot=pow(max(0.0,cos(da-t*2.3)),8.0)*mix(0.85,0.1,tr)*rf*density;
-  vec3 hot=vec3(1.0,0.99,0.96)*hotspot;
-  return ambient+glow+hot;
+  vec3 glow=glowCol*rf*turb*gStr*doppler*pulse*mix(0.85,0.2,tr)*density*0.65;
+  float hotspot=pow(max(0.0,cos(da-t*0.35)),8.0)*mix(0.85,0.1,tr)*rf*density;
+  return ambient+glow+vec3(1.0,0.99,0.96)*hotspot;
 }
 
 void main(){
   vec2 uv=vUV;
-  uv.x*=uQuadPixelSize.x/uQuadPixelSize.y;
+  uv.x*=uQuadPx.x/uQuadPx.y;
   vec3 rd=normalize(uCamR*uv.x+uCamU*uv.y+uCamF*1.8);
   vec3 ro=uCamPos;
-  float Rs=0.33;
-  float phot=Rs*1.5;
-  float GRAV=2.2;
-  float discHalf=Rs*0.4;
+  float Rs=0.33,phot=Rs*1.5,GRAV=2.2,discHalf=Rs*0.4;
   float t=uTime*0.15;
 
   vec3 pos=ro,vel=rd;
@@ -403,11 +393,8 @@ void main(){
     if(r<Rs*0.48){fallen=true;break;}
     if(r>10.0&&dot(vel,pos)>0.0)break;
     closestR=min(closestR,r);
-    float pDist=abs(r-phot);
-    photonAccum+=exp(-pDist*pDist/(Rs*Rs*0.002))*0.05;
-    float stepSz=0.055*r;
-    stepSz=max(stepSz,0.002);
-    stepSz=min(stepSz,0.22);
+    photonAccum+=exp(-pow(abs(r-phot),2.0)/(Rs*Rs*0.002))*0.05;
+    float stepSz=clamp(0.055*r,0.002,0.22);
     if(r<phot*2.5)stepSz*=0.3;
     if(r<phot*1.3)stepSz*=0.4;
     vec3 L=cross(pos,vel);float L2=dot(L,L);
@@ -416,37 +403,31 @@ void main(){
     pos+=vel*stepSz;
     float r2=length(pos);
     vec3 L2b=cross(pos,vel);
-    vec3 accel2=-(GRAV*Rs*dot(L2b,L2b)/(r2*r2*r2*r2*r2))*pos;
-    vel+=accel2*stepSz*0.5;
+    vel+=-(GRAV*Rs*dot(L2b,L2b)/(r2*r2*r2*r2*r2))*pos*stepSz*0.5;
     vel=normalize(vel);
 
-    float distToPlane=dot(pos,uDN);
-    float absD=abs(distToPlane);
+    float absD=abs(dot(pos,uDN));
     if(absD<discHalf&&r2>Rs*0.55){
-      float density=1.0-absD/discHalf;density=density*density;
-      float volDensity=density*stepSz*3.5;
-      vec2 pp=dp(pos);
-      vec3 vCol=shadeDiscVol(pp.x,pp.y,Rs,volDensity);
+      float density=1.0-absD/discHalf;density*=density;
+      vec2 pp=dp(pos,uDN);
+      vec3 vCol=shadeDisc(pp.x,pp.y,Rs,density*stepSz*3.5,t);
       float vBr=max(vCol.r,max(vCol.g,vCol.b));
-      float absorption=max(0.15,1.0-totalA*0.15);
-      totalCol+=vCol*absorption;
-      totalA+=vBr*absorption;
+      totalCol+=vCol*max(0.15,1.0-totalA*0.15);
+      totalA+=vBr*max(0.15,1.0-totalA*0.15);
     }
 
     float curDot=dot(pos,uDN);
     if(prevDot*curDot<0.0){
       float frac=abs(prevDot)/(abs(prevDot)+abs(curDot)+0.0001);
       vec3 crossPt=pos-vel*stepSz*(1.0-frac);
-      float cr=length(crossPt);
-      if(cr>Rs*0.55){
-        vec2 pp=dp(crossPt);
-        vec3 dCol=shadeDiscVol(pp.x,pp.y,Rs,1.0)*0.55;
+      if(length(crossPt)>Rs*0.55){
+        vec2 pp=dp(crossPt,uDN);
+        vec3 dCol=shadeDisc(pp.x,pp.y,Rs,1.0,t)*0.55;
         float dBr=max(dCol.r,max(dCol.g,dCol.b));
         if(dBr>0.001){
           float atten=(crossings>=2)?0.85:1.0;
-          float absorption=max(0.2,1.0-totalA*0.1);
-          totalCol+=dCol*atten*absorption;
-          totalA+=dBr*atten*absorption;
+          totalCol+=dCol*atten*max(0.2,1.0-totalA*0.1);
+          totalA+=dBr*atten*max(0.2,1.0-totalA*0.1);
           crossings++;
         }
       }
@@ -455,15 +436,11 @@ void main(){
   }
 
   float sh=fallen?1.0:1.0-smoothstep(Rs*0.46,Rs*0.5,closestR);
-
   float eRing=exp(-pow((closestR-phot)/(Rs*0.02),2.0))*2.5;
-  float eAng=atan(vel.z,vel.x);
-  eRing*=0.9+0.1*sin(eAng*8.0+uTime*1.5);
+  eRing*=0.9+0.1*sin(atan(vel.z,vel.x)*8.0+uTime*1.5);
   vec3 eRingCol=vec3(1.0,0.95,0.85)*eRing*(1.0-sh);
-
   photonAccum=min(photonAccum,3.5);
   vec3 phCol=vec3(0.9,0.82,0.65)*photonAccum*0.6*(1.0-sh);
-
   float halo=exp(-pow((closestR-Rs*2.5)/(Rs*2.5),2.0))*0.06;
   vec3 haloCol=vec3(0.5,0.38,0.2)*halo*(1.0-sh);
 
@@ -473,65 +450,122 @@ void main(){
     for(int i=0;i<3;i++){
       vec2 grid=skyUV*vec2(30.0+float(i)*15.0);vec2 cell=floor(grid);vec2 local=fract(grid)-0.5;
       float rnd=h22(cell+float(i)*100.0);vec2 off=vec2(h22(cell*1.3+7.0),h22(cell*2.1+13.0))-0.5;
-      float d=length(local-off*0.4);
-      bgStars+=exp(-d*d*800.0)*step(0.93,rnd)*rnd*(0.7+0.3*sin(uTime*(1.0+rnd*3.0)+rnd*50.0));
+      bgStars+=exp(-pow(length(local-off*0.4),2.0)*800.0)*step(0.93,rnd)*rnd*(0.7+0.3*sin(uTime*(1.0+rnd*3.0)+rnd*50.0));
     }
     bgStars*=1.0+smoothstep(Rs*2.0,phot*1.1,closestR)*2.5;
     bgStars*=max(0.0,1.0-totalA*3.0);
   }
 
-  float flareBase=pow(max(0.0,cos(eAng-t*2.3)),12.0);
-  float flare1=exp(-pow(length(uv-vec2(0.28,-0.02))/0.015,2.0))*flareBase*0.4;
-  float flare2=exp(-pow(length(uv-vec2(0.32,0.03))/0.01,2.0))*flareBase*0.25;
-  float flare3=exp(-pow(length(uv-vec2(0.22,0.01))/0.008,2.0))*flareBase*0.3;
-  vec3 flareCol=vec3(0.4,0.6,0.2)*flare1+vec3(0.6,0.5,0.15)*flare2+vec3(0.3,0.45,0.5)*flare3;
-
-  float scatterStr=totalA*0.008*sh;
-  vec3 scatter=vec3(0.4,0.3,0.15)*scatterStr;
+  float flareBase=pow(max(0.0,cos(atan(vel.z,vel.x)-t*2.3)),12.0);
+  vec3 flareCol=vec3(0.4,0.6,0.2)*exp(-pow(length(vUV-vec2(0.28,-0.02))/0.015,2.0))*flareBase*0.4;
+  flareCol+=vec3(0.6,0.5,0.15)*exp(-pow(length(vUV-vec2(0.32,0.03))/0.01,2.0))*flareBase*0.25;
 
   vec3 col=vec3(0);
   col+=vec3(0.7,0.78,0.95)*bgStars*0.5*(1.0-sh);
   col+=totalCol*(1.0-sh);
-  col+=eRingCol;
-  col+=phCol;
-  col+=haloCol;
+  col+=eRingCol+phCol+haloCol;
   col+=flareCol*(1.0-sh);
   col*=(1.0-sh);
   col+=vec3(0.004,0.004,0.003)*sh;
-  col+=scatter;
-
+  col+=vec3(0.4,0.3,0.15)*totalA*0.008*sh;
   float whitePoint=3.0;
   col=col*(1.0+col/(whitePoint*whitePoint))/(1.0+col);
   col*=vec3(1.01,1.0,0.98);
 
-  float a=sh*0.99+totalA*0.85+eRing*0.3+photonAccum*0.3;
-  a+=halo+bgStars*0.2;
+  float a=sh*0.99+totalA*0.85+eRing*0.3+photonAccum*0.3+halo+bgStars*0.2;
   a=clamp(a,0.0,1.0);
-  float fade=smoothstep(6.0,0.5,closestR);
-  a=max(a*fade,sh*0.99*smoothstep(2.0,0.3,closestR));
+  a=max(a*smoothstep(6.0,0.5,closestR),sh*0.99*smoothstep(2.0,0.3,closestR));
   gl_FragColor=vec4(col,a);
 }`;
 
-  /* BH disc normal (tilted 10 deg off XZ plane) */
-  const BH_DISC_TILT = 10.0 * Math.PI / 180.0;
-  const bhDiscNormal = [0.0, Math.cos(BH_DISC_TILT), -Math.sin(BH_DISC_TILT)];
+  /* Per-BH disc tilts for visual variety */
+  const BH_DISC_TILTS = [
+    { tiltX: 10, tiltZ: 0 },
+    { tiltX: 15, tiltZ: 25 },
+  ];
 
-  /* Camera basis from orbit parameters */
-  function cameraLookAtBH(yawA, pitchA, d) {
-    const cp=Math.cos(pitchA),sp=Math.sin(pitchA),cy=Math.cos(yawA),sy=Math.sin(yawA);
-    const px=d*cp*sy, py=d*sp, pz=d*cp*cy;
-    const fl=Math.sqrt(px*px+py*py+pz*pz);
-    const fx=-px/fl, fy=-py/fl, fz=-pz/fl;
-    let rx=fz, ry=0, rz=-fx, rl=Math.sqrt(rx*rx+rz*rz);
-    if(rl<0.0001){rx=1;rz=0;rl=1;} rx/=rl; rz/=rl;
+  function getBHDiscNormal(bhIndex) {
+    const cfg = BH_DISC_TILTS[bhIndex] || BH_DISC_TILTS[0];
+    const tx = cfg.tiltX * Math.PI / 180, tz = cfg.tiltZ * Math.PI / 180;
+    let nx=0, ny=1, nz=0;
+    const cx=Math.cos(tx), sx=Math.sin(tx);
+    const ny2=ny*cx-nz*sx, nz2=ny*sx+nz*cx; ny=ny2; nz=nz2;
+    const cz=Math.cos(tz), sz=Math.sin(tz);
+    const nx2=nx*cz-ny*sz, ny3=nx*sz+ny*cz; nx=nx2; ny=ny3;
+    return [nx, ny, nz];
+  }
+
+  let progBlackHole = null;
+  let blackHoleQuadVBO = null;
+
+  function setupBlackHoleGargantua() {
+    progBlackHole = makeProgram(VS_BLACKHOLE, FS_BLACKHOLE);
+    blackHoleQuadVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, blackHoleQuadVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  }
+
+  function drawBlackHoleGargantua(bhWorldPos, worldRadius, time, bhIndex) {
+    if (!progBlackHole) return;
+    const mvp = buildMVP();
+    const bx=bhWorldPos[0], by=bhWorldPos[1], bz=bhWorldPos[2];
+    const clipX=bx*mvp[0]+by*mvp[4]+bz*mvp[8]+mvp[12];
+    const clipY=bx*mvp[1]+by*mvp[5]+bz*mvp[9]+mvp[13];
+    const cw=bx*mvp[3]+by*mvp[7]+bz*mvp[11]+mvp[15];
+    if(cw<=0.01) return;
+    const ndcX=clipX/cw, ndcY=clipY/cw;
+    if(Math.abs(ndcX)>2.5||Math.abs(ndcY)>2.5) return;
+
+    const screenRadiusPx=(worldRadius*canvas.height*1.2)/cw;
+    const quadMult=3.5;
+    const ndcSizeX=(screenRadiusPx*quadMult)/canvas.width*2.0;
+    const ndcSizeY=(screenRadiusPx*quadMult)/canvas.height*2.0;
+    if(screenRadiusPx<4) return;
+
+    const cp=Math.cos(pitch), sp=Math.sin(pitch);
+    const cyaw=Math.cos(yaw), syaw=Math.sin(yaw);
+    const camWX=syaw*cp*camDist+panX;
+    const camWY=-sp*camDist+panY;
+    const camWZ=cyaw*cp*camDist;
+
+    const relX=camWX-bx, relY=camWY-by, relZ=camWZ-bz;
+    const dist=Math.sqrt(relX*relX+relY*relY+relZ*relZ);
+    const scale=4.0/Math.max(dist,0.01);
+    const scaledCam=[relX*scale, relY*scale, relZ*scale];
+
+    const fLen=Math.max(dist,0.01);
+    const fx=-relX/fLen, fy=-relY/fLen, fz=-relZ/fLen;
+    let rx=fz, ry=0, rz=-fx;
+    let rLen=Math.sqrt(rx*rx+ry*ry+rz*rz);
+    if(rLen<0.0001){rx=1;ry=0;rz=0;rLen=1;}
+    rx/=rLen; rz/=rLen;
     const ux=fy*rz-fz*ry, uy=fz*rx-fx*rz, uz=fx*ry-fy*rx;
-    return {pos:[px,py,pz], right:[rx,ry,rz], up:[ux,uy,uz], forward:[fx,fy,fz]};
+
+    const dn=getBHDiscNormal(bhIndex||0);
+
+    gl.useProgram(progBlackHole);
+    gl.bindBuffer(gl.ARRAY_BUFFER, blackHoleQuadVBO);
+    const aPos=gl.getAttribLocation(progBlackHole,'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSizeX,ndcSizeY);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPx'),screenRadiusPx*quadMult*2,screenRadiusPx*quadMult*2);
+    gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),[rx,ry,rz]);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamU'),[ux,uy,uz]);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamF'),[fx,fy,fz]);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uDN'),dn);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.disableVertexAttribArray(aPos);
   }
 
   /* Black hole data -- loaded from star_map.json black_holes[] array */
   let blackHoleWorldPos = [];
   let blackHoleSizes = [];
-  let blackHoleQuadVBO = null;
   let bhData = [];
 
   /* ── World position from normalized coords ── */
@@ -1036,58 +1070,6 @@ void main(){
     gl.disableVertexAttribArray(aPos_h);
   }
 
-  /* ── Draw Black Hole ── */
-  let progBlackHole = null;
-  function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
-    if (!progBlackHole) return;
-
-    /* Project BH center to NDC */
-    const cx=bhWorldPos[0]*mvp[0]+bhWorldPos[1]*mvp[4]+bhWorldPos[2]*mvp[8]+mvp[12];
-    const cy=bhWorldPos[0]*mvp[1]+bhWorldPos[1]*mvp[5]+bhWorldPos[2]*mvp[9]+mvp[13];
-    const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
-    if(cw<=0) return;
-    const ndcX=cx/cw, ndcY=cy/cw;
-
-    /* Perspective-correct NDC size from world radius.
-       mvp[5] = 1/tan(fov/2), the projection's Y scale factor.
-       This gives the same perspective as every other object in the scene.
-       Multiply by 4 for disc + lensing extent beyond the core. */
-    const ndcCore = (bhRadius * mvp[5]) / cw;
-    const ndcSize = ndcCore * 4.0;
-
-    /* Camera position relative to BH, normalized to shader scale (Rs=0.33) */
-    const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
-    const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
-    if(dist<0.01) return;
-    const sc=4.0/dist;
-    const scaledCam=[relCam[0]*sc,relCam[1]*sc,relCam[2]*sc];
-
-    /* Pixel size for aspect correction */
-    const pxW = ndcSize * canvas.width;
-    const pxH = ndcSize * canvas.height;
-
-    gl.useProgram(progBlackHole);
-    gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
-    const aPos=gl.getAttribLocation(progBlackHole,'aQuadPos');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
-
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSize,ndcSize);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),pxW,pxH);
-    gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),camRight);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamU'),camUp);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamF'),camForward);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uDN'),bhDiscNormal);
-
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-    gl.disableVertexAttribArray(aPos);
-  }
-
   /* ── Render Loop ── */
   function render(){
     const W=canvas.width, H=canvas.height;
@@ -1192,12 +1174,8 @@ void main(){
     }
 
     /* 6. Supermassive black holes (Gargantua ray tracer) */
-    if(blackHoleWorldPos.length>0){
-      const camData=cameraLookAtBH(yaw,pitch,camDist);
-      const camWorldPos=[camData.pos[0]+panX, camData.pos[1]+panY, camData.pos[2]];
-      for(let i=0;i<blackHoleWorldPos.length;i++){
-        drawBlackHoleGargantua(blackHoleWorldPos[i], blackHoleSizes[i], mvp, camWorldPos, camData.right, camData.up, camData.forward, wallTime);
-      }
+    for(let i=0;i<blackHoleWorldPos.length;i++){
+      drawBlackHoleGargantua(blackHoleWorldPos[i], blackHoleSizes[i], wallTime, i);
     }
 
     /* 7. Hover & Selection halos (same as main.js) */
@@ -1284,16 +1262,13 @@ void main(){
     progTerritory=makeProgram(VS_TERR,FS_TERR);
     progLines=makeProgram(VS_LINES,FS_LINES);
     progHalo=makeProgram(VS_HALO,FS_HALO);
-    progBlackHole=makeProgram(VS_BLACKHOLE,FS_BLACKHOLE);
+    setupBlackHoleGargantua();
 
     /* Build geometry */
     bgVBO=gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER,bgVBO);
     gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
     haloVBO=gl.createBuffer();
-    blackHoleQuadVBO=gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
-    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 1,-1, -1,1, 1,1]),gl.STATIC_DRAW);
 
     /* Compute black hole world positions — use same height noise as stars */
     blackHoleWorldPos=bhData.map(bh=>{
