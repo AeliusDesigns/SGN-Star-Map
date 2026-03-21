@@ -320,13 +320,17 @@ void main(){
 
   const VS_BLACKHOLE = `
 attribute vec2 aQuadPos;
-uniform vec2 uCenter;
-uniform vec2 uSize;
+uniform mat4 uMVP;
+uniform vec3 uBHPos;
+uniform vec3 uBillR;
+uniform vec3 uBillU;
+uniform float uExtent;
 varying vec2 vUV;
 void main(){
   vUV = aQuadPos;
-  vec2 pos = uCenter + aQuadPos * uSize;
-  gl_Position = vec4(pos, 0.0, 1.0);
+  /* Build billboard vertex in world space: BH center + quad offset along camera axes */
+  vec3 worldPos = uBHPos + uBillR * aQuadPos.x * uExtent + uBillU * aQuadPos.y * uExtent;
+  gl_Position = uMVP * vec4(worldPos, 1.0);
 }`;
 
   const FS_BLACKHOLE = `
@@ -1041,42 +1045,45 @@ void main(){
   let progBlackHole = null;
   function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
     if (!progBlackHole) return;
-    const cx=bhWorldPos[0]*mvp[0]+bhWorldPos[1]*mvp[4]+bhWorldPos[2]*mvp[8]+mvp[12];
-    const cy=bhWorldPos[0]*mvp[1]+bhWorldPos[1]*mvp[5]+bhWorldPos[2]*mvp[9]+mvp[13];
-    const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
-    if(cw<=0) return;
-    const ndcX=cx/cw, ndcY=cy/cw;
 
-    /* Correct perspective projection: use mvp[5] (Y focal length = 1/tan(fov/2))
-       to project the world-space radius to NDC, same as the rest of the scene.
-       Multiply by 3 to cover full disc + lensing halo extent. */
-    const coreNDC = (bhRadius * mvp[5]) / cw;
-    const extentMul = 3.0;
-    const ndcSizeX = coreNDC * extentMul;
-    const ndcSizeY = coreNDC * extentMul;
-    /* Pixel size for aspect correction uniform */
-    const screenPxX = ndcSizeX * canvas.width * 0.5;
-    const screenPxY = ndcSizeY * canvas.height * 0.5;
+    /* Billboard extent in world units: core radius * multiplier for disc/lensing */
+    const extent = bhRadius * 3.0;
 
+    /* Camera-relative position for the ray tracer (normalized to shader scale) */
     const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
     const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
+    if(dist < 0.01) return;
     const sc=4.0/dist;
     const scaledCam=[relCam[0]*sc,relCam[1]*sc,relCam[2]*sc];
+
+    /* Pixel size of the quad for aspect correction in shader */
+    /* Project extent to screen to get approximate pixel size */
+    const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
+    if(cw<=0) return;
+    const screenPx = (extent * mvp[5] / cw) * canvas.height * 0.5;
 
     gl.useProgram(progBlackHole);
     gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
     const aPos=gl.getAttribLocation(progBlackHole,'aQuadPos');
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSizeX,ndcSizeY);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenPxX*2,screenPxY*2);
+
+    /* Billboard uniforms */
+    gl.uniformMatrix4fv(gl.getUniformLocation(progBlackHole,'uMVP'),false,mvp);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBHPos'),bhWorldPos);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBillR'),camRight);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uBillU'),camUp);
+    gl.uniform1f(gl.getUniformLocation(progBlackHole,'uExtent'),extent);
+
+    /* Ray tracer uniforms */
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenPx*2,screenPx*2);
     gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),camRight);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamU'),camUp);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamF'),camForward);
     gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uDN'),bhDiscNormal);
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
