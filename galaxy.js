@@ -312,104 +312,228 @@ void main(){
   gl_FragColor=vec4(col,clamp(alpha,0.0,1.0));
 }`;
 
-  /* ── Supermassive Black Hole shader ── */
-  /* Rendered as a large GL_POINT. The fragment shader fakes:
-     - Dark shadow (event horizon)
-     - Photon ring / Einstein ring (bright thin ring from lensed light)
-     - Accretion disc (hot material orbiting, doppler-shifted)
-     - Gravitational lensing distortion of nearby stars (glow warping)
-     All purely analytical in the fragment shader — no raymarching. */
+  /* ══════════════════════════════════════════════════════════════
+     SUPERMASSIVE BLACK HOLE — Gargantua Geodesic Ray Tracer
+     Schwarzschild geodesic ray march with two-layer disc shading
+     Adapted from sgn_blackhole_gargantua.js
+     ══════════════════════════════════════════════════════════════ */
 
   const VS_BLACKHOLE = `
-attribute vec3 position;
-uniform mat4 uMVP;
-uniform float uWorldRadius;
-uniform float uScreenHeight;
+attribute vec2 aQuadPos;
+uniform vec2 uCenter;
+uniform vec2 uSize;
+varying vec2 vUV;
 void main(){
-  gl_Position = uMVP * vec4(position, 1.0);
-  /* Scale like a real object: world radius projected to screen pixels */
-  gl_PointSize = (uWorldRadius * uScreenHeight) / gl_Position.w;
-  gl_PointSize = clamp(gl_PointSize, 8.0, 800.0);
+  vUV = aQuadPos;
+  vec2 pos = uCenter + aQuadPos * uSize;
+  gl_Position = vec4(pos, 0.0, 1.0);
 }`;
 
   const FS_BLACKHOLE = `
 precision highp float;
 uniform float uTime;
+uniform vec2 uQuadPixelSize;
+uniform vec3 uCamPos,uCamR,uCamU,uCamF,uDN;
+varying vec2 vUV;
+
+float h22(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n22(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+  return mix(mix(h22(i),h22(i+vec2(1,0)),f.x),mix(h22(i+vec2(0,1)),h22(i+vec2(1,1)),f.x),f.y);}
+float fb3(vec2 p){float v=0.0,a=0.5;mat2 rot=mat2(0.8,-0.6,0.6,0.8);
+  for(int i=0;i<5;i++){v+=a*n22(p);p=rot*p*2.1+vec2(1.7,3.1);a*=0.48;}return v;}
+
+vec2 dp(vec3 p){vec3 ref=abs(uDN.y)<0.99?vec3(0,1,0):vec3(1,0,0);
+  vec3 tx=normalize(cross(uDN,ref));vec3 tz=cross(tx,uDN);
+  return vec2(length(p),atan(dot(p,tz),dot(p,tx)));}
+
+vec3 shadeDiscVol(float dr,float da,float Rs,float density){
+  float iR=Rs*1.8,oR=Rs*14.0;
+  if(dr<iR||dr>oR)return vec3(0);
+  float tr=smoothstep(iR,oR,dr);
+  float rf=smoothstep(iR,iR+Rs*0.1,dr)*(1.0-smoothstep(oR-Rs*2.0,oR,dr));
+  float wispFade=fb3(vec2(da*4.0,dr*3.0/Rs))*0.4+0.6;
+  rf*=mix(1.0,wispFade,smoothstep(0.5,0.9,tr));
+  vec3 col=mix(vec3(1.0,0.98,0.95),vec3(0.95,0.88,0.72),smoothstep(0.0,0.25,tr));
+  col=mix(col,vec3(0.72,0.57,0.37),smoothstep(0.25,0.6,tr));
+  col=mix(col,vec3(0.45,0.33,0.19),smoothstep(0.6,1.0,tr));
+  float radBright=mix(1.5,0.3,tr*tr);
+  float logR=log(max(dr/Rs,0.1));
+  float band1=sin(logR*28.0)*0.12;
+  float band2=sin(logR*56.0)*0.06;
+  float band3=sin(logR*112.0)*0.03;
+  float band4=sin(dr*200.0/Rs)*0.02*smoothstep(0.3,0.0,tr);
+  float banding=0.8+band1+band2+band3+band4;
+  float clouds=fb3(vec2(da*3.0,dr*10.0/Rs))*0.15+0.85;
+  float wisps=fb3(vec2(da*7.0+dr*2.0/Rs,dr*20.0/Rs))*0.12+0.88;
+  wisps=mix(1.0,wisps,smoothstep(0.3,0.7,tr));
+  vec3 ambient=col*rf*radBright*banding*clouds*wisps*density;
+  float t=uTime*0.15;
+  float turb=fb3(vec2(da*2.5+t*0.8,dr*8.0/Rs))*0.4+0.6;
+  float gStreaks=fb3(vec2(da*5.0-dr*2.0/Rs+t*1.3,dr*14.0/Rs))*0.3+0.7;
+  float doppler=0.4+0.6*cos(da-t*2.3);
+  float pulse=0.92+0.08*sin(t*6.5+dr*6.0/Rs);
+  vec3 glowCol=mix(vec3(1.0,0.95,0.85),vec3(0.78,0.58,0.3),tr);
+  vec3 glow=glowCol*rf*turb*gStreaks*doppler*pulse*mix(0.85,0.2,tr)*density*0.65;
+  float hotspot=pow(max(0.0,cos(da-t*2.3)),8.0)*mix(0.85,0.1,tr)*rf*density;
+  vec3 hot=vec3(1.0,0.99,0.96)*hotspot;
+  return ambient+glow+hot;
+}
 
 void main(){
-  vec2 uv = gl_PointCoord * 2.0 - 1.0;
-  float r = length(uv);
-  float ang = atan(uv.y, uv.x);
-  float PI = 3.14159265;
+  vec2 uv=vUV;
+  uv.x*=uQuadPixelSize.x/uQuadPixelSize.y;
+  vec3 rd=normalize(uCamR*uv.x+uCamU*uv.y+uCamF*1.8);
+  vec3 ro=uCamPos;
+  float Rs=0.33;
+  float phot=Rs*1.5;
+  float GRAV=2.2;
+  float discHalf=Rs*0.4;
+  float t=uTime*0.15;
 
-  /* Radii */
-  float shadowR = 0.14;
-  float photonR = 0.18;
-  float iscoR   = 0.26;
-  float discOut  = 0.65;
+  vec3 pos=ro,vel=rd;
+  vec3 totalCol=vec3(0);
+  float totalA=0.0;
+  bool fallen=false;
+  float closestR=100.0;
+  float prevDot=dot(pos,uDN);
+  int crossings=0;
+  float photonAccum=0.0;
 
-  /* Event horizon: hard black */
-  float shadow = 1.0 - smoothstep(shadowR - 0.008, shadowR + 0.008, r);
+  for(int i=0;i<80;i++){
+    float r=length(pos);
+    if(r<Rs*0.48){fallen=true;break;}
+    if(r>10.0&&dot(vel,pos)>0.0)break;
+    closestR=min(closestR,r);
+    float pDist=abs(r-phot);
+    photonAccum+=exp(-pDist*pDist/(Rs*Rs*0.002))*0.05;
+    float stepSz=0.055*r;
+    stepSz=max(stepSz,0.002);
+    stepSz=min(stepSz,0.22);
+    if(r<phot*2.5)stepSz*=0.3;
+    if(r<phot*1.3)stepSz*=0.4;
+    vec3 L=cross(pos,vel);float L2=dot(L,L);
+    vec3 accel=-(GRAV*Rs*L2/(r*r*r*r*r))*pos;
+    vel+=accel*stepSz*0.5;
+    pos+=vel*stepSz;
+    float r2=length(pos);
+    vec3 L2b=cross(pos,vel);
+    vec3 accel2=-(GRAV*Rs*dot(L2b,L2b)/(r2*r2*r2*r2*r2))*pos;
+    vel+=accel2*stepSz*0.5;
+    vel=normalize(vel);
 
-  /* Photon ring: thin bright ring */
-  float photonRing = exp(-pow((r - photonR) / 0.015, 2.0)) * 1.5;
-  photonRing *= 0.9 + 0.1 * sin(ang * 6.0 + uTime * 3.0);
+    float distToPlane=dot(pos,uDN);
+    float absD=abs(distToPlane);
+    if(absD<discHalf&&r2>Rs*0.55){
+      float density=1.0-absD/discHalf;density=density*density;
+      float volDensity=density*stepSz*3.5;
+      vec2 pp=dp(pos);
+      vec3 vCol=shadeDiscVol(pp.x,pp.y,Rs,volDensity);
+      float vBr=max(vCol.r,max(vCol.g,vCol.b));
+      float absorption=max(0.15,1.0-totalA*0.15);
+      totalCol+=vCol*absorption;
+      totalA+=vBr*absorption;
+    }
 
-  /* Accretion disc: tilted elliptical band */
-  vec2 discUV = vec2(uv.x, uv.y * 2.8);
-  float discR = length(discUV);
-  float discAng = atan(discUV.y, discUV.x);
+    float curDot=dot(pos,uDN);
+    if(prevDot*curDot<0.0){
+      float frac=abs(prevDot)/(abs(prevDot)+abs(curDot)+0.0001);
+      vec3 crossPt=pos-vel*stepSz*(1.0-frac);
+      float cr=length(crossPt);
+      if(cr>Rs*0.55){
+        vec2 pp=dp(crossPt);
+        vec3 dCol=shadeDiscVol(pp.x,pp.y,Rs,1.0)*0.55;
+        float dBr=max(dCol.r,max(dCol.g,dCol.b));
+        if(dBr>0.001){
+          float atten=(crossings>=2)?0.85:1.0;
+          float absorption=max(0.2,1.0-totalA*0.1);
+          totalCol+=dCol*atten*absorption;
+          totalA+=dBr*atten*absorption;
+          crossings++;
+        }
+      }
+    }
+    prevDot=curDot;
+  }
 
-  float discMask = smoothstep(iscoR - 0.02, iscoR + 0.03, discR)
-                 * (1.0 - smoothstep(discOut - 0.05, discOut + 0.02, discR));
+  float sh=fallen?1.0:1.0-smoothstep(Rs*0.46,Rs*0.5,closestR);
 
-  /* Temperature: white-hot inner, orange mid, red outer */
-  float tempT = smoothstep(iscoR, discOut, discR);
-  vec3 discCol = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.65, 0.2), smoothstep(0.0, 0.5, tempT));
-  discCol = mix(discCol, vec3(0.5, 0.15, 0.03), smoothstep(0.5, 1.0, tempT));
+  float eRing=exp(-pow((closestR-phot)/(Rs*0.02),2.0))*2.5;
+  float eAng=atan(vel.z,vel.x);
+  eRing*=0.9+0.1*sin(eAng*8.0+uTime*1.5);
+  vec3 eRingCol=vec3(1.0,0.95,0.85)*eRing*(1.0-sh);
 
-  /* Spiral structure */
-  float spiral = sin(discAng * 3.0 - discR * 20.0 + uTime * 1.0) * 0.5 + 0.5;
-  float turb = sin(discAng * 7.0 + discR * 35.0 - uTime * 2.0) * 0.25 + 0.75;
-  float discBright = discMask * (0.5 + spiral * 0.3) * turb;
+  photonAccum=min(photonAccum,3.5);
+  vec3 phCol=vec3(0.9,0.82,0.65)*photonAccum*0.6*(1.0-sh);
 
-  /* Doppler beaming */
-  float doppler = 0.6 + 0.4 * cos(discAng - uTime * 0.6);
-  discBright *= doppler;
-  discBright *= (1.0 - shadow);
+  float halo=exp(-pow((closestR-Rs*2.5)/(Rs*2.5),2.0))*0.06;
+  vec3 haloCol=vec3(0.5,0.38,0.2)*halo*(1.0-sh);
 
-  /* Lensing glow just outside photon ring */
-  float lensGlow = exp(-pow((r - photonR * 1.5) / 0.06, 2.0)) * 0.25;
-  /* Faint Einstein ring */
-  float einstein = exp(-pow((r - photonR * 2.2) / 0.02, 2.0)) * 0.35;
-  einstein *= 0.85 + 0.15 * sin(ang * 4.0 - uTime * 1.5);
+  float bgStars=0.0;
+  if(!fallen&&closestR>Rs*0.55){
+    vec2 skyUV=vec2(atan(vel.z,vel.x),asin(clamp(vel.y,-1.0,1.0)));
+    for(int i=0;i<3;i++){
+      vec2 grid=skyUV*vec2(30.0+float(i)*15.0);vec2 cell=floor(grid);vec2 local=fract(grid)-0.5;
+      float rnd=h22(cell+float(i)*100.0);vec2 off=vec2(h22(cell*1.3+7.0),h22(cell*2.1+13.0))-0.5;
+      float d=length(local-off*0.4);
+      bgStars+=exp(-d*d*800.0)*step(0.93,rnd)*rnd*(0.7+0.3*sin(uTime*(1.0+rnd*3.0)+rnd*50.0));
+    }
+    bgStars*=1.0+smoothstep(Rs*2.0,phot*1.1,closestR)*2.5;
+    bgStars*=max(0.0,1.0-totalA*3.0);
+  }
 
-  /* Compose */
-  vec3 col = vec3(0.0);
-  col += discCol * discBright * 0.85;
-  col += vec3(0.85, 0.9, 1.0) * photonRing * (1.0 - shadow);
-  col += vec3(0.8, 0.7, 0.5) * einstein * (1.0 - shadow);
-  col += vec3(0.3, 0.4, 0.6) * lensGlow * (1.0 - shadow);
+  float flareBase=pow(max(0.0,cos(eAng-t*2.3)),12.0);
+  float flare1=exp(-pow(length(uv-vec2(0.28,-0.02))/0.015,2.0))*flareBase*0.4;
+  float flare2=exp(-pow(length(uv-vec2(0.32,0.03))/0.01,2.0))*flareBase*0.25;
+  float flare3=exp(-pow(length(uv-vec2(0.22,0.01))/0.008,2.0))*flareBase*0.3;
+  vec3 flareCol=vec3(0.4,0.6,0.2)*flare1+vec3(0.6,0.5,0.15)*flare2+vec3(0.3,0.45,0.5)*flare3;
 
-  /* Faint outer halo */
-  float outerHalo = exp(-r * r * 2.5) * 0.05;
-  col += vec3(0.25, 0.3, 0.45) * outerHalo;
+  float scatterStr=totalA*0.008*sh;
+  vec3 scatter=vec3(0.4,0.3,0.15)*scatterStr;
 
-  col *= (1.0 - shadow);
+  vec3 col=vec3(0);
+  col+=vec3(0.7,0.78,0.95)*bgStars*0.5*(1.0-sh);
+  col+=totalCol*(1.0-sh);
+  col+=eRingCol;
+  col+=phCol;
+  col+=haloCol;
+  col+=flareCol*(1.0-sh);
+  col*=(1.0-sh);
+  col+=vec3(0.004,0.004,0.003)*sh;
+  col+=scatter;
 
-  float alpha = shadow * 0.97 + discBright + photonRing + einstein * 0.7 + lensGlow + outerHalo;
-  alpha = clamp(alpha, 0.0, 1.0);
-  alpha *= 1.0 - smoothstep(0.7, 1.0, r);
+  float whitePoint=3.0;
+  col=col*(1.0+col/(whitePoint*whitePoint))/(1.0+col);
+  col*=vec3(1.01,1.0,0.98);
 
-  if(alpha < 0.003) discard;
-  gl_FragColor = vec4(col, alpha);
+  float a=sh*0.99+totalA*0.85+eRing*0.3+photonAccum*0.3;
+  a+=halo+bgStars*0.2;
+  a=clamp(a,0.0,1.0);
+  float fade=smoothstep(6.0,0.5,closestR);
+  a=max(a*fade,sh*0.99*smoothstep(2.0,0.3,closestR));
+  gl_FragColor=vec4(col,a);
 }`;
 
-  /* Black hole data — loaded from star_map.json black_holes[] array */
+  /* BH disc normal (tilted 10 deg off XZ plane) */
+  const BH_DISC_TILT = 10.0 * Math.PI / 180.0;
+  const bhDiscNormal = [0.0, Math.cos(BH_DISC_TILT), -Math.sin(BH_DISC_TILT)];
+
+  /* Camera basis from orbit parameters */
+  function cameraLookAtBH(yawA, pitchA, d) {
+    const cp=Math.cos(pitchA),sp=Math.sin(pitchA),cy=Math.cos(yawA),sy=Math.sin(yawA);
+    const px=d*cp*sy, py=d*sp, pz=d*cp*cy;
+    const fl=Math.sqrt(px*px+py*py+pz*pz);
+    const fx=-px/fl, fy=-py/fl, fz=-pz/fl;
+    let rx=fz, ry=0, rz=-fx, rl=Math.sqrt(rx*rx+rz*rz);
+    if(rl<0.0001){rx=1;rz=0;rl=1;} rx/=rl; rz/=rl;
+    const ux=fy*rz-fz*ry, uy=fz*rx-fx*rz, uz=fx*ry-fy*rx;
+    return {pos:[px,py,pz], right:[rx,ry,rz], up:[ux,uy,uz], forward:[fx,fy,fz]};
+  }
+
+  /* Black hole data -- loaded from star_map.json black_holes[] array */
   let blackHoleWorldPos = [];
   let blackHoleSizes = [];
-  let blackHoleVBO = null;
-  let bhData = []; /* raw from JSON */
+  let blackHoleQuadVBO = null;
+  let bhData = [];
 
   /* ── World position from normalized coords ── */
   /* Uses smooth spatial noise for Y so nearby systems have coherent heights.
@@ -915,21 +1039,37 @@ void main(){
 
   /* ── Draw Black Hole ── */
   let progBlackHole = null;
-  function drawBlackHole(pos, worldRadius, time) {
+  function drawBlackHoleGargantua(bhWorldPos, bhRadius, mvp, camWorldPos, camRight, camUp, camForward, time) {
     if (!progBlackHole) return;
+    const cx=bhWorldPos[0]*mvp[0]+bhWorldPos[1]*mvp[4]+bhWorldPos[2]*mvp[8]+mvp[12];
+    const cy=bhWorldPos[0]*mvp[1]+bhWorldPos[1]*mvp[5]+bhWorldPos[2]*mvp[9]+mvp[13];
+    const cw=bhWorldPos[0]*mvp[3]+bhWorldPos[1]*mvp[7]+bhWorldPos[2]*mvp[11]+mvp[15];
+    if(cw<=0) return;
+    const ndcX=cx/cw, ndcY=cy/cw;
+    const screenRadius=(bhRadius*canvas.height*3.0)/cw;
+    const ndcSizeX=screenRadius/canvas.width*2.0, ndcSizeY=screenRadius/canvas.height*2.0;
+    const relCam=[camWorldPos[0]-bhWorldPos[0],camWorldPos[1]-bhWorldPos[1],camWorldPos[2]-bhWorldPos[2]];
+    const dist=Math.sqrt(relCam[0]**2+relCam[1]**2+relCam[2]**2);
+    const sc=4.0/dist;
+    const scaledCam=[relCam[0]*sc,relCam[1]*sc,relCam[2]*sc];
+
     gl.useProgram(progBlackHole);
-    gl.uniformMatrix4fv(gl.getUniformLocation(progBlackHole, 'uMVP'), false, buildMVP());
-    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uWorldRadius'), worldRadius);
-    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uScreenHeight'), canvas.height);
-    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uTime'), time);
-    gl.bindBuffer(gl.ARRAY_BUFFER, blackHoleVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.DYNAMIC_DRAW);
-    const aPos = gl.getAttribLocation(progBlackHole, 'position');
+    gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
+    const aPos=gl.getAttribLocation(progBlackHole,'aQuadPos');
     gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSizeX,ndcSizeY);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPixelSize'),screenRadius*2,screenRadius*2);
+    gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),camRight);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamU'),camUp);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamF'),camForward);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uDN'),bhDiscNormal);
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.POINTS, 0, 1);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     gl.disableVertexAttribArray(aPos);
   }
 
@@ -1036,9 +1176,13 @@ void main(){
       gl.disableVertexAttribArray(sP); gl.disableVertexAttribArray(sC); gl.disableVertexAttribArray(sS);
     }
 
-    /* 6. Supermassive black holes */
-    for(let i=0;i<blackHoleWorldPos.length;i++){
-      drawBlackHole(blackHoleWorldPos[i], blackHoleSizes[i], wallTime);
+    /* 6. Supermassive black holes (Gargantua ray tracer) */
+    if(blackHoleWorldPos.length>0){
+      const camData=cameraLookAtBH(yaw,pitch,camDist);
+      const camWorldPos=[camData.pos[0]+panX, camData.pos[1]+panY, camData.pos[2]];
+      for(let i=0;i<blackHoleWorldPos.length;i++){
+        drawBlackHoleGargantua(blackHoleWorldPos[i], blackHoleSizes[i], mvp, camWorldPos, camData.right, camData.up, camData.forward, wallTime);
+      }
     }
 
     /* 7. Hover & Selection halos (same as main.js) */
@@ -1132,7 +1276,9 @@ void main(){
     gl.bindBuffer(gl.ARRAY_BUFFER,bgVBO);
     gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
     haloVBO=gl.createBuffer();
-    blackHoleVBO=gl.createBuffer();
+    blackHoleQuadVBO=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,blackHoleQuadVBO);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 1,-1, -1,1, 1,1]),gl.STATIC_DRAW);
 
     /* Compute black hole world positions — use same height noise as stars */
     blackHoleWorldPos=bhData.map(bh=>{
@@ -1147,7 +1293,11 @@ void main(){
       const y=((noiseVal*2-1)*GALAXY_THICKNESS*0.35)*thick;
       return [x,y,z];
     });
-    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*8.0); /* world-space radius */
+    /* BH size: JSON "size" field is a scale multiplier.
+       1.0 = standard SMBH (~8 world units radius).
+       For the larger eastern galaxy, use size ~1.6-2.0 in the editor.
+       The quad is rendered at 3x this radius for lensing extent. */
+    blackHoleSizes=bhData.map(bh=>(bh.size||1.0)*8.0);
 
     buildBGStars();
     rebuildStarsVBO();
