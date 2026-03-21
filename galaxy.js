@@ -12,7 +12,7 @@
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
   const TERRITORY_RES = 512;
-  const TERRITORY_RADIUS = 6;
+  const TERRITORY_RADIUS = 3.5;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
   const STAR_TYPES = [
@@ -738,64 +738,40 @@ void main(){
     const extX=GALAXY_SPREAD_X/2+20;
     const extZ=GALAXY_SPREAD_Z/2+20;
     const worldW=extX*2, worldH=extZ*2;
-    const CLAIM_R=TERRITORY_RADIUS; /* radius of each system's circular claim bubble */
+    const CLAIM_R=TERRITORY_RADIUS;
+    const pxSize=worldW/res;
 
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
-
-    /* Collect only owned systems for speed */
     const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
 
-    /* Pass 1: Distance-field ownership.
-       For each pixel, find the distance to the nearest owned system.
-       If within CLAIM_R, check that no closer unowned system "blocks" the claim.
-       The result is smooth circular bubbles that merge organically. */
+    /* SDF ownership grid */
     const ownerGrid=new Array(res*res);
-    const sdfGrid=new Float32Array(res*res); /* signed distance: negative=inside, positive=outside */
+    const sdfGrid=new Float32Array(res*res);
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
-
-        /* Find the minimum distance to any owned system, tracking which polity */
         let minDist=1e9, bestOwner=null;
         for(const sys of ownedSystems){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
           if(d<minDist){ minDist=d; bestOwner=sys.owner; }
         }
-
         const gi=gy*res+gx;
-        /* Signed distance from the claim boundary (negative = inside territory) */
         const sdf=minDist-CLAIM_R;
-
         if(bestOwner&&sdf<0){
           ownerGrid[gi]=bestOwner;
-          sdfGrid[gi]=sdf; /* negative = how deep inside */
+          sdfGrid[gi]=sdf;
         } else {
           ownerGrid[gi]=null;
-          sdfGrid[gi]=sdf>0?sdf:0;
+          sdfGrid[gi]=Math.max(sdf,0);
         }
       }
     }
 
-    /* Pass 2: Build border from SDF.
-       Border pixels are those near the zero-crossing of the SDF.
-       This produces perfectly smooth curves since the SDF is based on
-       Euclidean distance to circles, not grid cells. */
-    const borderGrid=new Uint8Array(res*res);
-    const pxSize=worldW/res; /* world units per pixel */
-    const borderW=pxSize*2.5; /* border thickness in world units (~2.5 pixels wide) */
-
-    for(let gi=0;gi<res*res;gi++){
-      if(!ownerGrid[gi]) continue;
-      const d=Math.abs(sdfGrid[gi]); /* distance from boundary */
-      if(d<borderW) borderGrid[gi]=2; /* inner border */
-      else if(d<borderW*2) borderGrid[gi]=1; /* outer glow */
-    }
-
-    /* Pass 3: Build fill texture */
+    /* Fill texture — NO blur, SDF gives smooth edges already */
     const fillData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
@@ -804,51 +780,36 @@ void main(){
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
-      /* Smooth alpha fade near the edge using SDF */
-      const depth=-sdfGrid[gi]; /* positive = how deep inside */
-      const edgeSmooth=Math.min(1.0, depth/(pxSize*3)); /* fade over ~3 pixels at edge */
+      const depth=-sdfGrid[gi];
+      /* Smooth edge fade over 2 pixels, then constant interior */
+      const edgeSmooth=Math.min(1.0, depth/(pxSize*2));
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-      fillData[idx+3]=Math.round(edgeSmooth*180);
-    }
-    /* Gaussian blur on fill for soft interior */
-    const kernel=[1,4,6,4,1], kSum=16, kR=2;
-    const temp=new Uint8Array(fillData.length);
-    for(let y=0;y<res;y++) for(let x=0;x<res;x++){
-      let r=0,g=0,b=0,a=0;
-      for(let k=-kR;k<=kR;k++){ const sx=Math.max(0,Math.min(res-1,x+k)); const i=(y*res+sx)*4; const w=kernel[k+kR]; r+=fillData[i]*w; g+=fillData[i+1]*w; b+=fillData[i+2]*w; a+=fillData[i+3]*w; }
-      const i=(y*res+x)*4; temp[i]=r/kSum; temp[i+1]=g/kSum; temp[i+2]=b/kSum; temp[i+3]=a/kSum;
-    }
-    const out=new Uint8Array(fillData.length);
-    for(let y=0;y<res;y++) for(let x=0;x<res;x++){
-      let r=0,g=0,b=0,a=0;
-      for(let k=-kR;k<=kR;k++){ const sy=Math.max(0,Math.min(res-1,y+k)); const i=(sy*res+x)*4; const w=kernel[k+kR]; r+=temp[i]*w; g+=temp[i+1]*w; b+=temp[i+2]*w; a+=temp[i+3]*w; }
-      const i=(y*res+x)*4; out[i]=r/kSum; out[i+1]=g/kSum; out[i+2]=b/kSum; out[i+3]=a/kSum;
+      fillData[idx+3]=Math.round(edgeSmooth*255);
     }
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,out);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Pass 4: Stroke texture from SDF border.
-       The SDF gives sub-pixel smooth borders inherently. */
+    /* Stroke texture — SDF contour line */
     const strokeData=new Uint8Array(res*res*4);
+    const borderW=pxSize*2.5;
     for(let gi=0;gi<res*res;gi++){
-      if(borderGrid[gi]===0) continue;
       const pid=ownerGrid[gi];
       if(!pid) continue;
+      const distFromEdge=-sdfGrid[gi];
+      if(distFromEdge>borderW) continue;
       const pol=polMap.get(pid);
       if(!pol) continue;
       const sc=hexToRgb(pol.strokeColor||pol.color);
       const idx=gi*4;
-      /* Smooth alpha from SDF distance to boundary */
-      const d=Math.abs(sdfGrid[gi]);
-      const smoothA=Math.max(0, 1.0 - d/borderW);
+      const alpha=Math.max(0, 1.0 - distFromEdge/borderW);
       strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
-      strokeData[idx+3]=Math.round(smoothA*255);
+      strokeData[idx+3]=Math.round(alpha*255);
     }
     if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
