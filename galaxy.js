@@ -11,8 +11,8 @@
   const GALAXY_SPREAD_Z = 140;
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
-  const TERRITORY_RES = 512;
-  const TERRITORY_RADIUS = 3.5;
+  const TERRITORY_RES = 1024;
+  const TERRITORY_RADIUS = 2.5;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
   const STAR_TYPES = [
@@ -201,6 +201,7 @@ varying vec2 vUV;
 void main(){ gl_Position=uMVP*vec4(position,1.0); vUV=aUV; }`;
 
   const FS_TERR = `
+#extension GL_OES_standard_derivatives : enable
 precision highp float;
 uniform sampler2D uTex;
 uniform sampler2D uStrokeTex;
@@ -208,27 +209,32 @@ uniform float uTime;
 varying vec2 vUV;
 void main(){
   vec4 fill=texture2D(uTex,vUV);
-  vec4 stroke=texture2D(uStrokeTex,vUV);
-  if(fill.a<0.01&&stroke.a<0.01) discard;
+  vec4 strokeCol=texture2D(uStrokeTex,vUV);
 
-  /* Breathing pulse on borders */
+  /* Compute edge from fill alpha gradient using screen-space derivatives.
+     This gives perfectly smooth, sub-pixel anti-aliased borders
+     because GL_LINEAR interpolation makes fill.a continuous. */
+  float da_dx=dFdx(fill.a);
+  float da_dy=dFdy(fill.a);
+  float gradient=length(vec2(da_dx, da_dy));
+
+  /* Edge strength: strong where alpha transitions sharply (at the border) */
+  float edge=smoothstep(0.0, 0.15, gradient) * step(0.02, fill.a);
+
+  if(fill.a<0.01&&edge<0.01) discard;
+
+  /* Breathing pulse */
   float breathe=0.6+0.4*sin(uTime*1.8);
 
   /* Fill: soft interior wash */
-  float fillA=fill.a*0.15;
+  float fillA=fill.a*0.12;
 
-  /* Contested hatching */
-  if(fill.a>0.01&&fill.a<0.50){
-    float hatch=sin((vUV.x+vUV.y)*200.0+uTime*2.0)*0.5+0.5;
-    fillA*=0.5+hatch*0.5;
-  }
+  /* Stroke: smooth curved border from gradient detection */
+  vec3 sCol=strokeCol.a>0.01 ? strokeCol.rgb : fill.rgb;
+  float strokeA=edge*breathe*0.85;
 
-  /* Stroke: crisp border with breathing pulse.
-     stroke.a is already 0-1 (GPU normalizes Uint8 automatically). */
-  float strokeA=stroke.a*breathe*0.9;
-
-  /* Composite: stroke on top of fill */
-  vec3 col=fill.rgb*fillA*(1.0-strokeA)+stroke.rgb*strokeA;
+  /* Composite */
+  vec3 col=fill.rgb*fillA*(1.0-strokeA)+sCol*strokeA;
   float alpha=fillA*(1.0-strokeA)+strokeA;
   gl_FragColor=vec4(col/max(alpha,0.001),alpha);
 }`;
@@ -666,6 +672,7 @@ void main(){
     gl=canvas.getContext('webgl',{antialias:true});
     if(!gl){ gl=canvas.getContext('experimental-webgl'); }
     if(!gl){ alert('WebGL not supported'); return false; }
+    gl.getExtension('OES_standard_derivatives');
     return true;
   }
 
