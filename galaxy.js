@@ -313,24 +313,35 @@ void main(){
 }`;
 
   /* ══════════════════════════════════════════════════════════════════
-     GARGANTUA BLACK HOLE — from blackhole_gargantua_integration.js
+     GARGANTUA BLACK HOLE — Fullscreen overlay with inverse VP ray reconstruction
+     Adapted from gargantua_threejs_v8.html for raw WebGL1
+     
+     Architecture:
+     - Single fullscreen quad rendered AFTER all scene geometry
+     - Fragment shader reconstructs world-space rays from inverse ViewProjection
+     - Traces both BHs in one pass, composites with premultiplied alpha
      ══════════════════════════════════════════════════════════════════ */
 
   const VS_BLACKHOLE = `
 attribute vec2 aPos;
-uniform vec2 uCenter;
-uniform vec2 uSize;
 varying vec2 vUV;
 void main(){
-  vUV = aPos;
-  gl_Position = vec4(uCenter + aPos * uSize, 0.0, 1.0);
+  vUV = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
 }`;
 
   const FS_BLACKHOLE = `
 precision highp float;
 uniform float uTime;
-uniform vec2 uQuadPx;
-uniform vec3 uCamPos, uCamR, uCamU, uCamF, uDN;
+uniform vec2 uRes;
+uniform vec3 uCamPos;
+uniform mat4 uInvVP;
+uniform vec3 uBH0Pos;
+uniform float uBH0Rs;
+uniform vec3 uBH0DN;
+uniform vec3 uBH1Pos;
+uniform float uBH1Rs;
+uniform vec3 uBH1DN;
 varying vec2 vUV;
 
 float h22(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -339,7 +350,7 @@ float n22(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
 float fb3(vec2 p){float v=0.0,a=0.5;mat2 rot=mat2(0.8,-0.6,0.6,0.8);
   for(int i=0;i<5;i++){v+=a*n22(p);p=rot*p*2.1+vec2(1.7,3.1);a*=0.48;}return v;}
 
-vec2 dp(vec3 p, vec3 dn){
+vec2 dpolar(vec3 p,vec3 dn){
   vec3 ref=abs(dn.y)<0.99?vec3(0,1,0):vec3(1,0,0);
   vec3 tx=normalize(cross(dn,ref));vec3 tz=cross(tx,dn);
   return vec2(length(p),atan(dot(p,tz),dot(p,tx)));
@@ -349,80 +360,92 @@ vec3 shadeDisc(float dr,float da,float Rs,float density,float t){
   float iR=Rs*1.8,oR=Rs*14.0;
   if(dr<iR||dr>oR)return vec3(0);
   float tr=smoothstep(iR,oR,dr);
-  float rf=smoothstep(iR,iR+Rs*0.1,dr)*(1.0-smoothstep(oR-Rs*2.0,oR,dr));
+  float rf=smoothstep(iR,iR+Rs*0.15,dr)*(1.0-smoothstep(oR-Rs*2.0,oR,dr));
   rf*=mix(1.0,fb3(vec2(da*4.0,dr*3.0/Rs))*0.4+0.6,smoothstep(0.5,0.9,tr));
   vec3 col=mix(vec3(1.0,0.98,0.95),vec3(0.95,0.88,0.72),smoothstep(0.0,0.25,tr));
   col=mix(col,vec3(0.72,0.57,0.37),smoothstep(0.25,0.6,tr));
   col=mix(col,vec3(0.45,0.33,0.19),smoothstep(0.6,1.0,tr));
   float radBright=mix(1.5,0.3,tr*tr);
+  float orbSpeed=1.0/(0.5+tr*2.0);
+  float orbAngle=da-t*orbSpeed*1.5;
   float logR=log(max(dr/Rs,0.1));
-  float banding=0.8+sin(logR*28.0)*0.12+sin(logR*56.0)*0.06+sin(logR*112.0)*0.03;
-  banding+=sin(dr*200.0/Rs)*0.02*smoothstep(0.3,0.0,tr);
-  float clouds=fb3(vec2(da*3.0,dr*10.0/Rs))*0.15+0.85;
-  float wisps=mix(1.0,fb3(vec2(da*7.0+dr*2.0/Rs,dr*20.0/Rs))*0.12+0.88,smoothstep(0.3,0.7,tr));
-  vec3 ambient=col*rf*radBright*banding*clouds*wisps*density;
-  float turb=fb3(vec2(da*2.5+t*0.12,dr*8.0/Rs))*0.4+0.6;
-  float gStr=fb3(vec2(da*5.0-dr*2.0/Rs+t*0.2,dr*14.0/Rs))*0.3+0.7;
-  float doppler=0.4+0.6*cos(da-t*0.35);
-  float pulse=0.92+0.08*sin(t*1.0+dr*6.0/Rs);
+  float bandNoise=fb3(vec2(orbAngle*2.0,logR*3.0))*0.5+0.5;
+  float band1=sin(logR*12.0+orbAngle*0.3)*0.08*bandNoise;
+  float band2=sin(logR*24.0+orbAngle*0.2)*0.04*(1.0-bandNoise*0.5);
+  float banding=0.9+band1+band2;
+  float n1=fb3(vec2(orbAngle*1.5,dr*4.0/Rs));
+  float n2=fb3(vec2(orbAngle*3.0+n1*2.0,dr*8.0/Rs+n1));
+  float tex=(n1*0.5+n2*0.5)*0.3+0.7;
+  vec3 ambient=col*rf*radBright*banding*tex*density;
+  float glow1=fb3(vec2(orbAngle*2.5+t*0.05,dr*6.0/Rs));
+  float glow2=fb3(vec2(orbAngle*5.0-dr*2.0/Rs,dr*12.0/Rs+t*0.08));
+  float glowTex=glow1*0.5+glow2*0.5;
+  glowTex=0.5+glowTex*0.5;
+  float doppler=0.4+0.6*cos(orbAngle);
+  float pulse=0.9+0.1*sin(t*2.0+dr*4.0/Rs);
   vec3 glowCol=mix(vec3(1.0,0.95,0.85),vec3(0.78,0.58,0.3),tr);
-  vec3 glow=glowCol*rf*turb*gStr*doppler*pulse*mix(0.85,0.2,tr)*density*0.65;
-  float hotspot=pow(max(0.0,cos(da-t*0.35)),8.0)*mix(0.85,0.1,tr)*rf*density;
+  vec3 glow=glowCol*rf*glowTex*doppler*pulse*mix(0.8,0.2,tr)*density*0.6;
+  float hotspot=pow(max(0.0,cos(orbAngle)),6.0)*mix(0.8,0.1,tr)*rf*density;
   return ambient+glow+vec3(1.0,0.99,0.96)*hotspot;
 }
 
-void main(){
-  vec2 uv=vUV;
-  uv.x*=uQuadPx.x/uQuadPx.y;
-  vec3 rd=normalize(uCamR*uv.x+uCamU*uv.y+uCamF*1.8);
-  vec3 ro=uCamPos;
-  float Rs=0.33,phot=Rs*1.5,GRAV=2.2,discHalf=Rs*0.4;
-  float t=uTime*0.15;
+vec4 traceBH(vec3 ro, vec3 rd, vec3 bhPos, float Rs, vec3 dn, float t){
+  vec3 localRo = ro - bhPos;
+  vec3 vel = rd;
+  float camDist=length(localRo);
+  float tClosest=max(0.0, -dot(localRo,vel));
+  vec3 closestPt=localRo+vel*tClosest;
+  float minApproach=length(closestPt);
+  if(minApproach > Rs*30.0) return vec4(0);
 
-  vec3 pos=ro,vel=rd;
+  float phot=Rs*1.5, GRAV=2.5, discHalf=Rs*0.5;
+  vec3 pos=localRo;
   vec3 totalCol=vec3(0);
   float totalA=0.0;
-  bool fallen=false;
   float closestR=100.0;
-  float prevDot=dot(pos,uDN);
+  float prevDot=dot(pos,dn);
   int crossings=0;
   float photonAccum=0.0;
+  float escapeR=max(camDist*1.5,Rs*30.0);
+  float rayOff=fract(localRo.x*13.7+localRo.z*7.3)*0.15+0.925;
 
   for(int i=0;i<80;i++){
     float r=length(pos);
-    if(r<Rs*0.48){fallen=true;break;}
-    if(r>10.0&&dot(vel,pos)>0.0)break;
+    if(r<Rs*0.35)break;
+    if(r>escapeR&&dot(vel,pos)>0.0)break;
     closestR=min(closestR,r);
     photonAccum+=exp(-pow(abs(r-phot),2.0)/(Rs*Rs*0.002))*0.05;
-    float stepSz=clamp(0.055*r,0.002,0.22);
+    float stepSz=clamp(0.055*r,Rs*0.01,Rs*5.0);
     if(r<phot*2.5)stepSz*=0.3;
     if(r<phot*1.3)stepSz*=0.4;
+    if(r>Rs*15.0)stepSz=max(stepSz,r*0.12);
+    stepSz*=rayOff;
     vec3 L=cross(pos,vel);float L2=dot(L,L);
     vec3 accel=-(GRAV*Rs*L2/(r*r*r*r*r))*pos;
     vel+=accel*stepSz*0.5;
     pos+=vel*stepSz;
     float r2=length(pos);
     vec3 L2b=cross(pos,vel);
-    vel+=-(GRAV*Rs*dot(L2b,L2b)/(r2*r2*r2*r2*r2))*pos*stepSz*0.5;
+    vec3 accel2=-(GRAV*Rs*dot(L2b,L2b)/(r2*r2*r2*r2*r2))*pos;
+    vel+=accel2*stepSz*0.5;
     vel=normalize(vel);
-
-    float absD=abs(dot(pos,uDN));
+    float absD=abs(dot(pos,dn));
     if(absD<discHalf&&r2>Rs*0.55){
-      float density=1.0-absD/discHalf;density*=density;
-      vec2 pp=dp(pos,uDN);
-      vec3 vCol=shadeDisc(pp.x,pp.y,Rs,density*stepSz*3.5,t);
+      float density=exp(-absD*absD/(discHalf*discHalf*0.35));
+      vec2 pp=dpolar(pos,dn);
+      vec3 vCol=shadeDisc(pp.x,pp.y,Rs,density*stepSz*2.5/Rs,t);
       float vBr=max(vCol.r,max(vCol.g,vCol.b));
-      totalCol+=vCol*max(0.15,1.0-totalA*0.15);
-      totalA+=vBr*max(0.15,1.0-totalA*0.15);
+      float absorption=max(0.15,1.0-totalA*0.15);
+      totalCol+=vCol*absorption;
+      totalA+=vBr*absorption;
     }
-
-    float curDot=dot(pos,uDN);
+    float curDot=dot(pos,dn);
     if(prevDot*curDot<0.0){
       float frac=abs(prevDot)/(abs(prevDot)+abs(curDot)+0.0001);
       vec3 crossPt=pos-vel*stepSz*(1.0-frac);
       if(length(crossPt)>Rs*0.55){
-        vec2 pp=dp(crossPt,uDN);
-        vec3 dCol=shadeDisc(pp.x,pp.y,Rs,1.0,t)*0.55;
+        vec2 pp=dpolar(crossPt,dn);
+        vec3 dCol=shadeDisc(pp.x,pp.y,Rs,1.0,t)*0.7;
         float dBr=max(dCol.r,max(dCol.g,dCol.b));
         if(dBr>0.001){
           float atten=(crossings>=2)?0.85:1.0;
@@ -435,47 +458,57 @@ void main(){
     prevDot=curDot;
   }
 
-  float sh=fallen?1.0:1.0-smoothstep(Rs*0.46,Rs*0.5,closestR);
-  float eRing=exp(-pow((closestR-phot)/(Rs*0.02),2.0))*2.5;
-  eRing*=0.9+0.1*sin(atan(vel.z,vel.x)*8.0+uTime*1.5);
-  vec3 eRingCol=vec3(1.0,0.95,0.85)*eRing*(1.0-sh);
+  float sh=1.0-smoothstep(Rs*0.4,Rs*0.58,closestR);
+  float eRing=exp(-pow((closestR-phot)/(Rs*0.025),2.0))*4.0;
+  eRing*=0.85+0.15*sin(atan(vel.z,vel.x)*8.0+t*4.0);
+  float eRing2=exp(-pow((closestR-phot*0.82)/(Rs*0.03),2.0))*2.0;
   photonAccum=min(photonAccum,3.5);
-  vec3 phCol=vec3(0.9,0.82,0.65)*photonAccum*0.6*(1.0-sh);
   float halo=exp(-pow((closestR-Rs*2.5)/(Rs*2.5),2.0))*0.06;
-  vec3 haloCol=vec3(0.5,0.38,0.2)*halo*(1.0-sh);
-
-  float bgStars=0.0;
-  if(!fallen&&closestR>Rs*0.55){
-    vec2 skyUV=vec2(atan(vel.z,vel.x),asin(clamp(vel.y,-1.0,1.0)));
-    for(int i=0;i<3;i++){
-      vec2 grid=skyUV*vec2(30.0+float(i)*15.0);vec2 cell=floor(grid);vec2 local=fract(grid)-0.5;
-      float rnd=h22(cell+float(i)*100.0);vec2 off=vec2(h22(cell*1.3+7.0),h22(cell*2.1+13.0))-0.5;
-      bgStars+=exp(-pow(length(local-off*0.4),2.0)*800.0)*step(0.93,rnd)*rnd*(0.7+0.3*sin(uTime*(1.0+rnd*3.0)+rnd*50.0));
-    }
-    bgStars*=1.0+smoothstep(Rs*2.0,phot*1.1,closestR)*2.5;
-    bgStars*=max(0.0,1.0-totalA*3.0);
-  }
-
-  float flareBase=pow(max(0.0,cos(atan(vel.z,vel.x)-t*2.3)),12.0);
-  vec3 flareCol=vec3(0.4,0.6,0.2)*exp(-pow(length(vUV-vec2(0.28,-0.02))/0.015,2.0))*flareBase*0.4;
-  flareCol+=vec3(0.6,0.5,0.15)*exp(-pow(length(vUV-vec2(0.32,0.03))/0.01,2.0))*flareBase*0.25;
-
+  float lensBoost=exp(-pow((closestR-phot*1.3)/(Rs*0.6),2.0))*0.8;
   vec3 col=vec3(0);
-  col+=vec3(0.7,0.78,0.95)*bgStars*0.5*(1.0-sh);
-  col+=totalCol*(1.0-sh);
-  col+=eRingCol+phCol+haloCol;
-  col+=flareCol*(1.0-sh);
+  col+=totalCol*(1.0+lensBoost)*(1.0-sh);
+  col+=vec3(1.0,0.97,0.88)*eRing*(1.0-sh);
+  col+=vec3(0.95,0.88,0.7)*eRing2*(1.0-sh);
+  col+=vec3(0.9,0.82,0.65)*photonAccum*0.6*(1.0-sh);
+  col+=vec3(0.5,0.38,0.2)*halo*(1.0-sh);
   col*=(1.0-sh);
-  col+=vec3(0.004,0.004,0.003)*sh;
-  col+=vec3(0.4,0.3,0.15)*totalA*0.008*sh;
-  float whitePoint=3.0;
-  col=col*(1.0+col/(whitePoint*whitePoint))/(1.0+col);
+  col+=vec3(0.002,0.002,0.002)*sh;
+  float wp=3.0;
+  col=col*(1.0+col/(wp*wp))/(1.0+col);
   col*=vec3(1.01,1.0,0.98);
-
-  float a=sh*0.99+totalA*0.85+eRing*0.3+photonAccum*0.3+halo+bgStars*0.2;
+  float a=totalA*0.85+(eRing+eRing2)*0.3+photonAccum*0.3+halo+lensBoost*0.2;
   a=clamp(a,0.0,1.0);
-  a=max(a*smoothstep(6.0,0.5,closestR),sh*0.99*smoothstep(2.0,0.3,closestR));
-  gl_FragColor=vec4(col,a);
+  a=max(a*smoothstep(Rs*25.0,Rs*2.0,closestR), sh);
+  if(sh>0.5) a=1.0;
+  return vec4(col,a);
+}
+
+void main(){
+  vec2 ndc = vUV * 2.0 - 1.0;
+  vec4 nearW = uInvVP * vec4(ndc, -1.0, 1.0);
+  vec4 farW  = uInvVP * vec4(ndc,  1.0, 1.0);
+  nearW.xyz /= nearW.w;
+  farW.xyz /= farW.w;
+  vec3 ro = nearW.xyz;
+  vec3 rd = normalize(farW.xyz - nearW.xyz);
+  float t = uTime * 2.0;
+
+  vec4 bh0 = traceBH(ro, rd, uBH0Pos, uBH0Rs, uBH0DN, t);
+  vec4 bh1 = traceBH(ro, rd, uBH1Pos, uBH1Rs, uBH1DN, t);
+
+  vec3 col = vec3(0);
+  float a = 0.0;
+  if(bh0.a > 0.002 && bh1.a > 0.002){
+    col = bh0.rgb * bh0.a + bh1.rgb * bh1.a * (1.0 - bh0.a);
+    a = bh0.a + bh1.a * (1.0 - bh0.a);
+  } else if(bh0.a > 0.002){
+    col = bh0.rgb; a = bh0.a;
+  } else if(bh1.a > 0.002){
+    col = bh1.rgb; a = bh1.a;
+  } else {
+    discard;
+  }
+  gl_FragColor = vec4(col * a, a);
 }`;
 
   /* Per-BH disc tilts for visual variety */
@@ -505,61 +538,60 @@ void main(){
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   }
 
-  function drawBlackHoleGargantua(bhWorldPos, worldRadius, time, bhIndex) {
-    if (!progBlackHole) return;
-    const mvp = buildMVP();
-    const bx=bhWorldPos[0], by=bhWorldPos[1], bz=bhWorldPos[2];
-    const clipX=bx*mvp[0]+by*mvp[4]+bz*mvp[8]+mvp[12];
-    const clipY=bx*mvp[1]+by*mvp[5]+bz*mvp[9]+mvp[13];
-    const cw=bx*mvp[3]+by*mvp[7]+bz*mvp[11]+mvp[15];
-    if(cw<=0.01) return;
-    const ndcX=clipX/cw, ndcY=clipY/cw;
-    if(Math.abs(ndcX)>2.5||Math.abs(ndcY)>2.5) return;
-
-    const screenRadiusPx=(worldRadius*canvas.height*1.2)/cw;
-    const quadMult=3.5;
-    const ndcSizeX=(screenRadiusPx*quadMult)/canvas.width*2.0;
-    const ndcSizeY=(screenRadiusPx*quadMult)/canvas.height*2.0;
-    if(screenRadiusPx<4) return;
-
+  /* Get camera world position from orbit params */
+  function getCamWorldPos() {
     const cp=Math.cos(pitch), sp=Math.sin(pitch);
-    const cyaw=Math.cos(yaw), syaw=Math.sin(yaw);
-    const camWX=syaw*cp*camDist+panX;
-    const camWY=-sp*camDist+panY;
-    const camWZ=cyaw*cp*camDist;
+    const cy=Math.cos(yaw), sy=Math.sin(yaw);
+    return [sy*cp*camDist+panX, -sp*camDist+panY, cy*cp*camDist];
+  }
 
-    const relX=camWX-bx, relY=camWY-by, relZ=camWZ-bz;
-    const dist=Math.sqrt(relX*relX+relY*relY+relZ*relZ);
-    const scale=4.0/Math.max(dist,0.01);
-    const scaledCam=[relX*scale, relY*scale, relZ*scale];
+  function drawBlackHolesOverlay(time) {
+    if (!progBlackHole || blackHoleWorldPos.length === 0) return;
 
-    const fLen=Math.max(dist,0.01);
-    const fx=-relX/fLen, fy=-relY/fLen, fz=-relZ/fLen;
-    let rx=fz, ry=0, rz=-fx;
-    let rLen=Math.sqrt(rx*rx+ry*ry+rz*rz);
-    if(rLen<0.0001){rx=1;ry=0;rz=0;rLen=1;}
-    rx/=rLen; rz/=rLen;
-    const ux=fy*rz-fz*ry, uy=fz*rx-fx*rz, uz=fx*ry-fy*rx;
+    /* The MVP from buildMVP() is our ViewProjection matrix (no model transform).
+       Invert it so the shader can reconstruct world-space rays from screen pixels. */
+    const vp = buildMVP();
+    const invVP = mat4Invert(vp);
+    if (!invVP) return;
 
-    const dn=getBHDiscNormal(bhIndex||0);
+    const camPos = getCamWorldPos();
+
+    /* BH 0 data (or defaults if fewer than 2) */
+    const bh0Pos = blackHoleWorldPos[0] || [0,0,0];
+    const bh0Rs  = blackHoleSizes[0] || 1.0;
+    const bh0DN  = getBHDiscNormal(0);
+
+    /* BH 1 data */
+    const bh1Pos = blackHoleWorldPos.length > 1 ? blackHoleWorldPos[1] : [99999,99999,99999];
+    const bh1Rs  = blackHoleWorldPos.length > 1 ? blackHoleSizes[1] : 0.001;
+    const bh1DN  = blackHoleWorldPos.length > 1 ? getBHDiscNormal(1) : [0,1,0];
 
     gl.useProgram(progBlackHole);
     gl.bindBuffer(gl.ARRAY_BUFFER, blackHoleQuadVBO);
-    const aPos=gl.getAttribLocation(progBlackHole,'aPos');
+    const aPos = gl.getAttribLocation(progBlackHole, 'aPos');
     gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uCenter'),ndcX,ndcY);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uSize'),ndcSizeX,ndcSizeY);
-    gl.uniform2f(gl.getUniformLocation(progBlackHole,'uQuadPx'),screenRadiusPx*quadMult*2,screenRadiusPx*quadMult*2);
-    gl.uniform1f(gl.getUniformLocation(progBlackHole,'uTime'),time);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamPos'),scaledCam);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamR'),[rx,ry,rz]);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamU'),[ux,uy,uz]);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uCamF'),[fx,fy,fz]);
-    gl.uniform3fv(gl.getUniformLocation(progBlackHole,'uDN'),dn);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uTime'), time);
+    gl.uniform2f(gl.getUniformLocation(progBlackHole, 'uRes'), canvas.width, canvas.height);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole, 'uCamPos'), camPos);
+    gl.uniformMatrix4fv(gl.getUniformLocation(progBlackHole, 'uInvVP'), false, invVP);
+
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole, 'uBH0Pos'), bh0Pos);
+    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uBH0Rs'), bh0Rs);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole, 'uBH0DN'), bh0DN);
+
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole, 'uBH1Pos'), bh1Pos);
+    gl.uniform1f(gl.getUniformLocation(progBlackHole, 'uBH1Rs'), bh1Rs);
+    gl.uniform3fv(gl.getUniformLocation(progBlackHole, 'uBH1DN'), bh1DN);
+
+    /* Premultiplied alpha blending: ONE, ONE_MINUS_SRC_ALPHA
+       This ensures the shadow (dark color, alpha=1) fully blocks the background */
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    /* Restore standard blending for subsequent draws */
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.disableVertexAttribArray(aPos);
   }
 
@@ -1173,10 +1205,8 @@ void main(){
       gl.disableVertexAttribArray(sP); gl.disableVertexAttribArray(sC); gl.disableVertexAttribArray(sS);
     }
 
-    /* 6. Supermassive black holes (Gargantua ray tracer) */
-    for(let i=0;i<blackHoleWorldPos.length;i++){
-      drawBlackHoleGargantua(blackHoleWorldPos[i], blackHoleSizes[i], wallTime, i);
-    }
+    /* 6. Supermassive black holes (fullscreen overlay, inverse VP ray reconstruction) */
+    drawBlackHolesOverlay(wallTime);
 
     /* 7. Hover & Selection halos (same as main.js) */
     const t=wallTime;
