@@ -11,7 +11,7 @@
   const GALAXY_SPREAD_Z = 140;
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
-  const TERRITORY_RES = 1024;
+  const TERRITORY_RES = 2048;
   const TERRITORY_RADIUS = 2.5;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
@@ -751,34 +751,99 @@ void main(){
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
     const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
+    const unownedSystems=systems.filter(s=>!s.owner||s.owner==='unassigned'||hiddenPolities.has(s.owner));
 
-    /* SDF ownership grid */
+    /* Spatial hash for fast nearest-neighbor lookup.
+       Cell size = CLAIM_R so we only check 3x3 neighborhood. */
+    const cellSize=Math.max(CLAIM_R, 3);
+    const hashOwned=new Map();
+    const hashUnowned=new Map();
+    function cellKey(wx,wz){ return Math.floor(wx/cellSize)+','+Math.floor(wz/cellSize); }
+    function insertHash(hash,sys){
+      const k=cellKey(sys._worldPos[0],sys._worldPos[2]);
+      if(!hash.has(k)) hash.set(k,[]);
+      hash.get(k).push(sys);
+    }
+    for(const sys of ownedSystems) insertHash(hashOwned,sys);
+    for(const sys of unownedSystems) insertHash(hashUnowned,sys);
+
+    function nearestInHash(hash,wx,wz,maxR){
+      const cx=Math.floor(wx/cellSize), cz=Math.floor(wz/cellSize);
+      let best=maxR*maxR, bestSys=null;
+      const searchR=Math.ceil(maxR/cellSize);
+      for(let dz=-searchR;dz<=searchR;dz++){
+        for(let dx=-searchR;dx<=searchR;dx++){
+          const k=(cx+dx)+','+(cz+dz);
+          const bucket=hash.get(k);
+          if(!bucket) continue;
+          for(const sys of bucket){
+            const ddx=sys._worldPos[0]-wx, ddz=sys._worldPos[2]-wz;
+            const d2=ddx*ddx+ddz*ddz;
+            if(d2<best){ best=d2; bestSys=sys; }
+          }
+        }
+      }
+      return bestSys?{sys:bestSys, dist:Math.sqrt(best)}:null;
+    }
+
+    /* SDF ownership grid with unowned-system avoidance */
     const ownerGrid=new Array(res*res);
     const sdfGrid=new Float32Array(res*res);
+    /* Search radius: only need to look within CLAIM_R + some margin */
+    const searchR=CLAIM_R+cellSize;
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
-        let minDist=1e9, bestOwner=null;
-        for(const sys of ownedSystems){
-          const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
-          const d=Math.sqrt(dx*dx+dz*dz);
-          if(d<minDist){ minDist=d; bestOwner=sys.owner; }
-        }
+
+        const nearOwned=nearestInHash(hashOwned,wx,wz,searchR);
         const gi=gy*res+gx;
-        const sdf=minDist-CLAIM_R;
-        if(bestOwner&&sdf<0){
-          ownerGrid[gi]=bestOwner;
+
+        if(!nearOwned||nearOwned.dist>CLAIM_R){
+          ownerGrid[gi]=null;
+          sdfGrid[gi]=nearOwned?(nearOwned.dist-CLAIM_R):99;
+          continue;
+        }
+
+        /* Check if a closer unowned system should block this claim.
+           Territory retreats to the midpoint between owned and unowned systems. */
+        const nearUnowned=nearestInHash(hashUnowned,wx,wz,searchR);
+        let effectiveR=CLAIM_R;
+        if(nearUnowned){
+          /* If unowned system is close, shrink claim to halfway between the two */
+          const ownedDist=nearOwned.dist;
+          const unownedDist=nearUnowned.dist;
+          const totalDist=Math.sqrt(
+            Math.pow(nearOwned.sys._worldPos[0]-nearUnowned.sys._worldPos[0],2)+
+            Math.pow(nearOwned.sys._worldPos[2]-nearUnowned.sys._worldPos[2],2)
+          );
+          if(totalDist<CLAIM_R*2.5){
+            /* Shrink claim to avoid smothering the unowned system */
+            effectiveR=Math.min(CLAIM_R, totalDist*0.45);
+          }
+          /* Also reject if this pixel is closer to the unowned system */
+          if(unownedDist<ownedDist*0.85){
+            ownerGrid[gi]=null;
+            sdfGrid[gi]=0;
+            continue;
+          }
+        }
+
+        /* Also check for differently-owned systems nearby.
+           Territory boundary sits at the midpoint between different owners. */
+        const sdf=nearOwned.dist-effectiveR;
+        if(sdf<0){
+          ownerGrid[gi]=nearOwned.sys.owner;
           sdfGrid[gi]=sdf;
         } else {
           ownerGrid[gi]=null;
-          sdfGrid[gi]=Math.max(sdf,0);
+          sdfGrid[gi]=sdf;
         }
       }
     }
 
-    /* Fill texture — NO blur, SDF gives smooth edges already */
+    /* Fill texture */
     const fillData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
@@ -788,7 +853,6 @@ void main(){
       const c=hexToRgb(pol.color);
       const idx=gi*4;
       const depth=-sdfGrid[gi];
-      /* Smooth edge fade over 2 pixels, then constant interior */
       const edgeSmooth=Math.min(1.0, depth/(pxSize*2));
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
       fillData[idx+3]=Math.round(edgeSmooth*255);
@@ -802,21 +866,18 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Stroke texture — SDF contour line */
+    /* Stroke texture — just store stroke color for the shader to use.
+       The actual border line is computed in the shader from dFdx/dFdy. */
     const strokeData=new Uint8Array(res*res*4);
-    const borderW=pxSize*2.5;
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
       if(!pid) continue;
-      const distFromEdge=-sdfGrid[gi];
-      if(distFromEdge>borderW) continue;
       const pol=polMap.get(pid);
       if(!pol) continue;
       const sc=hexToRgb(pol.strokeColor||pol.color);
       const idx=gi*4;
-      const alpha=Math.max(0, 1.0 - distFromEdge/borderW);
       strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
-      strokeData[idx+3]=Math.round(alpha*255);
+      strokeData[idx+3]=255;
     }
     if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
