@@ -40,6 +40,8 @@
   let bgVBO, bgStarsVBO, starsVBO, territoryQuadVBO, linesVBO, haloVBO;
   let starCount = 0, lineVertCount = 0;
   let territoryTexture = null;
+  let territoryStrokeTexture = null;
+  let showNames = true;
   let lanes = []; // raw lane data from JSON
   let idToWorld = new Map();
   let hoveredSystemId = null;
@@ -201,22 +203,51 @@ void main(){ gl_Position=uMVP*vec4(position,1.0); vUV=aUV; }`;
   const FS_TERR = `
 precision highp float;
 uniform sampler2D uTex;
+uniform sampler2D uStrokeTex;
 uniform float uTime;
 varying vec2 vUV;
 void main(){
   vec4 t=texture2D(uTex,vUV);
   if(t.a<0.01) discard;
+  vec4 s=texture2D(uStrokeTex,vUV);
+
+  /* Edge detection for border stroke */
   vec2 tx=1.0/vec2(128.0);
   float aL=texture2D(uTex,vUV+vec2(-tx.x*2.0,0.0)).a;
   float aR=texture2D(uTex,vUV+vec2(tx.x*2.0,0.0)).a;
   float aU=texture2D(uTex,vUV+vec2(0.0,tx.y*2.0)).a;
   float aD=texture2D(uTex,vUV+vec2(0.0,-tx.y*2.0)).a;
   float edge=clamp(1.0-min(min(aL,aR),min(aU,aD)),0.0,1.0);
-  float fill=t.a*0.10;
-  float edgeGlow=edge*t.a*0.45;
-  float alpha=fill+edgeGlow;
-  if(t.a<0.45){ float hatch=sin((vUV.x+vUV.y)*200.0+uTime*2.0)*0.5+0.5; alpha*=0.5+hatch*0.5; }
-  gl_FragColor=vec4(t.rgb,alpha);
+
+  /* Thicker edge: also sample diagonals */
+  float aLU=texture2D(uTex,vUV+vec2(-tx.x*1.5,tx.y*1.5)).a;
+  float aRU=texture2D(uTex,vUV+vec2(tx.x*1.5,tx.y*1.5)).a;
+  float aLD=texture2D(uTex,vUV+vec2(-tx.x*1.5,-tx.y*1.5)).a;
+  float aRD=texture2D(uTex,vUV+vec2(tx.x*1.5,-tx.y*1.5)).a;
+  float edgeDiag=clamp(1.0-min(min(aLU,aRU),min(aLD,aRD)),0.0,1.0);
+  edge=max(edge,edgeDiag*0.8);
+
+  /* Breathing pulse on the stroke border */
+  float breathe=0.55+0.45*sin(uTime*1.8);
+
+  /* Fill: polity interior color, soft */
+  float fill=t.a*0.08;
+  vec3 fillCol=t.rgb;
+
+  /* Stroke: border color with pulse */
+  float strokeA=edge*t.a*0.6*breathe;
+  vec3 strokeCol=(s.a>0.01)?s.rgb:t.rgb;
+
+  /* Contested hatching */
+  if(t.a<0.45){
+    float hatch=sin((vUV.x+vUV.y)*200.0+uTime*2.0)*0.5+0.5;
+    fill*=0.5+hatch*0.5;
+    strokeA*=0.5+hatch*0.5;
+  }
+
+  vec3 col=mix(fillCol*fill, strokeCol, strokeA/(fill+strokeA+0.001));
+  float alpha=fill+strokeA;
+  gl_FragColor=vec4(col,alpha);
 }`;
 
   /* Lane lines — same as main.js */
@@ -779,6 +810,42 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+
+    /* Build parallel stroke color texture (same layout, stroke color instead of fill) */
+    const strokeData=new Uint8Array(res*res*4);
+    for(let gy=0;gy<res;gy++){
+      for(let gx=0;gx<res;gx++){
+        const wx=(gx/res-0.5)*GALAXY_SPREAD_X;
+        const wz=(gy/res-0.5)*GALAXY_SPREAD_Z;
+        let maxInf2=0, maxPol2=null;
+        for(const sys of systems){
+          if(!sys.owner||sys.owner==='unassigned') continue;
+          if(hiddenPolities.has(sys.owner)) continue;
+          const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
+          const d2=Math.sqrt(dx*dx+dz*dz);
+          if(d2<TERRITORY_RADIUS){
+            const inf=Math.max(0,1-d2/TERRITORY_RADIUS); const sq=inf*inf;
+            if(sq>maxInf2){ maxPol2=sys.owner; maxInf2=sq; }
+          }
+        }
+        const idx=(gy*res+gx)*4;
+        if(maxPol2&&maxInf2>0.05){
+          const pol=polities.find(p=>p.id===maxPol2);
+          if(pol){
+            const sc=hexToRgb(pol.strokeColor||pol.color);
+            strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
+            strokeData[idx+3]=Math.round(Math.min(maxInf2,1)*255);
+          }
+        }
+      }
+    }
+    if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,strokeData);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   }
 
   function buildTerritoryQuad(){
@@ -952,6 +1019,7 @@ void main(){
     if(!editorUnlocked){ if(!requireEditor()) return; }
     document.getElementById('polity-name-input').value='';
     document.getElementById('polity-color-input').value='#38e8ff';
+    const si=document.getElementById('polity-stroke-input'); if(si) si.value='#ffffff';
     document.getElementById('polity-desc-input').value='';
     document.getElementById('polity-modal').classList.add('open');
   });
@@ -959,9 +1027,11 @@ void main(){
   document.getElementById('modal-confirm').addEventListener('click',()=>{
     const name=document.getElementById('polity-name-input').value.trim();
     const color=document.getElementById('polity-color-input').value;
+    const si=document.getElementById('polity-stroke-input');
+    const strokeColor=si?si.value:'#ffffff';
     const desc=document.getElementById('polity-desc-input').value.trim();
     if(!name){ showToast('Name required'); return; }
-    polities.push({id:'POL-'+Date.now().toString(36).toUpperCase(), name, color, description:desc});
+    polities.push({id:'POL-'+Date.now().toString(36).toUpperCase(), name, color, strokeColor, description:desc});
     document.getElementById('polity-modal').classList.remove('open');
     updateLegend(); refreshBulkPolityOptions(); showToast(`Created: ${name}`); markDirty();
   });
@@ -1153,6 +1223,10 @@ void main(){
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
       gl.uniform1i(gl.getUniformLocation(progTerritory,'uTex'),0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
+      gl.uniform1i(gl.getUniformLocation(progTerritory,'uStrokeTex'),1);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindBuffer(gl.ARRAY_BUFFER,territoryQuadVBO);
       const tP=gl.getAttribLocation(progTerritory,'position'), tU=gl.getAttribLocation(progTerritory,'aUV');
       gl.enableVertexAttribArray(tP); gl.vertexAttribPointer(tP,3,gl.FLOAT,false,20,0);
@@ -1220,6 +1294,7 @@ void main(){
     }
 
     updateTooltip();
+    updatePolityNames();
     requestAnimationFrame(render);
   }
 
@@ -1229,6 +1304,7 @@ void main(){
     if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
     if(e.key==='Escape'){ selectedSystemIds.clear(); selectedSystemId=null; updateBulkBar(); closePanel(); document.getElementById('polity-modal').classList.remove('open'); }
     if(e.key==='l'||e.key==='L'){ toggleLanes(); }
+    if(e.key==='n'||e.key==='N'){ toggleNames(); }
   });
 
   function toggleLanes(){
@@ -1240,6 +1316,68 @@ void main(){
       btn.style.borderColor=showLanes?'var(--cyan-dim)':'var(--border)';
     }
   }
+
+  function toggleNames(){
+    showNames=!showNames;
+    const btn=document.getElementById('btn-toggle-names');
+    if(btn){
+      btn.textContent=showNames?'NAMES ON':'NAMES OFF';
+      btn.style.color=showNames?'var(--cyan)':'var(--text-muted)';
+      btn.style.borderColor=showNames?'var(--cyan-dim)':'var(--border)';
+    }
+    const container=document.getElementById('polity-names');
+    if(container) container.style.display=showNames?'block':'none';
+  }
+
+  /* Compute polity centroids and project name labels to screen */
+  function updatePolityNames(){
+    const container=document.getElementById('polity-names');
+    if(!container||!showNames||polities.length===0){ if(container) container.innerHTML=''; return; }
+
+    const mvp=buildMVP();
+    const W=canvas.width, H=canvas.height;
+
+    /* Compute centroid of each polity's owned systems */
+    const centroids={};
+    const counts={};
+    for(const sys of systems){
+      if(!sys.owner||sys.owner==='unassigned') continue;
+      if(hiddenPolities.has(sys.owner)) continue;
+      if(!centroids[sys.owner]){ centroids[sys.owner]=[0,0,0]; counts[sys.owner]=0; }
+      centroids[sys.owner][0]+=sys._worldPos[0];
+      centroids[sys.owner][1]+=sys._worldPos[1];
+      centroids[sys.owner][2]+=sys._worldPos[2];
+      counts[sys.owner]++;
+    }
+
+    let html='';
+    for(const pol of polities){
+      if(!centroids[pol.id]||counts[pol.id]<1) continue;
+      const cx=centroids[pol.id][0]/counts[pol.id];
+      const cy=centroids[pol.id][1]/counts[pol.id];
+      const cz=centroids[pol.id][2]/counts[pol.id];
+
+      /* Project to screen */
+      const clipX=cx*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
+      const clipY=cx*mvp[1]+cy*mvp[5]+cz*mvp[9]+mvp[13];
+      const cw=cx*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
+      if(cw<=0) continue;
+      const ndcX=clipX/cw, ndcY=clipY/cw;
+      if(Math.abs(ndcX)>1.2||Math.abs(ndcY)>1.2) continue;
+      const sx=(ndcX*0.5+0.5)*W;
+      const sy=(1-(ndcY*0.5+0.5))*H;
+
+      const strokeCol=pol.strokeColor||pol.color;
+      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;color:${strokeCol};text-shadow:0 0 8px ${strokeCol}40, 0 0 3px ${pol.color}60;">${pol.name}</div>`;
+    }
+    container.innerHTML=html;
+  }
+
+  /* Wire toggle button clicks */
+  const btnLanes=document.getElementById('btn-toggle-lanes');
+  if(btnLanes) btnLanes.addEventListener('click',e=>{e.preventDefault();toggleLanes();});
+  const btnNames=document.getElementById('btn-toggle-names');
+  if(btnNames) btnNames.addEventListener('click',e=>{e.preventDefault();toggleNames();});
 
   /* ── Load data & boot ── */
   async function init(){
