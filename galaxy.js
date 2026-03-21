@@ -735,50 +735,52 @@ void main(){
 
   function buildTerritoryTexture(){
     const res=TERRITORY_RES;
-    /* The territory quad extends 20 units beyond the galaxy spread on each side.
-       The texture must cover the same world extent for UV alignment. */
     const extX=GALAXY_SPREAD_X/2+20;
     const extZ=GALAXY_SPREAD_Z/2+20;
     const worldW=extX*2, worldH=extZ*2;
+    const MAX_CLAIM_DIST=TERRITORY_RADIUS;
 
-    /* Pass 1: Build ownership grid */
+    /* Cache polity lookup */
+    const polMap=new Map();
+    for(const p of polities) polMap.set(p.id, p);
+
+    /* Pass 1: Voronoi ownership. Each pixel finds its nearest system.
+       If that system is owned AND closer than any unowned system, the pixel is claimed.
+       Territory is capped at MAX_CLAIM_DIST from the nearest owned system. */
     const ownerGrid=new Array(res*res);
-    const infGrid=new Float32Array(res*res);
-    const secGrid=new Array(res*res);
-    const secInfGrid=new Float32Array(res*res);
+    const distGrid=new Float32Array(res*res);
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
-        const influence={};
+        let nearOwnedDist=1e9, nearOwner=null;
+        let nearUnownedDist=1e9;
         for(const sys of systems){
-          if(!sys.owner||sys.owner==='unassigned') continue;
-          if(hiddenPolities.has(sys.owner)) continue;
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
-          const dist=Math.sqrt(dx*dx+dz*dz);
-          if(dist<TERRITORY_RADIUS){
-            const inf=Math.max(0,1-dist/TERRITORY_RADIUS); const sq=inf*inf;
-            if(!influence[sys.owner]) influence[sys.owner]=0;
-            influence[sys.owner]+=sq;
+          const d=Math.sqrt(dx*dx+dz*dz);
+          if(sys.owner&&sys.owner!=='unassigned'&&!hiddenPolities.has(sys.owner)){
+            if(d<nearOwnedDist){ nearOwnedDist=d; nearOwner=sys.owner; }
+          } else {
+            if(d<nearUnownedDist) nearUnownedDist=d;
           }
         }
-        let maxInf=0, maxPol=null, secInf=0, secPol=null;
-        for(const [pid,inf] of Object.entries(influence)){
-          if(inf>maxInf){ secPol=maxPol; secInf=maxInf; maxPol=pid; maxInf=inf; }
-          else if(inf>secInf){ secPol=pid; secInf=inf; }
-        }
         const gi=gy*res+gx;
-        if(maxPol&&maxInf>0.15){
-          ownerGrid[gi]=maxPol; infGrid[gi]=Math.min(maxInf,1);
-          if(secPol&&secInf>maxInf*0.5){ secGrid[gi]=secPol; secInfGrid[gi]=secInf; }
+        /* Claim this pixel only if:
+           1. There is a nearby owned system
+           2. It's within the max claim distance
+           3. The nearest owned system is closer than (or very close to) the nearest unowned system */
+        if(nearOwner&&nearOwnedDist<MAX_CLAIM_DIST&&nearOwnedDist<nearUnownedDist*1.1){
+          ownerGrid[gi]=nearOwner;
+          distGrid[gi]=nearOwnedDist;
         } else {
-          ownerGrid[gi]=null; infGrid[gi]=0;
+          ownerGrid[gi]=null;
+          distGrid[gi]=nearOwnedDist;
         }
       }
     }
 
-    /* Pass 2: Detect borders (8-neighbor check + outer ring) */
+    /* Pass 2: Detect borders */
     const borderGrid=new Uint8Array(res*res);
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
@@ -813,24 +815,13 @@ void main(){
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
       if(!pid) continue;
-      const pol=polities.find(p=>p.id===pid);
+      const pol=polMap.get(pid);
       if(!pol) continue;
-      const contested=secGrid[gi]&&secInfGrid[gi]>infGrid[gi]*0.5;
+      const c=hexToRgb(pol.color);
       const idx=gi*4;
-      if(contested){
-        const pol2=polities.find(p=>p.id===secGrid[gi]);
-        if(pol2){
-          const c=hexToRgb(pol.color),c2=hexToRgb(pol2.color);
-          fillData[idx]=Math.round((c[0]+c2[0])/2);
-          fillData[idx+1]=Math.round((c[1]+c2[1])/2);
-          fillData[idx+2]=Math.round((c[2]+c2[2])/2);
-          fillData[idx+3]=Math.round(infGrid[gi]*120);
-        }
-      } else {
-        const c=hexToRgb(pol.color);
-        fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-        fillData[idx+3]=Math.round(infGrid[gi]*200+55);
-      }
+      const edgeFade=1.0-Math.max(0,distGrid[gi]/MAX_CLAIM_DIST)*0.3;
+      fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
+      fillData[idx+3]=Math.round(edgeFade*200);
     }
     /* Gaussian blur on fill */
     const kernel=[1,4,6,4,1], kSum=16, kR=2;
@@ -855,13 +846,13 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Pass 4: Build stroke texture — border pixels only */
+    /* Pass 4: Stroke texture */
     const strokeData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       if(borderGrid[gi]===0) continue;
       const pid=ownerGrid[gi];
       if(!pid) continue;
-      const pol=polities.find(p=>p.id===pid);
+      const pol=polMap.get(pid);
       if(!pol) continue;
       const sc=hexToRgb(pol.strokeColor||pol.color);
       const idx=gi*4;
