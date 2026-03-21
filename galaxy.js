@@ -751,13 +751,10 @@ void main(){
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
     const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
-    const unownedSystems=systems.filter(s=>!s.owner||s.owner==='unassigned'||hiddenPolities.has(s.owner));
 
-    /* Spatial hash for fast nearest-neighbor lookup.
-       Cell size = CLAIM_R so we only check 3x3 neighborhood. */
-    const cellSize=Math.max(CLAIM_R, 3);
+    /* Spatial hash for fast lookup */
+    const cellSize=Math.max(CLAIM_R*2, 4);
     const hashOwned=new Map();
-    const hashUnowned=new Map();
     function cellKey(wx,wz){ return Math.floor(wx/cellSize)+','+Math.floor(wz/cellSize); }
     function insertHash(hash,sys){
       const k=cellKey(sys._worldPos[0],sys._worldPos[2]);
@@ -765,80 +762,61 @@ void main(){
       hash.get(k).push(sys);
     }
     for(const sys of ownedSystems) insertHash(hashOwned,sys);
-    for(const sys of unownedSystems) insertHash(hashUnowned,sys);
 
-    function nearestInHash(hash,wx,wz,maxR){
+    function nearbySystems(hash,wx,wz,maxR){
       const cx=Math.floor(wx/cellSize), cz=Math.floor(wz/cellSize);
-      let best=maxR*maxR, bestSys=null;
       const searchR=Math.ceil(maxR/cellSize);
+      const result=[];
       for(let dz=-searchR;dz<=searchR;dz++){
         for(let dx=-searchR;dx<=searchR;dx++){
-          const k=(cx+dx)+','+(cz+dz);
-          const bucket=hash.get(k);
-          if(!bucket) continue;
-          for(const sys of bucket){
-            const ddx=sys._worldPos[0]-wx, ddz=sys._worldPos[2]-wz;
-            const d2=ddx*ddx+ddz*ddz;
-            if(d2<best){ best=d2; bestSys=sys; }
-          }
+          const bucket=hash.get((cx+dx)+','+(cz+dz));
+          if(bucket) for(const sys of bucket) result.push(sys);
         }
       }
-      return bestSys?{sys:bestSys, dist:Math.sqrt(best)}:null;
+      return result;
     }
 
-    /* SDF ownership grid with unowned-system avoidance */
+    /* Smooth-union SDF (metaball blending).
+       Instead of min(d1, d2), we use a smooth minimum so nearby circles
+       merge into organic rounded shapes without visible individual bubbles. */
+    function smoothMin(a, b, k){
+      const h=Math.max(0, Math.min(1, 0.5 + 0.5*(b-a)/k));
+      return b*(1-h) + a*h - k*h*(1-h);
+    }
+
+    /* SDF ownership grid */
     const ownerGrid=new Array(res*res);
     const sdfGrid=new Float32Array(res*res);
-    /* Search radius: only need to look within CLAIM_R + some margin */
-    const searchR=CLAIM_R+cellSize;
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
 
-        const nearOwned=nearestInHash(hashOwned,wx,wz,searchR);
+        const nearby=nearbySystems(hashOwned,wx,wz,CLAIM_R+cellSize);
+
+        /* Compute smooth-union SDF across all nearby owned systems.
+           Each system contributes a circle of radius CLAIM_R.
+           The smooth minimum merges overlapping circles into rounded blobs. */
+        let sdf=999;
+        let bestOwner=null, bestDist=1e9;
+        const smoothK=CLAIM_R*0.8; /* blending radius - larger = smoother merges */
+
+        for(const sys of nearby){
+          const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
+          const d=Math.sqrt(dx*dx+dz*dz);
+          const sysSdf=d-CLAIM_R;
+          sdf=smoothMin(sdf, sysSdf, smoothK);
+          if(d<bestDist){ bestDist=d; bestOwner=sys.owner; }
+        }
+
         const gi=gy*res+gx;
-
-        if(!nearOwned||nearOwned.dist>CLAIM_R){
-          ownerGrid[gi]=null;
-          sdfGrid[gi]=nearOwned?(nearOwned.dist-CLAIM_R):99;
-          continue;
-        }
-
-        /* Check if a closer unowned system should block this claim.
-           Territory retreats to the midpoint between owned and unowned systems. */
-        const nearUnowned=nearestInHash(hashUnowned,wx,wz,searchR);
-        let effectiveR=CLAIM_R;
-        if(nearUnowned){
-          /* If unowned system is close, shrink claim to halfway between the two */
-          const ownedDist=nearOwned.dist;
-          const unownedDist=nearUnowned.dist;
-          const totalDist=Math.sqrt(
-            Math.pow(nearOwned.sys._worldPos[0]-nearUnowned.sys._worldPos[0],2)+
-            Math.pow(nearOwned.sys._worldPos[2]-nearUnowned.sys._worldPos[2],2)
-          );
-          if(totalDist<CLAIM_R*2.5){
-            /* Shrink claim to avoid smothering the unowned system */
-            effectiveR=Math.min(CLAIM_R, totalDist*0.45);
-          }
-          /* Also reject if this pixel is closer to the unowned system */
-          if(unownedDist<ownedDist*0.85){
-            ownerGrid[gi]=null;
-            sdfGrid[gi]=0;
-            continue;
-          }
-        }
-
-        /* Also check for differently-owned systems nearby.
-           Territory boundary sits at the midpoint between different owners. */
-        const sdf=nearOwned.dist-effectiveR;
-        if(sdf<0){
-          ownerGrid[gi]=nearOwned.sys.owner;
+        if(bestOwner&&sdf<0){
+          ownerGrid[gi]=bestOwner;
           sdfGrid[gi]=sdf;
         } else {
           ownerGrid[gi]=null;
-          sdfGrid[gi]=sdf;
+          sdfGrid[gi]=Math.max(sdf,0);
         }
       }
     }
@@ -866,8 +844,7 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Stroke texture — just store stroke color for the shader to use.
-       The actual border line is computed in the shader from dFdx/dFdy. */
+    /* Stroke texture — just stroke color, border drawn by shader */
     const strokeData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
