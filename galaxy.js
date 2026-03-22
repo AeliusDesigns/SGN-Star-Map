@@ -781,32 +781,34 @@ void main(){
       return {ownerGrid, polIdGrid, polIdMap, res};
     }
 
-    /* High-res grid for border line extraction */
-    const hiRes=TERRITORY_RES;
-    const hi=computeOwnership(hiRes);
-
     /* Low-res grid for fill texture (blur works well at low res) */
     const loRes=128;
     const lo=computeOwnership(loRes);
 
-    /* === Border lines via marching squares on high-res grid, then chain & smooth === */
-    const borderSegsRaw=[];  /* {pid, ax,az, bx,bz} raw segments */
-    const cellW=worldW/(hiRes-1);
-    const cellH=worldH/(hiRes-1);
+    /* === Border lines: low-res marching squares → chain → Douglas-Peucker simplification
+       This produces clean straight-line polygon borders like Stellaris === */
+
+    /* Use a moderate resolution for marching squares extraction */
+    const borderRes=512;
+    const borderOwn=computeOwnership(borderRes);
+    const bCellW=worldW/(borderRes-1);
+    const bCellH=worldH/(borderRes-1);
     const terrY=-0.5;
 
-    for(let gy=0;gy<hiRes-1;gy++){
-      for(let gx=0;gx<hiRes-1;gx++){
-        const i00=gy*hiRes+gx, i10=i00+1, i01=i00+hiRes, i11=i01+1;
-        const p00=hi.polIdGrid[i00], p10=hi.polIdGrid[i10], p01=hi.polIdGrid[i01], p11=hi.polIdGrid[i11];
+    const borderSegsRaw=[];
+    for(let gy=0;gy<borderRes-1;gy++){
+      for(let gx=0;gx<borderRes-1;gx++){
+        const i00=gy*borderRes+gx, i10=i00+1, i01=i00+borderRes, i11=i01+1;
+        const p00=borderOwn.polIdGrid[i00], p10=borderOwn.polIdGrid[i10];
+        const p01=borderOwn.polIdGrid[i01], p11=borderOwn.polIdGrid[i11];
 
-        const x0=-extX+gx*cellW, x1=x0+cellW;
-        const z0=-extZ+gy*cellH, z1=z0+cellH;
+        const x0=-extX+gx*bCellW, x1=x0+bCellW;
+        const z0=-extZ+gy*bCellH, z1=z0+bCellH;
 
-        const pid=hi.ownerGrid[i00]||hi.ownerGrid[i10]||hi.ownerGrid[i01]||hi.ownerGrid[i11];
+        const pid=borderOwn.ownerGrid[i00]||borderOwn.ownerGrid[i10]||borderOwn.ownerGrid[i01]||borderOwn.ownerGrid[i11];
         if(!pid) continue;
 
-        const ref=hi.polIdMap.get(pid)||0;
+        const ref=borderOwn.polIdMap.get(pid)||0;
         const v00=(p00===ref)?-1:1;
         const v10=(p10===ref)?-1:1;
         const v01=(p01===ref)?-1:1;
@@ -819,15 +821,12 @@ void main(){
           const t=va/(va-vb);
           return [pa[0]+(pb[0]-pa[0])*t, pa[1]+(pb[1]-pa[1])*t];
         }
-
         const eT=lerp(v00,v10,[x0,z0],[x1,z0]);
         const eB=lerp(v01,v11,[x0,z1],[x1,z1]);
         const eL=lerp(v00,v01,[x0,z0],[x0,z1]);
         const eR=lerp(v10,v11,[x1,z0],[x1,z1]);
 
-        function addSeg(a,b){
-          borderSegsRaw.push({pid, ax:a[0],az:a[1], bx:b[0],bz:b[1]});
-        }
+        function addSeg(a,b){ borderSegsRaw.push({pid, ax:a[0],az:a[1], bx:b[0],bz:b[1]}); }
 
         switch(c){
           case 1: case 14: addSeg(eT,eL); break;
@@ -842,22 +841,20 @@ void main(){
       }
     }
 
-    /* ── Chain segments into polylines per polity, then smooth ── */
+    /* ── Chain segments into polylines per polity ── */
     const segsByPolity=new Map();
     for(const seg of borderSegsRaw){
       if(!segsByPolity.has(seg.pid)) segsByPolity.set(seg.pid, []);
       segsByPolity.get(seg.pid).push(seg);
     }
 
-    /* Snap threshold: half a cell diagonal to join nearby endpoints */
-    const snapThresh=Math.sqrt(cellW*cellW+cellH*cellH)*0.6;
+    const snapThresh=Math.sqrt(bCellW*bCellW+bCellH*bCellH)*0.6;
     const snapThresh2=snapThresh*snapThresh;
 
     function chainSegments(segs){
-      /* Build adjacency: quantize endpoints to a grid for fast lookup */
       const qf=1.0/snapThresh;
       function qkey(x,z){ return (Math.round(x*qf))+','+(Math.round(z*qf)); }
-      const endMap=new Map(); /* qkey -> [{segIdx, end:'a'|'b'}] */
+      const endMap=new Map();
       for(let i=0;i<segs.length;i++){
         const s=segs[i];
         for(const end of ['a','b']){
@@ -867,17 +864,14 @@ void main(){
           endMap.get(k).push({idx:i, end});
         }
       }
-
       const used=new Uint8Array(segs.length);
       const chains=[];
-
       for(let start=0;start<segs.length;start++){
         if(used[start]) continue;
         used[start]=1;
         const s=segs[start];
         const chain=[[s.ax,s.az],[s.bx,s.bz]];
-
-        /* Extend forward from chain tail */
+        /* Extend forward */
         let extending=true;
         while(extending){
           extending=false;
@@ -894,13 +888,11 @@ void main(){
               used[n.idx]=1;
               const ox=n.end==='a'?ns.bx:ns.ax, oz=n.end==='a'?ns.bz:ns.az;
               chain.push([ox,oz]);
-              extending=true;
-              break;
+              extending=true; break;
             }
           }
         }
-
-        /* Extend backward from chain head */
+        /* Extend backward */
         extending=true;
         while(extending){
           extending=false;
@@ -917,47 +909,48 @@ void main(){
               used[n.idx]=1;
               const ox=n.end==='a'?ns.bx:ns.ax, oz=n.end==='a'?ns.bz:ns.az;
               chain.unshift([ox,oz]);
-              extending=true;
-              break;
+              extending=true; break;
             }
           }
         }
-
         if(chain.length>=2) chains.push(chain);
       }
       return chains;
     }
 
-    /* Chaikin subdivision for smooth curves */
-    function chaikinSmooth(pts, iterations){
-      let cur=pts;
-      for(let iter=0;iter<iterations;iter++){
-        const next=[];
-        const closed=(Math.abs(cur[0][0]-cur[cur.length-1][0])<snapThresh &&
-                      Math.abs(cur[0][1]-cur[cur.length-1][1])<snapThresh);
-        if(closed&&cur.length>2){
-          /* Closed loop: wrap around */
-          for(let i=0;i<cur.length;i++){
-            const j=(i+1)%cur.length;
-            next.push([cur[i][0]*0.75+cur[j][0]*0.25, cur[i][1]*0.75+cur[j][1]*0.25]);
-            next.push([cur[i][0]*0.25+cur[j][0]*0.75, cur[i][1]*0.25+cur[j][1]*0.75]);
-          }
+    /* Douglas-Peucker line simplification — produces clean straight segments */
+    function douglasPeucker(pts, epsilon){
+      if(pts.length<=2) return pts;
+      /* Find point with max distance from line between first and last */
+      let maxD=0, maxI=0;
+      const ax=pts[0][0], az=pts[0][1];
+      const bx=pts[pts.length-1][0], bz=pts[pts.length-1][1];
+      const dx=bx-ax, dz=bz-az;
+      const lenSq=dx*dx+dz*dz;
+      for(let i=1;i<pts.length-1;i++){
+        let d;
+        if(lenSq<1e-10){
+          d=Math.sqrt((pts[i][0]-ax)**2+(pts[i][1]-az)**2);
         } else {
-          /* Open: keep endpoints */
-          next.push(cur[0]);
-          for(let i=0;i<cur.length-1;i++){
-            next.push([cur[i][0]*0.75+cur[i+1][0]*0.25, cur[i][1]*0.75+cur[i+1][1]*0.25]);
-            next.push([cur[i][0]*0.25+cur[i+1][0]*0.75, cur[i][1]*0.25+cur[i+1][1]*0.75]);
-          }
-          next.push(cur[cur.length-1]);
+          const t=Math.max(0,Math.min(1,((pts[i][0]-ax)*dx+(pts[i][1]-az)*dz)/lenSq));
+          const px=ax+t*dx, pz=az+t*dz;
+          d=Math.sqrt((pts[i][0]-px)**2+(pts[i][1]-pz)**2);
         }
-        cur=next;
+        if(d>maxD){ maxD=d; maxI=i; }
       }
-      return cur;
+      if(maxD>epsilon){
+        const left=douglasPeucker(pts.slice(0,maxI+1), epsilon);
+        const right=douglasPeucker(pts.slice(maxI), epsilon);
+        return left.slice(0,-1).concat(right);
+      }
+      return [pts[0], pts[pts.length-1]];
     }
 
-    /* Build per-polity border VBOs from smoothed chains */
+    /* Build per-polity border VBOs from simplified chains */
     territoryBorderColors=[];
+    /* Douglas-Peucker epsilon: aggressive simplification for clean straight lines */
+    const dpEpsilon=2.5;
+
     for(const [pid, segs] of segsByPolity){
       const pol=polMap.get(pid);
       if(!pol) continue;
@@ -966,12 +959,13 @@ void main(){
       const verts=[];
 
       for(const chain of chains){
-        /* Apply 3 iterations of Chaikin smoothing for very clean curves */
-        const smooth=chain.length>3 ? chaikinSmooth(chain, 3) : chain;
+        /* Simplify to clean straight-line segments */
+        const simplified=douglasPeucker(chain, dpEpsilon);
+        if(simplified.length<2) continue;
         /* Convert polyline to GL_LINES pairs */
-        for(let i=0;i<smooth.length-1;i++){
-          verts.push(smooth[i][0], terrY, smooth[i][1]);
-          verts.push(smooth[i+1][0], terrY, smooth[i+1][1]);
+        for(let i=0;i<simplified.length-1;i++){
+          verts.push(simplified[i][0], terrY, simplified[i][1]);
+          verts.push(simplified[i+1][0], terrY, simplified[i+1][1]);
         }
       }
 
@@ -1548,10 +1542,7 @@ void main(){
       if(!sys.owner||sys.owner==='unassigned') continue;
       if(hiddenPolities.has(sys.owner)) continue;
       if(!polData[sys.owner]){
-        polData[sys.owner]={
-          pts:[], /* [x,z] pairs */
-          sumY:0, count:0
-        };
+        polData[sys.owner]={ pts:[], sumY:0, count:0 };
       }
       const d=polData[sys.owner];
       const wp=sys._worldPos;
@@ -1567,13 +1558,20 @@ void main(){
       const pts=d.pts;
       const avgY=d.sumY/d.count;
 
+      /* ── Compute axis-aligned bounding box first ── */
+      let bbMinX=1e9, bbMaxX=-1e9, bbMinZ=1e9, bbMaxZ=-1e9;
+      for(const p of pts){
+        if(p[0]<bbMinX) bbMinX=p[0]; if(p[0]>bbMaxX) bbMaxX=p[0];
+        if(p[1]<bbMinZ) bbMinZ=p[1]; if(p[1]>bbMaxZ) bbMaxZ=p[1];
+      }
+      const aabbW=bbMaxX-bbMinX;
+      const aabbH=bbMaxZ-bbMinZ;
+
       /* ── Compute oriented bounding box via PCA on the 2D (X,Z) points ── */
-      /* Mean center */
       let mx=0, mz=0;
       for(const p of pts){ mx+=p[0]; mz+=p[1]; }
       mx/=pts.length; mz/=pts.length;
 
-      /* Covariance matrix */
       let cxx=0, cxz=0, czz=0;
       for(const p of pts){
         const dx=p[0]-mx, dz=p[1]-mz;
@@ -1581,42 +1579,59 @@ void main(){
       }
       cxx/=pts.length; cxz/=pts.length; czz/=pts.length;
 
-      /* Principal eigenvector via analytic 2x2 eigendecomposition */
       const trace=cxx+czz;
       const det=cxx*czz-cxz*cxz;
       const disc=Math.sqrt(Math.max(0, trace*trace*0.25-det));
-      const lambda1=trace*0.5+disc; /* largest eigenvalue */
+      const lambda1=trace*0.5+disc;
+      const lambda2=trace*0.5-disc;
 
-      let ex=cxz, ez=lambda1-cxx;
-      const elen=Math.sqrt(ex*ex+ez*ez);
-      if(elen>1e-8){ ex/=elen; ez/=elen; }
-      else { ex=1; ez=0; } /* degenerate: default to X axis */
+      /* If territory is nearly round (eigenvalues similar), use AABB instead */
+      const eccentricity=(lambda1>0.01)?(lambda1-lambda2)/lambda1:0;
 
-      /* Minor axis */
-      const fx=-ez, fz=ex;
+      let ex, ez, fx, fz, majExtent, minExtent, centerX, centerZ;
 
-      /* Project all points onto major/minor axes to get OBB extents */
-      let minMaj=1e9, maxMaj=-1e9, minMin=1e9, maxMin=-1e9;
-      for(const p of pts){
-        const dx=p[0]-mx, dz=p[1]-mz;
-        const projMaj=dx*ex+dz*ez;
-        const projMin=dx*fx+dz*fz;
-        if(projMaj<minMaj) minMaj=projMaj;
-        if(projMaj>maxMaj) maxMaj=projMaj;
-        if(projMin<minMin) minMin=projMin;
-        if(projMin>maxMin) maxMin=projMin;
+      if(eccentricity<0.3){
+        /* Nearly round territory: use AABB (horizontal text) */
+        if(aabbW>=aabbH){
+          ex=1; ez=0; fx=0; fz=1;
+        } else {
+          ex=0; ez=1; fx=-1; fz=0;
+        }
+        /* Use AABB center */
+        centerX=(bbMinX+bbMaxX)*0.5;
+        centerZ=(bbMinZ+bbMaxZ)*0.5;
+        majExtent=Math.max(aabbW,aabbH);
+        minExtent=Math.min(aabbW,aabbH);
+      } else {
+        /* Elongated: use PCA axis */
+        ex=cxz; ez=lambda1-cxx;
+        const elen=Math.sqrt(ex*ex+ez*ez);
+        if(elen>1e-8){ ex/=elen; ez/=elen; }
+        else { ex=1; ez=0; }
+        fx=-ez; fz=ex;
+
+        /* Project points onto OBB axes */
+        let minMaj=1e9, maxMaj=-1e9, minMin=1e9, maxMin=-1e9;
+        for(const p of pts){
+          const dx=p[0]-mx, dz=p[1]-mz;
+          const projMaj=dx*ex+dz*ez;
+          const projMin=dx*fx+dz*fz;
+          if(projMaj<minMaj) minMaj=projMaj;
+          if(projMaj>maxMaj) maxMaj=projMaj;
+          if(projMin<minMin) minMin=projMin;
+          if(projMin>maxMin) maxMin=projMin;
+        }
+
+        /* OBB center */
+        const obbCenterMaj=(minMaj+maxMaj)*0.5;
+        const obbCenterMin=(minMin+maxMin)*0.5;
+        centerX=mx+ex*obbCenterMaj+fx*obbCenterMin;
+        centerZ=mz+ez*obbCenterMaj+fz*obbCenterMin;
+        majExtent=maxMaj-minMaj;
+        minExtent=maxMin-minMin;
       }
 
-      /* OBB center in world space */
-      const obbCenterMaj=(minMaj+maxMaj)*0.5;
-      const obbCenterMin=(minMin+maxMin)*0.5;
-      const wcx=mx+ex*obbCenterMaj+fx*obbCenterMin;
-      const wcz=mz+ez*obbCenterMaj+fz*obbCenterMin;
-
-      const majExtent=maxMaj-minMaj;
-      const minExtent=maxMin-minMin;
-
-      /* ── Project OBB center + axis endpoints to screen ── */
+      /* ── Project center + axis endpoints to screen ── */
       function proj3D(wx,wy,wz){
         const cx=wx*mvp[0]+wy*mvp[4]+wz*mvp[8]+mvp[12];
         const cy=wx*mvp[1]+wy*mvp[5]+wz*mvp[9]+mvp[13];
@@ -1625,14 +1640,14 @@ void main(){
         return [(cx/cw*0.5+0.5)*W, (1-(cy/cw*0.5+0.5))*H, cw];
       }
 
-      const sc=proj3D(wcx, avgY, wcz);
+      const sc=proj3D(centerX, avgY, centerZ);
       if(!sc) continue;
-      if(sc[0]<-W*0.5||sc[0]>W*1.5||sc[1]<-H*0.5||sc[1]>H*1.5) continue;
+      if(sc[0]<-W*0.3||sc[0]>W*1.3||sc[1]<-H*0.3||sc[1]>H*1.3) continue;
 
-      /* Project the major axis endpoints to get screen angle and span */
-      const halfMaj=majExtent*0.5;
-      const axStartX=wcx-ex*halfMaj, axStartZ=wcz-ez*halfMaj;
-      const axEndX=wcx+ex*halfMaj, axEndZ=wcz+ez*halfMaj;
+      /* Project the major axis endpoints — use inset (70% of extent) to keep text safely inside */
+      const insetMaj=majExtent*0.35;  /* half of 70% of major extent */
+      const axStartX=centerX-ex*insetMaj, axStartZ=centerZ-ez*insetMaj;
+      const axEndX=centerX+ex*insetMaj, axEndZ=centerZ+ez*insetMaj;
       const sA=proj3D(axStartX, avgY, axStartZ);
       const sB=proj3D(axEndX, avgY, axEndZ);
       if(!sA||!sB) continue;
@@ -1640,34 +1655,33 @@ void main(){
       /* Screen angle of major axis */
       const sdx=sB[0]-sA[0], sdy=sB[1]-sA[1];
       let angleDeg=Math.atan2(sdy,sdx)*180/Math.PI;
-      /* Keep text readable: flip if upside down */
       if(angleDeg>90) angleDeg-=180;
       if(angleDeg<-90) angleDeg+=180;
 
       const screenSpanMaj=Math.sqrt(sdx*sdx+sdy*sdy);
 
-      /* Project minor axis endpoints for minor screen span */
-      const halfMin=minExtent*0.5;
-      const mA=proj3D(wcx-fx*halfMin, avgY, wcz-fz*halfMin);
-      const mB=proj3D(wcx+fx*halfMin, avgY, wcz+fz*halfMin);
-      const screenSpanMin=(mA&&mB)?Math.sqrt((mB[0]-mA[0])**2+(mB[1]-mA[1])**2):screenSpanMaj*0.3;
+      /* Project minor axis endpoints with inset */
+      const insetMin=minExtent*0.25;  /* half of 50% of minor extent */
+      const mA=proj3D(centerX-fx*insetMin, avgY, centerZ-fz*insetMin);
+      const mB=proj3D(centerX+fx*insetMin, avgY, centerZ+fz*insetMin);
+      const screenSpanMin=(mA&&mB)?Math.sqrt((mB[0]-mA[0])**2+(mB[1]-mA[1])**2):screenSpanMaj*0.25;
 
-      /* ── Font sizing: fit name within ~70% of the major axis screen span ── */
+      /* ── Font sizing: fit name within the inset screen span ── */
       const nameLen=pol.name.length;
       const charWidth=0.62;
-      const maxFontByWidth=screenSpanMaj*0.70/(nameLen*charWidth);
-      /* Also constrain by minor axis so text doesn't overflow narrow territories */
-      const maxFontByHeight=screenSpanMin*0.55;
+      const maxFontByWidth=screenSpanMaj*0.90/(nameLen*charWidth);
+      /* Height constraint: text height (approx 1.1*fontSize) must fit minor span */
+      const maxFontByHeight=screenSpanMin*0.80;
       const fontSize=Math.round(Math.max(7, Math.min(72, Math.min(maxFontByWidth, maxFontByHeight))));
 
       if(fontSize<7) continue;
 
-      const opacity=Math.min(0.85, Math.max(0.12, (fontSize-7)/14));
+      const opacity=Math.min(0.80, Math.max(0.10, (fontSize-7)/16));
       const strokeCol=pol.strokeColor||pol.color;
-      const ls=Math.max(2, Math.round(fontSize*0.25));
-      const strokeW=Math.max(0.3, Math.min(2.0, fontSize*0.06));
+      const ls=Math.max(2, Math.round(fontSize*0.22));
+      const strokeW=Math.max(0.3, Math.min(2.0, fontSize*0.05));
 
-      html+=`<div class="polity-label" style="left:${sc[0].toFixed(1)}px;top:${sc[1].toFixed(1)}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(1)}deg);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.5);text-shadow:0 0 ${Math.round(fontSize*0.4)}px ${strokeCol}44, 0 0 ${Math.round(fontSize*0.15)}px rgba(0,0,0,0.9);">${pol.name}</div>`;
+      html+=`<div class="polity-label" style="left:${sc[0].toFixed(1)}px;top:${sc[1].toFixed(1)}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(1)}deg);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.4);text-shadow:0 0 ${Math.round(fontSize*0.5)}px ${strokeCol}33, 0 0 ${Math.round(fontSize*0.2)}px rgba(0,0,0,0.9);">${pol.name}</div>`;
     }
     container.innerHTML=html;
   }
