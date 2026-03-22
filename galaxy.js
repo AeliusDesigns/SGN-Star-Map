@@ -201,7 +201,6 @@ varying vec2 vUV;
 void main(){ gl_Position=uMVP*vec4(position,1.0); vUV=aUV; }`;
 
   const FS_TERR = `
-#extension GL_OES_standard_derivatives : enable
 precision highp float;
 uniform sampler2D uTex;
 uniform sampler2D uStrokeTex;
@@ -209,34 +208,34 @@ uniform float uTime;
 varying vec2 vUV;
 void main(){
   vec4 fill=texture2D(uTex,vUV);
-  vec4 strokeCol=texture2D(uStrokeTex,vUV);
+  vec4 stroke=texture2D(uStrokeTex,vUV);
 
-  /* Compute edge from fill alpha gradient using screen-space derivatives.
-     This gives perfectly smooth, sub-pixel anti-aliased borders
-     because GL_LINEAR interpolation makes fill.a continuous. */
-  float da_dx=dFdx(fill.a);
-  float da_dy=dFdy(fill.a);
-  float gradient=length(vec2(da_dx, da_dy));
+  /* fill.a encodes the SDF: 0=at boundary, increasing toward 1.0 deep inside.
+     stroke.rgb is the border color. stroke.a encodes the SDF for border pixels too. */
+  if(fill.a<0.005&&stroke.a<0.005) discard;
 
-  /* Edge strength: smoothstep over a wider range for softer, rounder borders */
-  float edge=smoothstep(0.01, 0.08, gradient) * step(0.02, fill.a);
-
-  if(fill.a<0.01&&edge<0.01) discard;
-
-  /* Breathing pulse */
   float breathe=0.6+0.4*sin(uTime*1.8);
 
-  /* Fill: soft interior wash */
-  float fillA=fill.a*0.12;
+  /* Decode SDF from fill alpha. fill.a=0 at boundary, 1.0 deep inside. */
+  float sdfNorm=fill.a; /* 0..1 normalized distance from edge */
 
-  /* Stroke: smooth curved border from gradient detection */
-  vec3 sCol=strokeCol.a>0.01 ? strokeCol.rgb : fill.rgb;
-  float strokeA=edge*breathe*0.85;
+  /* Fill: soft interior wash, fully opaque past a threshold */
+  float fillA=smoothstep(0.0, 0.15, sdfNorm)*0.18;
+
+  /* Border stroke: a smooth band near the edge (sdfNorm near 0).
+     Use smoothstep to create a clean band without any pixel artifacts. */
+  float borderOuter=1.0-smoothstep(0.0, 0.04, sdfNorm);  /* sharp outer edge */
+  float borderInner=1.0-smoothstep(0.02, 0.12, sdfNorm); /* softer inner fade */
+  float border=max(borderOuter*0.9, borderInner*0.5);
+
+  vec3 sCol=stroke.a>0.01 ? stroke.rgb : fill.rgb;
+  float strokeA=border*breathe;
 
   /* Composite */
   vec3 col=fill.rgb*fillA*(1.0-strokeA)+sCol*strokeA;
-  float alpha=fillA*(1.0-strokeA)+strokeA;
-  gl_FragColor=vec4(col/max(alpha,0.001),alpha);
+  float alpha=max(fillA, strokeA);
+  if(alpha<0.005) discard;
+  gl_FragColor=vec4(col/max(alpha,0.001), alpha);
 }`;
 
   /* Lane lines — same as main.js */
@@ -784,63 +783,56 @@ void main(){
       return b*(1-h) + a*h - k*h*(1-h);
     }
 
-    /* SDF ownership grid.
-       Compute two competing SDFs:
-       1. Owned SDF: smooth-union of circles around all owned systems
-       2. Unowned SDF: smooth-union of circles around all unowned systems
-       Territory exists where ownedSDF < unownedSDF (owned systems are closer).
-       This creates smooth curved borders that naturally avoid unowned systems. */
+    /* Compute SDF grids */
     const ownerGrid=new Array(res*res);
-    const sdfGrid=new Float32Array(res*res);
+    const sdfGrid=new Float32Array(res*res); /* distance from boundary, positive=inside */
     const searchMaxR=CLAIM_R*3+cellSize;
-    const smoothK=CLAIM_R*1.5; /* larger = rounder, more organic merges */
+    const smoothK=CLAIM_R*1.5;
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
 
-        /* Owned SDF (metaball blend of all nearby owned systems) */
         const nearOwned=nearbyFromHash(hashOwned,wx,wz,searchMaxR);
         let ownedSdf=999;
         let bestOwner=null, bestDist=1e9;
         for(const sys of nearOwned){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
-          const sysSdf=d-CLAIM_R;
-          ownedSdf=smoothMin(ownedSdf, sysSdf, smoothK);
+          ownedSdf=smoothMin(ownedSdf, d-CLAIM_R, smoothK);
           if(d<bestDist){ bestDist=d; bestOwner=sys.owner; }
         }
 
-        /* Unowned SDF with same blending */
         const nearUnowned=nearbyFromHash(hashUnowned,wx,wz,searchMaxR);
         let unownedSdf=999;
         for(const sys of nearUnowned){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
-          const sysSdf=d-CLAIM_R;
-          unownedSdf=smoothMin(unownedSdf, sysSdf, smoothK);
+          unownedSdf=smoothMin(unownedSdf, d-CLAIM_R, smoothK);
         }
 
         const gi=gy*res+gx;
-
         if(bestOwner&&ownedSdf<0&&ownedSdf<unownedSdf){
           ownerGrid[gi]=bestOwner;
-          /* Store the owned SDF directly for smooth edge fading.
-             The competition with unowned only determines the boundary decision,
-             not the edge smoothness. */
-          sdfGrid[gi]=ownedSdf;
+          /* Store positive depth (how far inside the boundary) */
+          sdfGrid[gi]=-ownedSdf;
         } else {
           ownerGrid[gi]=null;
-          sdfGrid[gi]=Math.max(ownedSdf,0);
+          sdfGrid[gi]=0;
         }
       }
     }
 
-    /* Fill texture */
+    /* Find max SDF depth for normalization */
+    let maxDepth=0.001;
+    for(let gi=0;gi<res*res;gi++) if(sdfGrid[gi]>maxDepth) maxDepth=sdfGrid[gi];
+
+    /* Fill texture: encode normalized SDF depth as alpha.
+       0 = at boundary, 255 = deep inside. GL_LINEAR interpolation
+       will smoothly interpolate between these, giving the shader
+       a perfectly smooth distance field to draw the border from. */
     const fillData=new Uint8Array(res*res*4);
-    /* Edge transition width in world units - spread over enough pixels for smooth dFdx */
-    const edgeWidth=Math.max(pxSize*8, 0.5);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
       if(!pid) continue;
@@ -848,10 +840,9 @@ void main(){
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
-      const depth=-sdfGrid[gi];
-      const edgeSmooth=Math.min(1.0, depth/edgeWidth);
+      const normDepth=Math.min(1.0, sdfGrid[gi]/maxDepth);
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-      fillData[idx+3]=Math.round(edgeSmooth*255);
+      fillData[idx+3]=Math.round(normDepth*255);
     }
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
@@ -862,7 +853,7 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    /* Stroke texture */
+    /* Stroke texture: stroke color everywhere inside territory */
     const strokeData=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
