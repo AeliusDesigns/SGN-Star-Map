@@ -211,7 +211,7 @@ varying vec2 vUV;
 void main(){
   vec4 fill=texture2D(uTex,vUV);
   if(fill.a<0.01) discard;
-  float fillA=fill.a*0.15;
+  float fillA=fill.a*0.35;
   gl_FragColor=vec4(fill.rgb, fillA);
 }`;
 
@@ -1275,29 +1275,21 @@ void main(){
       gl.drawArrays(gl.TRIANGLES,0,6);
       gl.disableVertexAttribArray(tP); gl.disableVertexAttribArray(tU);
 
-      /* 3b. Border lines (per-polity, multi-pass glow like lanes) */
-      const breathe=0.6+0.4*Math.sin(wallTime*1.8);
+      /* 3b. Border lines — thick solid stroke like Stellaris reference */
+      const breathe=0.7+0.3*Math.sin(wallTime*1.8);
       gl.useProgram(progLines);
       gl.uniformMatrix4fv(gl.getUniformLocation(progLines,'uMVP'),false,mvp);
       const aPB=gl.getAttribLocation(progLines,'position');
-      gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
       for(const b of territoryBorderColors){
         if(b.count<2) continue;
         gl.bindBuffer(gl.ARRAY_BUFFER,b.vbo);
         gl.enableVertexAttribArray(aPB);
         gl.vertexAttribPointer(aPB,3,gl.FLOAT,false,0,0);
         const r=b.color[0], g=b.color[1], bl=b.color[2];
-        /* Outer glow */
-        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r*0.5,g*0.5,bl*0.5,0.15*breathe);
-        gl.lineWidth(3.0);
-        gl.drawArrays(gl.LINES,0,b.count);
-        /* Mid */
-        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r*0.7,g*0.7,bl*0.7,0.35*breathe);
+        /* Solid bright border line */
+        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r,g,bl,0.85*breathe);
         gl.lineWidth(2.0);
-        gl.drawArrays(gl.LINES,0,b.count);
-        /* Core */
-        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r,g,bl,0.7*breathe);
-        gl.lineWidth(1.0);
         gl.drawArrays(gl.LINES,0,b.count);
         gl.disableVertexAttribArray(aPB);
       }
@@ -1406,7 +1398,7 @@ void main(){
     const mvp=buildMVP();
     const W=canvas.width, H=canvas.height;
 
-    /* Compute bounding box, centroid, and system count per polity */
+    /* Compute bounding box and centroid per polity */
     const polData={};
     for(const sys of systems){
       if(!sys.owner||sys.owner==='unassigned') continue;
@@ -1431,22 +1423,10 @@ void main(){
       const d=polData[pol.id];
       if(!d||d.count<1) continue;
 
-      /* Centroid in world space */
       const cx=d.sumX/d.count;
       const cy=d.sumY/d.count;
       const cz=d.sumZ/d.count;
-
-      /* Territory extent in world units */
       const extentX=d.maxX-d.minX;
-      const extentZ=d.maxZ-d.minZ;
-      const maxExtent=Math.max(extentX, extentZ, 1);
-
-      /* Determine if text should be rotated to follow the longer axis.
-         If territory is taller (Z) than wide (X), rotate 90 degrees.
-         Use a smooth threshold so near-square territories stay horizontal. */
-      const aspect=extentX/(extentZ+0.01);
-      let rotation=0;
-      if(aspect<0.6) rotation=-90; /* tall and narrow: rotate vertical */
 
       /* Project centroid to screen */
       const clipX=cx*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
@@ -1458,32 +1438,30 @@ void main(){
       const sx=(ndcX*0.5+0.5)*W;
       const sy=(1-(ndcY*0.5+0.5))*H;
 
-      /* Project a world-space reference distance to screen to get scale factor.
-         This makes text size proportional to how large the territory appears on screen. */
-      const refDist=maxExtent*0.5;
-      const refX=cx+refDist;
-      const refClipX=refX*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
-      const refCw=refX*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
-      const refNdcX=refClipX/refCw;
-      const screenExtent=Math.abs(refNdcX-ndcX)*W*0.5;
+      /* Project territory width to screen pixels */
+      const leftX=d.minX;
+      const rightX=d.maxX;
+      const lClip=leftX*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
+      const lCw=leftX*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
+      const rClip=rightX*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
+      const rCw=rightX*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
+      if(lCw<=0||rCw<=0) continue;
+      const screenWidth=Math.abs((rClip/rCw-lClip/lCw)*0.5*W);
 
-      /* Font size: scale with screen extent of territory.
-         Clamp to reasonable range. Larger territories get larger text. */
+      /* Font size: fit the name within ~80% of the territory screen width.
+         Always horizontal. */
       const nameLen=pol.name.length;
-      const baseFontSize=Math.max(8, Math.min(48, screenExtent*0.7/Math.max(nameLen*0.4, 1)));
-      const fontSize=Math.round(baseFontSize);
+      const charWidth=0.65; /* approximate character width ratio */
+      const fontSize=Math.round(Math.max(7, Math.min(60, screenWidth*0.8/(nameLen*charWidth))));
 
-      /* Hide if too small to read */
       if(fontSize<6) continue;
 
-      /* Opacity: fade out when very small, full when large */
-      const opacity=Math.min(0.85, Math.max(0.2, (fontSize-6)/10));
-
+      const opacity=Math.min(0.9, Math.max(0.15, (fontSize-6)/12));
       const strokeCol=pol.strokeColor||pol.color;
-      const ls=Math.max(1, Math.round(fontSize*0.25));
+      const ls=Math.max(2, Math.round(fontSize*0.3));
+      const strokeW=Math.max(0.5, Math.min(2.5, fontSize*0.07));
 
-      const strokeW=Math.max(0.5, Math.min(2, fontSize*0.06));
-      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${rotation}deg);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.7);text-shadow:0 0 ${Math.round(fontSize*0.4)}px rgba(255,255,255,0.3), 0 0 ${Math.round(fontSize*0.8)}px ${strokeCol}40, 0 2px 6px rgba(0,0,0,0.9);">${pol.name}</div>`;
+      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.65);text-shadow:0 0 ${Math.round(fontSize*0.3)}px rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.9);">${pol.name}</div>`;
     }
     container.innerHTML=html;
   }
