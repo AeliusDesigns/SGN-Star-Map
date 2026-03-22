@@ -717,7 +717,6 @@ void main(){
   function hexToRgb(hex){ const h=hex.replace('#',''); return [parseInt(h.substring(0,2),16),parseInt(h.substring(2,4),16),parseInt(h.substring(4,6),16)]; }
 
   function buildTerritoryTexture(){
-    const res=TERRITORY_RES;
     const extX=GALAXY_SPREAD_X/2+20;
     const extZ=GALAXY_SPREAD_Z/2+20;
     const worldW=extX*2, worldH=extZ*2;
@@ -725,7 +724,7 @@ void main(){
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
 
-    /* Spatial hash of ALL systems (owned + unowned) for Voronoi */
+    /* Spatial hash of ALL systems */
     const cellSize=4;
     const hashAll=new Map();
     function cellKey(wx,wz){ return Math.floor(wx/cellSize)+','+Math.floor(wz/cellSize); }
@@ -739,11 +738,10 @@ void main(){
     function nearestSystem(wx,wz){
       const cx=Math.floor(wx/cellSize), cz=Math.floor(wz/cellSize);
       let best=1e9, bestSys=null;
-      /* Search expanding rings until we find something */
       for(let ring=0;ring<=5;ring++){
         for(let dz=-ring;dz<=ring;dz++){
           for(let dx=-ring;dx<=ring;dx++){
-            if(Math.abs(dx)<ring&&Math.abs(dz)<ring) continue; /* skip inner cells already checked */
+            if(Math.abs(dx)<ring&&Math.abs(dz)<ring) continue;
             const bucket=hashAll.get((cx+dx)+','+(cz+dz));
             if(!bucket) continue;
             for(const sys of bucket){
@@ -753,59 +751,63 @@ void main(){
             }
           }
         }
-        if(bestSys&&ring>0) break; /* found in previous ring, one more ring to be sure */
+        if(bestSys&&ring>0) break;
       }
       return bestSys;
     }
 
-    /* Pass 1: Voronoi ownership grid.
-       Each pixel finds its nearest system. If that system is owned, the pixel
-       belongs to that polity. This is a true Voronoi diagram. */
-    const ownerGrid=new Array(res*res); /* polity id or null */
-    const polIdGrid=new Int32Array(res*res); /* numeric polity index for fast comparison */
-    const polIdMap=new Map(); /* polity id string -> numeric index */
-    let nextPolIdx=1;
-    for(const p of polities){ polIdMap.set(p.id, nextPolIdx++); }
-
-    for(let gy=0;gy<res;gy++){
-      for(let gx=0;gx<res;gx++){
-        const wx=(gx/(res-1))*worldW - extX;
-        const wz=(gy/(res-1))*worldH - extZ;
-        const nearest=nearestSystem(wx,wz);
-        const gi=gy*res+gx;
-        if(nearest&&nearest.owner&&nearest.owner!=='unassigned'&&!hiddenPolities.has(nearest.owner)){
-          ownerGrid[gi]=nearest.owner;
-          polIdGrid[gi]=polIdMap.get(nearest.owner)||0;
-        } else {
-          ownerGrid[gi]=null;
-          polIdGrid[gi]=0;
+    /* Helper: compute Voronoi ownership for a grid of given resolution */
+    function computeOwnership(res){
+      const ownerGrid=new Array(res*res);
+      const polIdMap=new Map();
+      let nextIdx=1;
+      for(const p of polities) polIdMap.set(p.id, nextIdx++);
+      const polIdGrid=new Int32Array(res*res);
+      for(let gy=0;gy<res;gy++){
+        for(let gx=0;gx<res;gx++){
+          const wx=(gx/(res-1))*worldW - extX;
+          const wz=(gy/(res-1))*worldH - extZ;
+          const nearest=nearestSystem(wx,wz);
+          const gi=gy*res+gx;
+          if(nearest&&nearest.owner&&nearest.owner!=='unassigned'&&!hiddenPolities.has(nearest.owner)){
+            ownerGrid[gi]=nearest.owner;
+            polIdGrid[gi]=polIdMap.get(nearest.owner)||0;
+          } else {
+            ownerGrid[gi]=null;
+            polIdGrid[gi]=0;
+          }
         }
       }
+      return {ownerGrid, polIdGrid, polIdMap, res};
     }
 
-    /* Pass 2: Marching squares on ownership boundary.
-       Extract contour lines where ownership changes (owned->unowned or polity A->polity B). */
+    /* High-res grid for border line extraction */
+    const hiRes=TERRITORY_RES;
+    const hi=computeOwnership(hiRes);
+
+    /* Low-res grid for fill texture (blur works well at low res) */
+    const loRes=128;
+    const lo=computeOwnership(loRes);
+
+    /* === Border lines via marching squares on high-res grid === */
     const borderVerts=[];
     const borderPolIds=[];
-    const cellW=worldW/(res-1);
-    const cellH=worldH/(res-1);
+    const cellW=worldW/(hiRes-1);
+    const cellH=worldH/(hiRes-1);
     const terrY=-0.5;
 
-    for(let gy=0;gy<res-1;gy++){
-      for(let gx=0;gx<res-1;gx++){
-        const i00=gy*res+gx, i10=i00+1, i01=i00+res, i11=i01+1;
-        const p00=polIdGrid[i00], p10=polIdGrid[i10], p01=polIdGrid[i01], p11=polIdGrid[i11];
+    for(let gy=0;gy<hiRes-1;gy++){
+      for(let gx=0;gx<hiRes-1;gx++){
+        const i00=gy*hiRes+gx, i10=i00+1, i01=i00+hiRes, i11=i01+1;
+        const p00=hi.polIdGrid[i00], p10=hi.polIdGrid[i10], p01=hi.polIdGrid[i01], p11=hi.polIdGrid[i11];
 
-        /* Check each edge for ownership changes */
         const x0=-extX+gx*cellW, x1=x0+cellW;
         const z0=-extZ+gy*cellH, z1=z0+cellH;
 
-        /* Get the owned polity in this cell (for coloring) */
-        const pid=ownerGrid[i00]||ownerGrid[i10]||ownerGrid[i01]||ownerGrid[i11];
-        if(!pid) continue; /* no owned corners at all */
+        const pid=hi.ownerGrid[i00]||hi.ownerGrid[i10]||hi.ownerGrid[i01]||hi.ownerGrid[i11];
+        if(!pid) continue;
 
-        /* For each cell, treat it as binary: is this corner owned by 'pid'? */
-        const ref=polIdMap.get(pid)||0;
+        const ref=hi.polIdMap.get(pid)||0;
         const v00=(p00===ref)?-1:1;
         const v10=(p10===ref)?-1:1;
         const v01=(p01===ref)?-1:1;
@@ -856,7 +858,6 @@ void main(){
         borderVerts[vi+3],borderVerts[vi+4],borderVerts[vi+5]
       );
     }
-
     for(const [pid,verts] of polBorderVerts){
       const pol=polMap.get(pid);
       if(!pol) continue;
@@ -870,54 +871,51 @@ void main(){
       });
     }
 
-    /* Fill texture from Voronoi ownership */
-    const fillRaw=new Uint8Array(res*res*4);
-    for(let gi=0;gi<res*res;gi++){
-      const pid=ownerGrid[gi];
+    /* === Fill texture from low-res grid with heavy blur === */
+    const fillRaw=new Uint8Array(loRes*loRes*4);
+    for(let gi=0;gi<loRes*loRes;gi++){
+      const pid=lo.ownerGrid[gi];
       if(!pid) continue;
       const pol=polMap.get(pid);
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
       fillRaw[idx]=c[0]; fillRaw[idx+1]=c[1]; fillRaw[idx+2]=c[2];
-      fillRaw[idx+3]=200;
+      fillRaw[idx+3]=220;
     }
-
-    /* Multi-pass Gaussian blur to smooth the fill edges.
-       This eliminates the stair-step look on the territory boundary.
-       The border lines (GL_LINES) provide the crisp edge on top. */
+    /* Heavy blur (3 passes) at low res eliminates all stair-stepping */
     const kernel=[1,4,6,4,1], kSum=16, kR=2;
-    function blurPass(src){
+    function blurPass(src, bRes){
       const temp=new Uint8Array(src.length);
-      for(let y=0;y<res;y++) for(let x=0;x<res;x++){
+      for(let y=0;y<bRes;y++) for(let x=0;x<bRes;x++){
         let r=0,g=0,b=0,a=0;
         for(let k=-kR;k<=kR;k++){
-          const sx=Math.max(0,Math.min(res-1,x+k));
-          const i=(y*res+sx)*4; const w=kernel[k+kR];
+          const sx=Math.max(0,Math.min(bRes-1,x+k));
+          const i=(y*bRes+sx)*4; const w=kernel[k+kR];
           r+=src[i]*w; g+=src[i+1]*w; b+=src[i+2]*w; a+=src[i+3]*w;
         }
-        const i=(y*res+x)*4;
+        const i=(y*bRes+x)*4;
         temp[i]=r/kSum; temp[i+1]=g/kSum; temp[i+2]=b/kSum; temp[i+3]=a/kSum;
       }
       const out=new Uint8Array(src.length);
-      for(let y=0;y<res;y++) for(let x=0;x<res;x++){
+      for(let y=0;y<bRes;y++) for(let x=0;x<bRes;x++){
         let r=0,g=0,b=0,a=0;
         for(let k=-kR;k<=kR;k++){
-          const sy=Math.max(0,Math.min(res-1,y+k));
-          const i=(sy*res+x)*4; const w=kernel[k+kR];
+          const sy=Math.max(0,Math.min(bRes-1,y+k));
+          const i=(sy*bRes+x)*4; const w=kernel[k+kR];
           r+=temp[i]*w; g+=temp[i+1]*w; b+=temp[i+2]*w; a+=temp[i+3]*w;
         }
-        const i=(y*res+x)*4;
+        const i=(y*bRes+x)*4;
         out[i]=r/kSum; out[i+1]=g/kSum; out[i+2]=b/kSum; out[i+3]=a/kSum;
       }
       return out;
     }
-    /* Two blur passes for smoother edges */
-    const fillData=blurPass(blurPass(fillRaw));
+    let fillData=fillRaw;
+    for(let p=0;p<3;p++) fillData=blurPass(fillData, loRes);
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,loRes,loRes,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
@@ -1455,36 +1453,43 @@ void main(){
       const d=polData[pol.id];
       if(!d||d.count<1) continue;
 
-      const cx=d.sumX/d.count;
-      const cy=d.sumY/d.count;
-      const cz=d.sumZ/d.count;
+      /* Use bounding box center (not centroid) so text is visually centered in territory */
+      const bcx=(d.minX+d.maxX)*0.5;
+      const bcy=d.sumY/d.count;
+      const bcz=(d.minZ+d.maxZ)*0.5;
       const extentX=d.maxX-d.minX;
+      const extentZ=d.maxZ-d.minZ;
 
-      /* Project centroid to screen */
-      const clipX=cx*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
-      const clipY=cx*mvp[1]+cy*mvp[5]+cz*mvp[9]+mvp[13];
-      const cw=cx*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
+      /* Project bbox center to screen */
+      const clipX=bcx*mvp[0]+bcy*mvp[4]+bcz*mvp[8]+mvp[12];
+      const clipY=bcx*mvp[1]+bcy*mvp[5]+bcz*mvp[9]+mvp[13];
+      const cw=bcx*mvp[3]+bcy*mvp[7]+bcz*mvp[11]+mvp[15];
       if(cw<=0) continue;
       const ndcX=clipX/cw, ndcY=clipY/cw;
       if(Math.abs(ndcX)>1.5||Math.abs(ndcY)>1.5) continue;
       const sx=(ndcX*0.5+0.5)*W;
       const sy=(1-(ndcY*0.5+0.5))*H;
 
-      /* Project territory width to screen pixels */
-      const leftX=d.minX;
-      const rightX=d.maxX;
-      const lClip=leftX*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
-      const lCw=leftX*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
-      const rClip=rightX*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
-      const rCw=rightX*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
-      if(lCw<=0||rCw<=0) continue;
-      const screenWidth=Math.abs((rClip/rCw-lClip/lCw)*0.5*W);
+      /* Project the longer axis to screen pixels for sizing */
+      const useX=extentX>=extentZ;
+      const axisLen=useX?extentX:extentZ;
+      const aStart=useX?d.minX:bcx;
+      const aEnd=useX?d.maxX:bcx;
+      const aStartZ=useX?bcz:d.minZ;
+      const aEndZ=useX?bcz:d.maxZ;
+
+      const sClip=aStart*mvp[0]+bcy*mvp[4]+aStartZ*mvp[8]+mvp[12];
+      const sCw=aStart*mvp[3]+bcy*mvp[7]+aStartZ*mvp[11]+mvp[15];
+      const eClip=aEnd*mvp[0]+bcy*mvp[4]+aEndZ*mvp[8]+mvp[12];
+      const eCw=aEnd*mvp[3]+bcy*mvp[7]+aEndZ*mvp[11]+mvp[15];
+      if(sCw<=0||eCw<=0) continue;
+      const screenSpan=Math.abs((eClip/eCw-sClip/sCw)*0.5*W);
 
       /* Font size: fit the name within ~80% of the territory screen width.
          Always horizontal. */
       const nameLen=pol.name.length;
-      const charWidth=0.65; /* approximate character width ratio */
-      const fontSize=Math.round(Math.max(7, Math.min(60, screenWidth*0.8/(nameLen*charWidth))));
+      const charWidth=0.6;
+      const fontSize=Math.round(Math.max(7, Math.min(60, screenSpan*0.75/(nameLen*charWidth))));
 
       if(fontSize<6) continue;
 
