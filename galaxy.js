@@ -11,7 +11,7 @@
   const GALAXY_SPREAD_Z = 140;
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
-  const TERRITORY_RES = 256;
+  const TERRITORY_RES = 1024;
   const TERRITORY_RADIUS = 2.5;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
@@ -1406,38 +1406,83 @@ void main(){
     const mvp=buildMVP();
     const W=canvas.width, H=canvas.height;
 
-    /* Compute centroid of each polity's owned systems */
-    const centroids={};
-    const counts={};
+    /* Compute bounding box, centroid, and system count per polity */
+    const polData={};
     for(const sys of systems){
       if(!sys.owner||sys.owner==='unassigned') continue;
       if(hiddenPolities.has(sys.owner)) continue;
-      if(!centroids[sys.owner]){ centroids[sys.owner]=[0,0,0]; counts[sys.owner]=0; }
-      centroids[sys.owner][0]+=sys._worldPos[0];
-      centroids[sys.owner][1]+=sys._worldPos[1];
-      centroids[sys.owner][2]+=sys._worldPos[2];
-      counts[sys.owner]++;
+      if(!polData[sys.owner]){
+        polData[sys.owner]={
+          minX:1e9, maxX:-1e9, minZ:1e9, maxZ:-1e9,
+          sumX:0, sumY:0, sumZ:0, count:0
+        };
+      }
+      const d=polData[sys.owner];
+      const wp=sys._worldPos;
+      d.sumX+=wp[0]; d.sumY+=wp[1]; d.sumZ+=wp[2]; d.count++;
+      if(wp[0]<d.minX) d.minX=wp[0];
+      if(wp[0]>d.maxX) d.maxX=wp[0];
+      if(wp[2]<d.minZ) d.minZ=wp[2];
+      if(wp[2]>d.maxZ) d.maxZ=wp[2];
     }
 
     let html='';
     for(const pol of polities){
-      if(!centroids[pol.id]||counts[pol.id]<1) continue;
-      const cx=centroids[pol.id][0]/counts[pol.id];
-      const cy=centroids[pol.id][1]/counts[pol.id];
-      const cz=centroids[pol.id][2]/counts[pol.id];
+      const d=polData[pol.id];
+      if(!d||d.count<1) continue;
 
-      /* Project to screen */
+      /* Centroid in world space */
+      const cx=d.sumX/d.count;
+      const cy=d.sumY/d.count;
+      const cz=d.sumZ/d.count;
+
+      /* Territory extent in world units */
+      const extentX=d.maxX-d.minX;
+      const extentZ=d.maxZ-d.minZ;
+      const maxExtent=Math.max(extentX, extentZ, 1);
+
+      /* Determine if text should be rotated to follow the longer axis.
+         If territory is taller (Z) than wide (X), rotate 90 degrees.
+         Use a smooth threshold so near-square territories stay horizontal. */
+      const aspect=extentX/(extentZ+0.01);
+      let rotation=0;
+      if(aspect<0.6) rotation=-90; /* tall and narrow: rotate vertical */
+
+      /* Project centroid to screen */
       const clipX=cx*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
       const clipY=cx*mvp[1]+cy*mvp[5]+cz*mvp[9]+mvp[13];
       const cw=cx*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
       if(cw<=0) continue;
       const ndcX=clipX/cw, ndcY=clipY/cw;
-      if(Math.abs(ndcX)>1.2||Math.abs(ndcY)>1.2) continue;
+      if(Math.abs(ndcX)>1.5||Math.abs(ndcY)>1.5) continue;
       const sx=(ndcX*0.5+0.5)*W;
       const sy=(1-(ndcY*0.5+0.5))*H;
 
+      /* Project a world-space reference distance to screen to get scale factor.
+         This makes text size proportional to how large the territory appears on screen. */
+      const refDist=maxExtent*0.5;
+      const refX=cx+refDist;
+      const refClipX=refX*mvp[0]+cy*mvp[4]+cz*mvp[8]+mvp[12];
+      const refCw=refX*mvp[3]+cy*mvp[7]+cz*mvp[11]+mvp[15];
+      const refNdcX=refClipX/refCw;
+      const screenExtent=Math.abs(refNdcX-ndcX)*W*0.5;
+
+      /* Font size: scale with screen extent of territory.
+         Clamp to reasonable range. Larger territories get larger text. */
+      const nameLen=pol.name.length;
+      const baseFontSize=Math.max(8, Math.min(48, screenExtent*0.7/Math.max(nameLen*0.4, 1)));
+      const fontSize=Math.round(baseFontSize);
+
+      /* Hide if too small to read */
+      if(fontSize<6) continue;
+
+      /* Opacity: fade out when very small, full when large */
+      const opacity=Math.min(0.85, Math.max(0.2, (fontSize-6)/10));
+
       const strokeCol=pol.strokeColor||pol.color;
-      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;color:${strokeCol};text-shadow:0 0 8px ${strokeCol}40, 0 0 3px ${pol.color}60;">${pol.name}</div>`;
+      const ls=Math.max(1, Math.round(fontSize*0.25));
+
+      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${rotation}deg);text-shadow:0 0 ${Math.round(fontSize*0.5)}px ${strokeCol}50, 0 0 ${Math.round(fontSize*0.3)}px ${pol.color}40, 0 2px 4px rgba(0,0,0,0.8);">${pol.name}</div>`;
     }
     container.innerHTML=html;
   }
