@@ -789,9 +789,8 @@ void main(){
     const loRes=128;
     const lo=computeOwnership(loRes);
 
-    /* === Border lines via marching squares on high-res grid === */
-    const borderVerts=[];
-    const borderPolIds=[];
+    /* === Border lines via marching squares on high-res grid, then chain & smooth === */
+    const borderSegsRaw=[];  /* {pid, ax,az, bx,bz} raw segments */
     const cellW=worldW/(hiRes-1);
     const cellH=worldH/(hiRes-1);
     const terrY=-0.5;
@@ -827,8 +826,7 @@ void main(){
         const eR=lerp(v10,v11,[x1,z0],[x1,z1]);
 
         function addSeg(a,b){
-          borderVerts.push(a[0],terrY,a[1], b[0],terrY,b[1]);
-          borderPolIds.push(pid);
+          borderSegsRaw.push({pid, ax:a[0],az:a[1], bx:b[0],bz:b[1]});
         }
 
         switch(c){
@@ -844,23 +842,140 @@ void main(){
       }
     }
 
-    /* Build per-polity border VBOs */
-    territoryBorderColors=[];
-    const polBorderVerts=new Map();
-    for(let i=0;i<borderPolIds.length;i++){
-      const pid=borderPolIds[i];
-      if(!pid) continue;
-      if(!polBorderVerts.has(pid)) polBorderVerts.set(pid,[]);
-      const arr=polBorderVerts.get(pid);
-      const vi=i*6;
-      arr.push(
-        borderVerts[vi],borderVerts[vi+1],borderVerts[vi+2],
-        borderVerts[vi+3],borderVerts[vi+4],borderVerts[vi+5]
-      );
+    /* ── Chain segments into polylines per polity, then smooth ── */
+    const segsByPolity=new Map();
+    for(const seg of borderSegsRaw){
+      if(!segsByPolity.has(seg.pid)) segsByPolity.set(seg.pid, []);
+      segsByPolity.get(seg.pid).push(seg);
     }
-    for(const [pid,verts] of polBorderVerts){
+
+    /* Snap threshold: half a cell diagonal to join nearby endpoints */
+    const snapThresh=Math.sqrt(cellW*cellW+cellH*cellH)*0.6;
+    const snapThresh2=snapThresh*snapThresh;
+
+    function chainSegments(segs){
+      /* Build adjacency: quantize endpoints to a grid for fast lookup */
+      const qf=1.0/snapThresh;
+      function qkey(x,z){ return (Math.round(x*qf))+','+(Math.round(z*qf)); }
+      const endMap=new Map(); /* qkey -> [{segIdx, end:'a'|'b'}] */
+      for(let i=0;i<segs.length;i++){
+        const s=segs[i];
+        for(const end of ['a','b']){
+          const kx=end==='a'?s.ax:s.bx, kz=end==='a'?s.az:s.bz;
+          const k=qkey(kx,kz);
+          if(!endMap.has(k)) endMap.set(k,[]);
+          endMap.get(k).push({idx:i, end});
+        }
+      }
+
+      const used=new Uint8Array(segs.length);
+      const chains=[];
+
+      for(let start=0;start<segs.length;start++){
+        if(used[start]) continue;
+        used[start]=1;
+        const s=segs[start];
+        const chain=[[s.ax,s.az],[s.bx,s.bz]];
+
+        /* Extend forward from chain tail */
+        let extending=true;
+        while(extending){
+          extending=false;
+          const tail=chain[chain.length-1];
+          const k=qkey(tail[0],tail[1]);
+          const neighbors=endMap.get(k);
+          if(!neighbors) break;
+          for(const n of neighbors){
+            if(used[n.idx]) continue;
+            const ns=segs[n.idx];
+            const nx=n.end==='a'?ns.ax:ns.bx, nz=n.end==='a'?ns.az:ns.bz;
+            const dx=nx-tail[0], dz=nz-tail[1];
+            if(dx*dx+dz*dz<snapThresh2){
+              used[n.idx]=1;
+              const ox=n.end==='a'?ns.bx:ns.ax, oz=n.end==='a'?ns.bz:ns.az;
+              chain.push([ox,oz]);
+              extending=true;
+              break;
+            }
+          }
+        }
+
+        /* Extend backward from chain head */
+        extending=true;
+        while(extending){
+          extending=false;
+          const head=chain[0];
+          const k=qkey(head[0],head[1]);
+          const neighbors=endMap.get(k);
+          if(!neighbors) break;
+          for(const n of neighbors){
+            if(used[n.idx]) continue;
+            const ns=segs[n.idx];
+            const nx=n.end==='a'?ns.ax:ns.bx, nz=n.end==='a'?ns.az:ns.bz;
+            const dx=nx-head[0], dz=nz-head[1];
+            if(dx*dx+dz*dz<snapThresh2){
+              used[n.idx]=1;
+              const ox=n.end==='a'?ns.bx:ns.ax, oz=n.end==='a'?ns.bz:ns.az;
+              chain.unshift([ox,oz]);
+              extending=true;
+              break;
+            }
+          }
+        }
+
+        if(chain.length>=2) chains.push(chain);
+      }
+      return chains;
+    }
+
+    /* Chaikin subdivision for smooth curves */
+    function chaikinSmooth(pts, iterations){
+      let cur=pts;
+      for(let iter=0;iter<iterations;iter++){
+        const next=[];
+        const closed=(Math.abs(cur[0][0]-cur[cur.length-1][0])<snapThresh &&
+                      Math.abs(cur[0][1]-cur[cur.length-1][1])<snapThresh);
+        if(closed&&cur.length>2){
+          /* Closed loop: wrap around */
+          for(let i=0;i<cur.length;i++){
+            const j=(i+1)%cur.length;
+            next.push([cur[i][0]*0.75+cur[j][0]*0.25, cur[i][1]*0.75+cur[j][1]*0.25]);
+            next.push([cur[i][0]*0.25+cur[j][0]*0.75, cur[i][1]*0.25+cur[j][1]*0.75]);
+          }
+        } else {
+          /* Open: keep endpoints */
+          next.push(cur[0]);
+          for(let i=0;i<cur.length-1;i++){
+            next.push([cur[i][0]*0.75+cur[i+1][0]*0.25, cur[i][1]*0.75+cur[i+1][1]*0.25]);
+            next.push([cur[i][0]*0.25+cur[i+1][0]*0.75, cur[i][1]*0.25+cur[i+1][1]*0.75]);
+          }
+          next.push(cur[cur.length-1]);
+        }
+        cur=next;
+      }
+      return cur;
+    }
+
+    /* Build per-polity border VBOs from smoothed chains */
+    territoryBorderColors=[];
+    for(const [pid, segs] of segsByPolity){
       const pol=polMap.get(pid);
       if(!pol) continue;
+
+      const chains=chainSegments(segs);
+      const verts=[];
+
+      for(const chain of chains){
+        /* Apply 3 iterations of Chaikin smoothing for very clean curves */
+        const smooth=chain.length>3 ? chaikinSmooth(chain, 3) : chain;
+        /* Convert polyline to GL_LINES pairs */
+        for(let i=0;i<smooth.length-1;i++){
+          verts.push(smooth[i][0], terrY, smooth[i][1]);
+          verts.push(smooth[i+1][0], terrY, smooth[i+1][1]);
+        }
+      }
+
+      if(verts.length<6) continue;
       const vbo=gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
       gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
@@ -1305,8 +1420,7 @@ void main(){
       gl.drawArrays(gl.TRIANGLES,0,6);
       gl.disableVertexAttribArray(tP); gl.disableVertexAttribArray(tU);
 
-      /* 3b. Border lines — thick solid stroke like Stellaris reference */
-      const breathe=0.7+0.3*Math.sin(wallTime*1.8);
+      /* 3b. Border lines — solid clean stroke like Stellaris */
       gl.useProgram(progLines);
       gl.uniformMatrix4fv(gl.getUniformLocation(progLines,'uMVP'),false,mvp);
       const aPB=gl.getAttribLocation(progLines,'position');
@@ -1317,8 +1431,8 @@ void main(){
         gl.enableVertexAttribArray(aPB);
         gl.vertexAttribPointer(aPB,3,gl.FLOAT,false,0,0);
         const r=b.color[0], g=b.color[1], bl=b.color[2];
-        /* Solid bright border line */
-        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r,g,bl,0.85*breathe);
+        /* Solid bright border line — no animation, clean and flat */
+        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r,g,bl,0.92);
         gl.lineWidth(2.0);
         gl.drawArrays(gl.LINES,0,b.count);
         gl.disableVertexAttribArray(aPB);
@@ -1420,7 +1534,7 @@ void main(){
     if(container) container.style.display=showNames?'block':'none';
   }
 
-  /* Compute polity centroids and project name labels to screen */
+  /* Compute polity territory shapes and project Stellaris-style oriented name labels */
   function updatePolityNames(){
     const container=document.getElementById('polity-names');
     if(!container||!showNames||polities.length===0){ if(container) container.innerHTML=''; return; }
@@ -1428,77 +1542,132 @@ void main(){
     const mvp=buildMVP();
     const W=canvas.width, H=canvas.height;
 
-    /* Compute bounding box and centroid per polity */
+    /* Gather all systems per polity with world positions */
     const polData={};
     for(const sys of systems){
       if(!sys.owner||sys.owner==='unassigned') continue;
       if(hiddenPolities.has(sys.owner)) continue;
       if(!polData[sys.owner]){
         polData[sys.owner]={
-          minX:1e9, maxX:-1e9, minZ:1e9, maxZ:-1e9,
-          sumX:0, sumY:0, sumZ:0, count:0
+          pts:[], /* [x,z] pairs */
+          sumY:0, count:0
         };
       }
       const d=polData[sys.owner];
       const wp=sys._worldPos;
-      d.sumX+=wp[0]; d.sumY+=wp[1]; d.sumZ+=wp[2]; d.count++;
-      if(wp[0]<d.minX) d.minX=wp[0];
-      if(wp[0]>d.maxX) d.maxX=wp[0];
-      if(wp[2]<d.minZ) d.minZ=wp[2];
-      if(wp[2]>d.maxZ) d.maxZ=wp[2];
+      d.pts.push([wp[0],wp[2]]);
+      d.sumY+=wp[1]; d.count++;
     }
 
     let html='';
     for(const pol of polities){
       const d=polData[pol.id];
-      if(!d||d.count<1) continue;
+      if(!d||d.count<2) continue;
 
-      /* Use bounding box center (not centroid) so text is visually centered in territory */
-      const bcx=(d.minX+d.maxX)*0.5;
-      const bcy=d.sumY/d.count;
-      const bcz=(d.minZ+d.maxZ)*0.5;
-      const extentX=d.maxX-d.minX;
-      const extentZ=d.maxZ-d.minZ;
+      const pts=d.pts;
+      const avgY=d.sumY/d.count;
 
-      /* Project bbox center to screen */
-      const clipX=bcx*mvp[0]+bcy*mvp[4]+bcz*mvp[8]+mvp[12];
-      const clipY=bcx*mvp[1]+bcy*mvp[5]+bcz*mvp[9]+mvp[13];
-      const cw=bcx*mvp[3]+bcy*mvp[7]+bcz*mvp[11]+mvp[15];
-      if(cw<=0) continue;
-      const ndcX=clipX/cw, ndcY=clipY/cw;
-      if(Math.abs(ndcX)>1.5||Math.abs(ndcY)>1.5) continue;
-      const sx=(ndcX*0.5+0.5)*W;
-      const sy=(1-(ndcY*0.5+0.5))*H;
+      /* ── Compute oriented bounding box via PCA on the 2D (X,Z) points ── */
+      /* Mean center */
+      let mx=0, mz=0;
+      for(const p of pts){ mx+=p[0]; mz+=p[1]; }
+      mx/=pts.length; mz/=pts.length;
 
-      /* Project the longer axis to screen pixels for sizing */
-      const useX=extentX>=extentZ;
-      const axisLen=useX?extentX:extentZ;
-      const aStart=useX?d.minX:bcx;
-      const aEnd=useX?d.maxX:bcx;
-      const aStartZ=useX?bcz:d.minZ;
-      const aEndZ=useX?bcz:d.maxZ;
+      /* Covariance matrix */
+      let cxx=0, cxz=0, czz=0;
+      for(const p of pts){
+        const dx=p[0]-mx, dz=p[1]-mz;
+        cxx+=dx*dx; cxz+=dx*dz; czz+=dz*dz;
+      }
+      cxx/=pts.length; cxz/=pts.length; czz/=pts.length;
 
-      const sClip=aStart*mvp[0]+bcy*mvp[4]+aStartZ*mvp[8]+mvp[12];
-      const sCw=aStart*mvp[3]+bcy*mvp[7]+aStartZ*mvp[11]+mvp[15];
-      const eClip=aEnd*mvp[0]+bcy*mvp[4]+aEndZ*mvp[8]+mvp[12];
-      const eCw=aEnd*mvp[3]+bcy*mvp[7]+aEndZ*mvp[11]+mvp[15];
-      if(sCw<=0||eCw<=0) continue;
-      const screenSpan=Math.abs((eClip/eCw-sClip/sCw)*0.5*W);
+      /* Principal eigenvector via analytic 2x2 eigendecomposition */
+      const trace=cxx+czz;
+      const det=cxx*czz-cxz*cxz;
+      const disc=Math.sqrt(Math.max(0, trace*trace*0.25-det));
+      const lambda1=trace*0.5+disc; /* largest eigenvalue */
 
-      /* Font size: fit the name within ~80% of the territory screen width.
-         Always horizontal. */
+      let ex=cxz, ez=lambda1-cxx;
+      const elen=Math.sqrt(ex*ex+ez*ez);
+      if(elen>1e-8){ ex/=elen; ez/=elen; }
+      else { ex=1; ez=0; } /* degenerate: default to X axis */
+
+      /* Minor axis */
+      const fx=-ez, fz=ex;
+
+      /* Project all points onto major/minor axes to get OBB extents */
+      let minMaj=1e9, maxMaj=-1e9, minMin=1e9, maxMin=-1e9;
+      for(const p of pts){
+        const dx=p[0]-mx, dz=p[1]-mz;
+        const projMaj=dx*ex+dz*ez;
+        const projMin=dx*fx+dz*fz;
+        if(projMaj<minMaj) minMaj=projMaj;
+        if(projMaj>maxMaj) maxMaj=projMaj;
+        if(projMin<minMin) minMin=projMin;
+        if(projMin>maxMin) maxMin=projMin;
+      }
+
+      /* OBB center in world space */
+      const obbCenterMaj=(minMaj+maxMaj)*0.5;
+      const obbCenterMin=(minMin+maxMin)*0.5;
+      const wcx=mx+ex*obbCenterMaj+fx*obbCenterMin;
+      const wcz=mz+ez*obbCenterMaj+fz*obbCenterMin;
+
+      const majExtent=maxMaj-minMaj;
+      const minExtent=maxMin-minMin;
+
+      /* ── Project OBB center + axis endpoints to screen ── */
+      function proj3D(wx,wy,wz){
+        const cx=wx*mvp[0]+wy*mvp[4]+wz*mvp[8]+mvp[12];
+        const cy=wx*mvp[1]+wy*mvp[5]+wz*mvp[9]+mvp[13];
+        const cw=wx*mvp[3]+wy*mvp[7]+wz*mvp[11]+mvp[15];
+        if(cw<=0) return null;
+        return [(cx/cw*0.5+0.5)*W, (1-(cy/cw*0.5+0.5))*H, cw];
+      }
+
+      const sc=proj3D(wcx, avgY, wcz);
+      if(!sc) continue;
+      if(sc[0]<-W*0.5||sc[0]>W*1.5||sc[1]<-H*0.5||sc[1]>H*1.5) continue;
+
+      /* Project the major axis endpoints to get screen angle and span */
+      const halfMaj=majExtent*0.5;
+      const axStartX=wcx-ex*halfMaj, axStartZ=wcz-ez*halfMaj;
+      const axEndX=wcx+ex*halfMaj, axEndZ=wcz+ez*halfMaj;
+      const sA=proj3D(axStartX, avgY, axStartZ);
+      const sB=proj3D(axEndX, avgY, axEndZ);
+      if(!sA||!sB) continue;
+
+      /* Screen angle of major axis */
+      const sdx=sB[0]-sA[0], sdy=sB[1]-sA[1];
+      let angleDeg=Math.atan2(sdy,sdx)*180/Math.PI;
+      /* Keep text readable: flip if upside down */
+      if(angleDeg>90) angleDeg-=180;
+      if(angleDeg<-90) angleDeg+=180;
+
+      const screenSpanMaj=Math.sqrt(sdx*sdx+sdy*sdy);
+
+      /* Project minor axis endpoints for minor screen span */
+      const halfMin=minExtent*0.5;
+      const mA=proj3D(wcx-fx*halfMin, avgY, wcz-fz*halfMin);
+      const mB=proj3D(wcx+fx*halfMin, avgY, wcz+fz*halfMin);
+      const screenSpanMin=(mA&&mB)?Math.sqrt((mB[0]-mA[0])**2+(mB[1]-mA[1])**2):screenSpanMaj*0.3;
+
+      /* ── Font sizing: fit name within ~70% of the major axis screen span ── */
       const nameLen=pol.name.length;
-      const charWidth=0.6;
-      const fontSize=Math.round(Math.max(7, Math.min(60, screenSpan*0.75/(nameLen*charWidth))));
+      const charWidth=0.62;
+      const maxFontByWidth=screenSpanMaj*0.70/(nameLen*charWidth);
+      /* Also constrain by minor axis so text doesn't overflow narrow territories */
+      const maxFontByHeight=screenSpanMin*0.55;
+      const fontSize=Math.round(Math.max(7, Math.min(72, Math.min(maxFontByWidth, maxFontByHeight))));
 
-      if(fontSize<6) continue;
+      if(fontSize<7) continue;
 
-      const opacity=Math.min(0.9, Math.max(0.15, (fontSize-6)/12));
+      const opacity=Math.min(0.85, Math.max(0.12, (fontSize-7)/14));
       const strokeCol=pol.strokeColor||pol.color;
-      const ls=Math.max(2, Math.round(fontSize*0.3));
-      const strokeW=Math.max(0.5, Math.min(2.5, fontSize*0.07));
+      const ls=Math.max(2, Math.round(fontSize*0.25));
+      const strokeW=Math.max(0.3, Math.min(2.0, fontSize*0.06));
 
-      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.65);text-shadow:0 0 ${Math.round(fontSize*0.3)}px rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.9);">${pol.name}</div>`;
+      html+=`<div class="polity-label" style="left:${sc[0].toFixed(1)}px;top:${sc[1].toFixed(1)}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(1)}deg);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.5);text-shadow:0 0 ${Math.round(fontSize*0.4)}px ${strokeCol}44, 0 0 ${Math.round(fontSize*0.15)}px rgba(0,0,0,0.9);">${pol.name}</div>`;
     }
     container.innerHTML=html;
   }
