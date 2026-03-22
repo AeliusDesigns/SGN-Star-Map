@@ -11,7 +11,7 @@
   const GALAXY_SPREAD_Z = 140;
   const GALAXY_THICKNESS = 12;
   const BG_STAR_COUNT = 5000;
-  const TERRITORY_RES = 2048;
+  const TERRITORY_RES = 256;
   const TERRITORY_RADIUS = 2.5;
   const TAG_OPTIONS = ['capital','homeworld','fortress','outpost','frontier','contested','dangerous','trade','ruins','anomaly'];
 
@@ -42,6 +42,9 @@
   let territoryTexture = null;
   let territoryStrokeTexture = null;
   let showNames = true;
+  let territoryBorderVBO = null;
+  let territoryBorderCount = 0;
+  let territoryBorderColors = []; /* per-polity border VBOs */
   let lanes = []; // raw lane data from JSON
   let idToWorld = new Map();
   let hoveredSystemId = null;
@@ -203,39 +206,13 @@ void main(){ gl_Position=uMVP*vec4(position,1.0); vUV=aUV; }`;
   const FS_TERR = `
 precision highp float;
 uniform sampler2D uTex;
-uniform sampler2D uStrokeTex;
 uniform float uTime;
 varying vec2 vUV;
 void main(){
   vec4 fill=texture2D(uTex,vUV);
-  vec4 stroke=texture2D(uStrokeTex,vUV);
-
-  /* fill.a encodes the SDF: 0=at boundary, increasing toward 1.0 deep inside.
-     stroke.rgb is the border color. stroke.a encodes the SDF for border pixels too. */
-  if(fill.a<0.005&&stroke.a<0.005) discard;
-
-  float breathe=0.6+0.4*sin(uTime*1.8);
-
-  /* Decode SDF from fill alpha. fill.a=0 at boundary, 1.0 deep inside. */
-  float sdfNorm=fill.a; /* 0..1 normalized distance from edge */
-
-  /* Fill: soft interior wash, fully opaque past a threshold */
-  float fillA=smoothstep(0.0, 0.15, sdfNorm)*0.18;
-
-  /* Border stroke: a smooth band near the edge (sdfNorm near 0).
-     Use smoothstep to create a clean band without any pixel artifacts. */
-  float borderOuter=1.0-smoothstep(0.0, 0.04, sdfNorm);  /* sharp outer edge */
-  float borderInner=1.0-smoothstep(0.02, 0.12, sdfNorm); /* softer inner fade */
-  float border=max(borderOuter*0.9, borderInner*0.5);
-
-  vec3 sCol=stroke.a>0.01 ? stroke.rgb : fill.rgb;
-  float strokeA=border*breathe;
-
-  /* Composite */
-  vec3 col=fill.rgb*fillA*(1.0-strokeA)+sCol*strokeA;
-  float alpha=max(fillA, strokeA);
-  if(alpha<0.005) discard;
-  gl_FragColor=vec4(col/max(alpha,0.001), alpha);
+  if(fill.a<0.01) discard;
+  float fillA=fill.a*0.15;
+  gl_FragColor=vec4(fill.rgb, fillA);
 }`;
 
   /* Lane lines — same as main.js */
@@ -745,14 +722,12 @@ void main(){
     const extZ=GALAXY_SPREAD_Z/2+20;
     const worldW=extX*2, worldH=extZ*2;
     const CLAIM_R=TERRITORY_RADIUS;
-    const pxSize=worldW/res;
 
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
     const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
     const unownedSystems=systems.filter(s=>!s.owner||s.owner==='unassigned'||hiddenPolities.has(s.owner));
 
-    /* Spatial hashes */
     const cellSize=Math.max(CLAIM_R*2, 4);
     const hashOwned=new Map();
     const hashUnowned=new Map();
@@ -783,20 +758,20 @@ void main(){
       return b*(1-h) + a*h - k*h*(1-h);
     }
 
-    /* Compute SDF grids */
-    const ownerGrid=new Array(res*res);
-    const sdfGrid=new Float32Array(res*res); /* distance from boundary, positive=inside */
+    /* Compute SDF on grid */
+    const sdfRes=256; /* lower res for SDF - contour extraction smooths it */
+    const sdf=new Float32Array(sdfRes*sdfRes);
+    const ownerAt=new Array(sdfRes*sdfRes);
     const searchMaxR=CLAIM_R*3+cellSize;
     const smoothK=CLAIM_R*1.5;
 
-    for(let gy=0;gy<res;gy++){
-      for(let gx=0;gx<res;gx++){
-        const wx=(gx/(res-1))*worldW - extX;
-        const wz=(gy/(res-1))*worldH - extZ;
+    for(let gy=0;gy<sdfRes;gy++){
+      for(let gx=0;gx<sdfRes;gx++){
+        const wx=(gx/(sdfRes-1))*worldW - extX;
+        const wz=(gy/(sdfRes-1))*worldH - extZ;
 
         const nearOwned=nearbyFromHash(hashOwned,wx,wz,searchMaxR);
-        let ownedSdf=999;
-        let bestOwner=null, bestDist=1e9;
+        let ownedSdf=999, bestOwner=null, bestDist=1e9;
         for(const sys of nearOwned){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
@@ -812,62 +787,123 @@ void main(){
           unownedSdf=smoothMin(unownedSdf, d-CLAIM_R, smoothK);
         }
 
-        const gi=gy*res+gx;
+        const gi=gy*sdfRes+gx;
         if(bestOwner&&ownedSdf<0&&ownedSdf<unownedSdf){
-          ownerGrid[gi]=bestOwner;
-          /* Store positive depth (how far inside the boundary) */
-          sdfGrid[gi]=-ownedSdf;
+          sdf[gi]=ownedSdf; /* negative = inside */
+          ownerAt[gi]=bestOwner;
         } else {
-          ownerGrid[gi]=null;
-          sdfGrid[gi]=0;
+          sdf[gi]=Math.max(ownedSdf, 0.01); /* positive = outside */
+          ownerAt[gi]=null;
         }
       }
     }
 
-    /* Find max SDF depth for normalization */
-    let maxDepth=0.001;
-    for(let gi=0;gi<res*res;gi++) if(sdfGrid[gi]>maxDepth) maxDepth=sdfGrid[gi];
+    /* Marching squares: extract contour lines at sdf=0.
+       For each cell of 4 pixels, check if the zero-crossing passes through.
+       Use linear interpolation along edges for sub-pixel smooth vertex positions. */
+    const borderVerts=[]; /* flat array of [x,y,z, x,y,z, ...] line segments */
+    const borderPolIds=[]; /* polity id per segment for coloring */
+    const cellW=worldW/(sdfRes-1);
+    const cellH=worldH/(sdfRes-1);
+    const terrY=-0.5; /* same Y as territory quad */
 
-    /* Fill texture: encode normalized SDF depth as alpha.
-       0 = at boundary, 255 = deep inside. GL_LINEAR interpolation
-       will smoothly interpolate between these, giving the shader
-       a perfectly smooth distance field to draw the border from. */
-    const fillData=new Uint8Array(res*res*4);
-    for(let gi=0;gi<res*res;gi++){
-      const pid=ownerGrid[gi];
+    for(let gy=0;gy<sdfRes-1;gy++){
+      for(let gx=0;gx<sdfRes-1;gx++){
+        const i00=gy*sdfRes+gx;
+        const i10=i00+1;
+        const i01=i00+sdfRes;
+        const i11=i01+1;
+        const v00=sdf[i00], v10=sdf[i10], v01=sdf[i01], v11=sdf[i11];
+
+        /* Classify corners: inside (negative) = 1, outside = 0 */
+        const c = (v00<0?1:0)|(v10<0?2:0)|(v01<0?4:0)|(v11<0?8:0);
+        if(c===0||c===15) continue; /* all same side, no contour */
+
+        /* World positions of corners */
+        const x0=-extX+gx*cellW, x1=x0+cellW;
+        const z0=-extZ+gy*cellH, z1=z0+cellH;
+
+        /* Interpolate zero-crossing position along an edge */
+        function lerp(va,vb,pa,pb){
+          const t=va/(va-vb);
+          return [pa[0]+(pb[0]-pa[0])*t, pa[1]+(pb[1]-pa[1])*t];
+        }
+
+        /* Edge midpoints where contour crosses */
+        const edgeTop=lerp(v00,v10,[x0,z0],[x1,z0]);
+        const edgeBot=lerp(v01,v11,[x0,z1],[x1,z1]);
+        const edgeLeft=lerp(v00,v01,[x0,z0],[x0,z1]);
+        const edgeRight=lerp(v10,v11,[x1,z0],[x1,z1]);
+
+        /* Get polity for this cell */
+        const pid=ownerAt[i00]||ownerAt[i10]||ownerAt[i01]||ownerAt[i11];
+
+        /* Marching squares lookup - which edges to connect */
+        function addSeg(a,b){
+          borderVerts.push(a[0],terrY,a[1], b[0],terrY,b[1]);
+          borderPolIds.push(pid);
+        }
+
+        switch(c){
+          case 1: case 14: addSeg(edgeTop,edgeLeft); break;
+          case 2: case 13: addSeg(edgeTop,edgeRight); break;
+          case 4: case 11: addSeg(edgeLeft,edgeBot); break;
+          case 8: case 7:  addSeg(edgeRight,edgeBot); break;
+          case 3: case 12: addSeg(edgeLeft,edgeRight); break;
+          case 5: case 10: addSeg(edgeTop,edgeBot); break;
+          case 6:  addSeg(edgeTop,edgeLeft); addSeg(edgeRight,edgeBot); break;
+          case 9:  addSeg(edgeTop,edgeRight); addSeg(edgeLeft,edgeBot); break;
+        }
+      }
+    }
+
+    /* Build per-polity border VBOs */
+    territoryBorderColors=[];
+    const polBorderVerts=new Map();
+    for(let i=0;i<borderPolIds.length;i++){
+      const pid=borderPolIds[i];
       if(!pid) continue;
+      if(!polBorderVerts.has(pid)) polBorderVerts.set(pid,[]);
+      const arr=polBorderVerts.get(pid);
+      const vi=i*6; /* 2 verts * 3 floats */
+      arr.push(
+        borderVerts[vi],borderVerts[vi+1],borderVerts[vi+2],
+        borderVerts[vi+3],borderVerts[vi+4],borderVerts[vi+5]
+      );
+    }
+
+    for(const [pid,verts] of polBorderVerts){
+      const pol=polMap.get(pid);
+      if(!pol) continue;
+      const vbo=gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
+      const sc=hexToRgb(pol.strokeColor||pol.color);
+      territoryBorderColors.push({
+        vbo, count:verts.length/3,
+        color:[sc[0]/255,sc[1]/255,sc[2]/255],
+        fillColor:hexToRgb(pol.color).map(v=>v/255)
+      });
+    }
+
+    /* Simple fill texture (low res is fine, borders are geometry now) */
+    const fillRes=256;
+    const fillData=new Uint8Array(fillRes*fillRes*4);
+    /* Reuse the SDF grid (already 256) */
+    for(let gi=0;gi<sdfRes*sdfRes;gi++){
+      const pid=ownerAt[gi];
+      if(!pid||sdf[gi]>=0) continue;
       const pol=polMap.get(pid);
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
-      const normDepth=Math.min(1.0, sdfGrid[gi]/maxDepth);
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-      fillData[idx+3]=Math.round(normDepth*255);
+      fillData[idx+3]=Math.round(Math.min(1, -sdf[gi]*2)*200);
     }
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-
-    /* Stroke texture: stroke color everywhere inside territory */
-    const strokeData=new Uint8Array(res*res*4);
-    for(let gi=0;gi<res*res;gi++){
-      const pid=ownerGrid[gi];
-      if(!pid) continue;
-      const pol=polMap.get(pid);
-      if(!pol) continue;
-      const sc=hexToRgb(pol.strokeColor||pol.color);
-      const idx=gi*4;
-      strokeData[idx]=sc[0]; strokeData[idx+1]=sc[1]; strokeData[idx+2]=sc[2];
-      strokeData[idx+3]=255;
-    }
-    if(!territoryStrokeTexture) territoryStrokeTexture=gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,strokeData);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,fillRes,fillRes,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
@@ -1240,8 +1276,9 @@ void main(){
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
     gl.disableVertexAttribArray(aP); gl.disableVertexAttribArray(aC); gl.disableVertexAttribArray(aS);
 
-    /* 3. Territory borders */
+    /* 3. Territory */
     if(territoryTexture&&polities.length>0){
+      /* 3a. Fill wash */
       gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
       gl.useProgram(progTerritory);
       gl.uniformMatrix4fv(gl.getUniformLocation(progTerritory,'uMVP'),false,mvp);
@@ -1249,16 +1286,40 @@ void main(){
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
       gl.uniform1i(gl.getUniformLocation(progTerritory,'uTex'),0);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D,territoryStrokeTexture);
-      gl.uniform1i(gl.getUniformLocation(progTerritory,'uStrokeTex'),1);
-      gl.activeTexture(gl.TEXTURE0);
       gl.bindBuffer(gl.ARRAY_BUFFER,territoryQuadVBO);
       const tP=gl.getAttribLocation(progTerritory,'position'), tU=gl.getAttribLocation(progTerritory,'aUV');
       gl.enableVertexAttribArray(tP); gl.vertexAttribPointer(tP,3,gl.FLOAT,false,20,0);
       gl.enableVertexAttribArray(tU); gl.vertexAttribPointer(tU,2,gl.FLOAT,false,20,12);
       gl.drawArrays(gl.TRIANGLES,0,6);
       gl.disableVertexAttribArray(tP); gl.disableVertexAttribArray(tU);
+
+      /* 3b. Border lines (per-polity, multi-pass glow like lanes) */
+      const breathe=0.6+0.4*Math.sin(wallTime*1.8);
+      gl.useProgram(progLines);
+      gl.uniformMatrix4fv(gl.getUniformLocation(progLines,'uMVP'),false,mvp);
+      const aPB=gl.getAttribLocation(progLines,'position');
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+      for(const b of territoryBorderColors){
+        if(b.count<2) continue;
+        gl.bindBuffer(gl.ARRAY_BUFFER,b.vbo);
+        gl.enableVertexAttribArray(aPB);
+        gl.vertexAttribPointer(aPB,3,gl.FLOAT,false,0,0);
+        const r=b.color[0], g=b.color[1], bl=b.color[2];
+        /* Outer glow */
+        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r*0.5,g*0.5,bl*0.5,0.15*breathe);
+        gl.lineWidth(3.0);
+        gl.drawArrays(gl.LINES,0,b.count);
+        /* Mid */
+        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r*0.7,g*0.7,bl*0.7,0.35*breathe);
+        gl.lineWidth(2.0);
+        gl.drawArrays(gl.LINES,0,b.count);
+        /* Core */
+        gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),r,g,bl,0.7*breathe);
+        gl.lineWidth(1.0);
+        gl.drawArrays(gl.LINES,0,b.count);
+        gl.disableVertexAttribArray(aPB);
+      }
+      gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
     }
 
     /* 4. Lanes — multi-pass glow (same as main.js) */
