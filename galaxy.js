@@ -716,295 +716,277 @@ void main(){
   function hexToRgb(hex){ const h=hex.replace('#',''); return [parseInt(h.substring(0,2),16),parseInt(h.substring(2,4),16),parseInt(h.substring(4,6),16)]; }
 
   function buildTerritoryTexture(){
-    const extX=GALAXY_SPREAD_X/2+20;
-    const extZ=GALAXY_SPREAD_Z/2+20;
-    const worldW=extX*2, worldH=extZ*2;
-
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
 
-    /* Spatial hash of ALL systems */
-    const cellSize=4;
-    const hashAll=new Map();
-    function cellKey(wx,wz){ return Math.floor(wx/cellSize)+','+Math.floor(wz/cellSize); }
-    function insertHash(hash,sys){
-      const k=cellKey(sys._worldPos[0],sys._worldPos[2]);
-      if(!hash.has(k)) hash.set(k,[]);
-      hash.get(k).push(sys);
-    }
-    for(const sys of systems) insertHash(hashAll,sys);
-
-    function nearestSystem(wx,wz){
-      const cx=Math.floor(wx/cellSize), cz=Math.floor(wz/cellSize);
-      let best=1e9, bestSys=null;
-      for(let ring=0;ring<=5;ring++){
-        for(let dz=-ring;dz<=ring;dz++){
-          for(let dx=-ring;dx<=ring;dx++){
-            if(Math.abs(dx)<ring&&Math.abs(dz)<ring) continue;
-            const bucket=hashAll.get((cx+dx)+','+(cz+dz));
-            if(!bucket) continue;
-            for(const sys of bucket){
-              const ddx=sys._worldPos[0]-wx, ddz=sys._worldPos[2]-wz;
-              const d2=ddx*ddx+ddz*ddz;
-              if(d2<best){ best=d2; bestSys=sys; }
-            }
-          }
-        }
-        if(bestSys&&ring>0) break;
-      }
-      return bestSys;
-    }
-
-    /* Helper: compute Voronoi ownership for a grid of given resolution */
-    function computeOwnership(res){
-      const ownerGrid=new Array(res*res);
-      const polIdMap=new Map();
-      let nextIdx=1;
-      for(const p of polities) polIdMap.set(p.id, nextIdx++);
-      const polIdGrid=new Int32Array(res*res);
-      for(let gy=0;gy<res;gy++){
-        for(let gx=0;gx<res;gx++){
-          const wx=(gx/(res-1))*worldW - extX;
-          const wz=(gy/(res-1))*worldH - extZ;
-          const nearest=nearestSystem(wx,wz);
-          const gi=gy*res+gx;
-          if(nearest&&nearest.owner&&nearest.owner!=='unassigned'&&!hiddenPolities.has(nearest.owner)){
-            ownerGrid[gi]=nearest.owner;
-            polIdGrid[gi]=polIdMap.get(nearest.owner)||0;
-          } else {
-            ownerGrid[gi]=null;
-            polIdGrid[gi]=0;
-          }
-        }
-      }
-      return {ownerGrid, polIdGrid, polIdMap, res};
-    }
-
-    /* === Border lines: low-res marching squares → chain → Douglas-Peucker simplification
-       This produces clean straight-line polygon borders like Stellaris === */
-
-    /* Use a moderate resolution for marching squares extraction */
-    const borderRes=512;
-    const borderOwn=computeOwnership(borderRes);
-    const bCellW=worldW/(borderRes-1);
-    const bCellH=worldH/(borderRes-1);
     const terrY=-0.5;
 
-    const borderSegsRaw=[];
-    for(let gy=0;gy<borderRes-1;gy++){
-      for(let gx=0;gx<borderRes-1;gx++){
-        const i00=gy*borderRes+gx, i10=i00+1, i01=i00+borderRes, i11=i01+1;
-        const p00=borderOwn.polIdGrid[i00], p10=borderOwn.polIdGrid[i10];
-        const p01=borderOwn.polIdGrid[i01], p11=borderOwn.polIdGrid[i11];
-
-        const x0=-extX+gx*bCellW, x1=x0+bCellW;
-        const z0=-extZ+gy*bCellH, z1=z0+bCellH;
-
-        const pid=borderOwn.ownerGrid[i00]||borderOwn.ownerGrid[i10]||borderOwn.ownerGrid[i01]||borderOwn.ownerGrid[i11];
-        if(!pid) continue;
-
-        const ref=borderOwn.polIdMap.get(pid)||0;
-        const v00=(p00===ref)?-1:1;
-        const v10=(p10===ref)?-1:1;
-        const v01=(p01===ref)?-1:1;
-        const v11=(p11===ref)?-1:1;
-
-        const c=(v00<0?1:0)|(v10<0?2:0)|(v01<0?4:0)|(v11<0?8:0);
-        if(c===0||c===15) continue;
-
-        function lerp(va,vb,pa,pb){
-          const t=va/(va-vb);
-          return [pa[0]+(pb[0]-pa[0])*t, pa[1]+(pb[1]-pa[1])*t];
-        }
-        const eT=lerp(v00,v10,[x0,z0],[x1,z0]);
-        const eB=lerp(v01,v11,[x0,z1],[x1,z1]);
-        const eL=lerp(v00,v01,[x0,z0],[x0,z1]);
-        const eR=lerp(v10,v11,[x1,z0],[x1,z1]);
-
-        function addSeg(a,b){ borderSegsRaw.push({pid, ax:a[0],az:a[1], bx:b[0],bz:b[1]}); }
-
-        switch(c){
-          case 1: case 14: addSeg(eT,eL); break;
-          case 2: case 13: addSeg(eT,eR); break;
-          case 4: case 11: addSeg(eL,eB); break;
-          case 8: case 7:  addSeg(eR,eB); break;
-          case 3: case 12: addSeg(eL,eR); break;
-          case 5: case 10: addSeg(eT,eB); break;
-          case 6:  addSeg(eT,eL); addSeg(eR,eB); break;
-          case 9:  addSeg(eT,eR); addSeg(eL,eB); break;
-        }
-      }
+    /* ═══ Collect stars per polity ═══ */
+    const polStars=new Map();
+    for(const sys of systems){
+      if(!sys.owner||sys.owner==='unassigned') continue;
+      if(hiddenPolities.has(sys.owner)) continue;
+      if(!polStars.has(sys.owner)) polStars.set(sys.owner,[]);
+      polStars.get(sys.owner).push([sys._worldPos[0], sys._worldPos[2]]);
     }
 
-    /* ── Chain segments into polylines per polity ── */
-    const segsByPolity=new Map();
-    for(const seg of borderSegsRaw){
-      if(!segsByPolity.has(seg.pid)) segsByPolity.set(seg.pid, []);
-      segsByPolity.get(seg.pid).push(seg);
+    /* ═══ Geometry utilities ═══ */
+
+    /* Convex hull (Andrew's monotone chain) — returns CCW polygon */
+    function convexHull(points){
+      if(points.length<3) return points.slice();
+      const pts=points.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+      const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+      const lower=[];
+      for(const p of pts){ while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop(); lower.push(p); }
+      const upper=[];
+      for(let i=pts.length-1;i>=0;i--){ const p=pts[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop(); upper.push(p); }
+      lower.pop(); upper.pop();
+      return lower.concat(upper);
     }
 
-    const snapThresh=Math.sqrt(bCellW*bCellW+bCellH*bCellH)*0.6;
-    const snapThresh2=snapThresh*snapThresh;
+    /* Concave hull via edge-splitting: start from convex hull, recursively
+       split long edges toward the nearest interior point to create concavities.
+       maxEdgeLen controls how detailed the hull becomes. */
+    function concaveHull(points, maxEdgeLen){
+      if(points.length<3) return points.slice();
+      const hull=convexHull(points);
+      if(hull.length<3) return hull;
 
-    function chainSegments(segs){
-      const qf=1.0/snapThresh;
-      function qkey(x,z){ return (Math.round(x*qf))+','+(Math.round(z*qf)); }
-      const endMap=new Map();
-      for(let i=0;i<segs.length;i++){
-        const s=segs[i];
-        for(const end of ['a','b']){
-          const kx=end==='a'?s.ax:s.bx, kz=end==='a'?s.az:s.bz;
-          const k=qkey(kx,kz);
-          if(!endMap.has(k)) endMap.set(k,[]);
-          endMap.get(k).push({idx:i, end});
-        }
-      }
-      const used=new Uint8Array(segs.length);
-      const chains=[];
-      for(let start=0;start<segs.length;start++){
-        if(used[start]) continue;
-        used[start]=1;
-        const s=segs[start];
-        const chain=[[s.ax,s.az],[s.bx,s.bz]];
-        /* Extend forward */
-        let extending=true;
-        while(extending){
-          extending=false;
-          const tail=chain[chain.length-1];
-          const k=qkey(tail[0],tail[1]);
-          const neighbors=endMap.get(k);
-          if(!neighbors) break;
-          for(const n of neighbors){
-            if(used[n.idx]) continue;
-            const ns=segs[n.idx];
-            const nx=n.end==='a'?ns.ax:ns.bx, nz=n.end==='a'?ns.az:ns.bz;
-            const dx=nx-tail[0], dz=nz-tail[1];
-            if(dx*dx+dz*dz<snapThresh2){
-              used[n.idx]=1;
-              const ox=n.end==='a'?ns.bx:ns.ax, oz=n.end==='a'?ns.bz:ns.az;
-              chain.push([ox,oz]);
-              extending=true; break;
-            }
+      /* Build a set of hull point indices for fast lookup */
+      const ptSet=new Set();
+      for(const p of hull) ptSet.add(p[0]+','+p[1]);
+
+      /* Interior points not on the hull */
+      const interior=points.filter(p=>!ptSet.has(p[0]+','+p[1]));
+      if(interior.length===0) return hull;
+
+      /* Iteratively refine: split edges that are too long by pulling toward nearest interior point */
+      let result=hull.slice();
+      const maxIter=8;
+      for(let iter=0;iter<maxIter;iter++){
+        let changed=false;
+        const next=[];
+        for(let i=0;i<result.length;i++){
+          const a=result[i];
+          const b=result[(i+1)%result.length];
+          next.push(a);
+
+          const edx=b[0]-a[0], edz=b[1]-a[1];
+          const edgeLen=Math.sqrt(edx*edx+edz*edz);
+          if(edgeLen<maxEdgeLen) continue;
+
+          /* Find the interior point closest to the edge midpoint that is also
+             on the interior side (right side of edge for CCW polygon) */
+          const mx=(a[0]+b[0])*0.5, mz=(a[1]+b[1])*0.5;
+          /* Normal pointing inward (right of CCW edge) */
+          const nx=-edz/edgeLen, nz=edx/edgeLen;
+
+          let bestPt=null, bestDist=1e9;
+          for(const p of interior){
+            /* Must be on interior side of edge */
+            const toP0=p[0]-a[0], toP1=p[1]-a[1];
+            const side=toP0*nx+toP1*nz;
+            if(side<1.0) continue; /* must be meaningfully inside */
+
+            /* Distance to edge midpoint */
+            const dx=p[0]-mx, dz=p[1]-mz;
+            const d=Math.sqrt(dx*dx+dz*dz);
+            /* Only consider points within half the edge length of the midpoint */
+            if(d<edgeLen*0.6&&d<bestDist){ bestDist=d; bestPt=p; }
+          }
+
+          if(bestPt){
+            next.push([bestPt[0],bestPt[1]]);
+            changed=true;
           }
         }
-        /* Extend backward */
-        extending=true;
-        while(extending){
-          extending=false;
-          const head=chain[0];
-          const k=qkey(head[0],head[1]);
-          const neighbors=endMap.get(k);
-          if(!neighbors) break;
-          for(const n of neighbors){
-            if(used[n.idx]) continue;
-            const ns=segs[n.idx];
-            const nx=n.end==='a'?ns.ax:ns.bx, nz=n.end==='a'?ns.az:ns.bz;
-            const dx=nx-head[0], dz=nz-head[1];
-            if(dx*dx+dz*dz<snapThresh2){
-              used[n.idx]=1;
-              const ox=n.end==='a'?ns.bx:ns.ax, oz=n.end==='a'?ns.bz:ns.az;
-              chain.unshift([ox,oz]);
-              extending=true; break;
-            }
-          }
-        }
-        if(chain.length>=2) chains.push(chain);
+        result=next;
+        if(!changed) break;
       }
-      return chains;
+      return result;
     }
 
-    /* Douglas-Peucker line simplification — produces clean straight segments */
-    function douglasPeucker(pts, epsilon){
-      if(pts.length<=2) return pts;
-      /* Find point with max distance from line between first and last */
-      let maxD=0, maxI=0;
-      const ax=pts[0][0], az=pts[0][1];
-      const bx=pts[pts.length-1][0], bz=pts[pts.length-1][1];
-      const dx=bx-ax, dz=bz-az;
-      const lenSq=dx*dx+dz*dz;
-      for(let i=1;i<pts.length-1;i++){
-        let d;
-        if(lenSq<1e-10){
-          d=Math.sqrt((pts[i][0]-ax)**2+(pts[i][1]-az)**2);
+    /* Offset/inflate a polygon outward by 'dist' units.
+       For each edge, compute the outward normal and shift vertices.
+       Returns the offset polygon. */
+    function offsetPolygon(poly, dist){
+      const n=poly.length;
+      if(n<3) return poly;
+
+      /* Compute outward edge normals */
+      const normals=[];
+      for(let i=0;i<n;i++){
+        const a=poly[i], b=poly[(i+1)%n];
+        const dx=b[0]-a[0], dz=b[1]-a[1];
+        const len=Math.sqrt(dx*dx+dz*dz)||1e-10;
+        /* Outward normal for CCW polygon: rotate edge direction 90° clockwise */
+        normals.push([dz/len, -dx/len]);
+      }
+
+      /* For each vertex, compute the intersection of its two adjacent offset edges */
+      const offset=[];
+      for(let i=0;i<n;i++){
+        const prev=(i-1+n)%n;
+        /* Offset edge 'prev' and edge 'i' */
+        const n1=normals[prev], n2=normals[i];
+        const p1a=[poly[prev][0]+n1[0]*dist, poly[prev][1]+n1[1]*dist];
+        const p1b=[poly[i][0]+n1[0]*dist, poly[i][1]+n1[1]*dist];
+        const p2a=[poly[i][0]+n2[0]*dist, poly[i][1]+n2[1]*dist];
+        const p2b=[poly[(i+1)%n][0]+n2[0]*dist, poly[(i+1)%n][1]+n2[1]*dist];
+
+        /* Line-line intersection */
+        const d1x=p1b[0]-p1a[0], d1z=p1b[1]-p1a[1];
+        const d2x=p2b[0]-p2a[0], d2z=p2b[1]-p2a[1];
+        const cross=d1x*d2z-d1z*d2x;
+        if(Math.abs(cross)<1e-10){
+          /* Parallel edges, just offset the vertex */
+          offset.push([poly[i][0]+n2[0]*dist, poly[i][1]+n2[1]*dist]);
         } else {
-          const t=Math.max(0,Math.min(1,((pts[i][0]-ax)*dx+(pts[i][1]-az)*dz)/lenSq));
-          const px=ax+t*dx, pz=az+t*dz;
-          d=Math.sqrt((pts[i][0]-px)**2+(pts[i][1]-pz)**2);
+          const t=((p2a[0]-p1a[0])*d2z-(p2a[1]-p1a[1])*d2x)/cross;
+          /* Clamp miter to avoid extreme spikes */
+          const clamped=Math.max(-3,Math.min(3,t));
+          offset.push([p1a[0]+d1x*clamped, p1a[1]+d1z*clamped]);
         }
-        if(d>maxD){ maxD=d; maxI=i; }
       }
-      if(maxD>epsilon){
-        const left=douglasPeucker(pts.slice(0,maxI+1), epsilon);
-        const right=douglasPeucker(pts.slice(maxI), epsilon);
-        return left.slice(0,-1).concat(right);
-      }
-      return [pts[0], pts[pts.length-1]];
+      return offset;
     }
 
-    /* Build per-polity border VBOs from simplified chains */
-    territoryBorderColors=[];
-    /* Douglas-Peucker epsilon: aggressive simplification for clean straight lines */
-    const dpEpsilon=2.5;
+    /* Triangulate a simple polygon (ear clipping) for fill rendering */
+    function triangulatePolygon(poly){
+      if(poly.length<3) return [];
+      const tris=[];
+      const pts=poly.map((p,i)=>({x:p[0],z:p[1],idx:i}));
+      const verts=pts.slice();
 
-    for(const [pid, segs] of segsByPolity){
+      function cross(o,a,b){ return (a.x-o.x)*(b.z-o.z)-(a.z-o.z)*(b.x-o.x); }
+      function isEar(prev,cur,next,rest){
+        if(cross(prev,cur,next)<=0) return false; /* not convex */
+        for(const p of rest){
+          if(p===prev||p===cur||p===next) continue;
+          /* Point in triangle test */
+          const d1=cross(prev,cur,p), d2=cross(cur,next,p), d3=cross(next,prev,p);
+          const hasNeg=(d1<0)||(d2<0)||(d3<0);
+          const hasPos=(d1>0)||(d2>0)||(d3>0);
+          if(!(hasNeg&&hasPos)) return false;
+        }
+        return true;
+      }
+
+      let safety=verts.length*3;
+      while(verts.length>2&&safety-->0){
+        let earFound=false;
+        for(let i=0;i<verts.length;i++){
+          const prev=verts[(i-1+verts.length)%verts.length];
+          const cur=verts[i];
+          const next=verts[(i+1)%verts.length];
+          if(isEar(prev,cur,next,verts)){
+            tris.push(prev.x,terrY,prev.z, cur.x,terrY,cur.z, next.x,terrY,next.z);
+            verts.splice(i,1);
+            earFound=true;
+            break;
+          }
+        }
+        if(!earFound) break;
+      }
+      return tris;
+    }
+
+    /* ═══ Build territory data per polity ═══ */
+    territoryBorderColors=[];
+    let territoryFillVBOs=[];
+
+    /* Determine hull edge length based on average inter-star distance */
+    const allPts=[];
+    for(const [,pts] of polStars) for(const p of pts) allPts.push(p);
+
+    for(const [pid, stars] of polStars){
       const pol=polMap.get(pid);
       if(!pol) continue;
+      if(stars.length<1) continue;
 
-      const chains=chainSegments(segs);
-      const verts=[];
-
-      for(const chain of chains){
-        /* Filter out short artifact chains — must have meaningful length */
-        let chainLen=0;
-        for(let i=0;i<chain.length-1;i++){
-          const dx=chain[i+1][0]-chain[i][0], dz=chain[i+1][1]-chain[i][1];
-          chainLen+=Math.sqrt(dx*dx+dz*dz);
+      /* For single-star polities, create a small diamond */
+      let borderPoly;
+      if(stars.length===1){
+        const s=stars[0];
+        const r=TERRITORY_RADIUS*3;
+        borderPoly=[[s[0]+r,s[1]], [s[0],s[1]+r], [s[0]-r,s[1]], [s[0],s[1]-r]];
+      } else if(stars.length===2){
+        const a=stars[0], b=stars[1];
+        const dx=b[0]-a[0], dz=b[1]-a[1];
+        const len=Math.sqrt(dx*dx+dz*dz)||1;
+        const nx=-dz/len*TERRITORY_RADIUS*2, nz=dx/len*TERRITORY_RADIUS*2;
+        const pad=TERRITORY_RADIUS*2;
+        borderPoly=[
+          [a[0]-dx/len*pad+nx, a[1]-dz/len*pad+nz],
+          [b[0]+dx/len*pad+nx, b[1]+dz/len*pad+nz],
+          [b[0]+dx/len*pad-nx, b[1]+dz/len*pad-nz],
+          [a[0]-dx/len*pad-nx, a[1]-dz/len*pad-nz]
+        ];
+      } else {
+        /* Compute average nearest-neighbor distance for concave hull threshold */
+        let avgNN=0;
+        for(const s of stars){
+          let minD=1e9;
+          for(const t of stars){
+            if(s===t) continue;
+            const d=Math.sqrt((s[0]-t[0])**2+(s[1]-t[1])**2);
+            if(d<minD) minD=d;
+          }
+          avgNN+=minD;
         }
-        if(chain.length<4 || chainLen<5.0) continue;
+        avgNN/=stars.length;
 
-        /* Simplify to clean straight-line segments */
-        const simplified=douglasPeucker(chain, dpEpsilon);
-        if(simplified.length<2) continue;
-        /* Convert polyline to GL_LINES pairs */
-        for(let i=0;i<simplified.length-1;i++){
-          verts.push(simplified[i][0], terrY, simplified[i][1]);
-          verts.push(simplified[i+1][0], terrY, simplified[i+1][1]);
-        }
+        /* Concave hull with edge length = 3x average NN distance */
+        const maxEdge=Math.max(avgNN*3, 15);
+        const hull=concaveHull(stars, maxEdge);
+
+        /* Offset outward to create border padding */
+        const offsetDist=Math.max(avgNN*0.6, TERRITORY_RADIUS*2.5);
+        borderPoly=offsetPolygon(hull, offsetDist);
       }
 
-      if(verts.length<6) continue;
-      const vbo=gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
-      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
+      if(borderPoly.length<3) continue;
+
+      /* ── Build border line VBO (LINE_LOOP as LINE pairs) ── */
+      const borderVerts=[];
+      for(let i=0;i<borderPoly.length;i++){
+        const a=borderPoly[i], b=borderPoly[(i+1)%borderPoly.length];
+        borderVerts.push(a[0],terrY,a[1], b[0],terrY,b[1]);
+      }
+      const borderVBO=gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER,borderVBO);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(borderVerts),gl.STATIC_DRAW);
       const sc=hexToRgb(pol.strokeColor||pol.color);
       territoryBorderColors.push({
-        vbo, count:verts.length/3,
+        vbo:borderVBO, count:borderVerts.length/3,
         color:[sc[0]/255,sc[1]/255,sc[2]/255]
       });
+
+      /* ── Build fill triangle VBO ── */
+      const fillTris=triangulatePolygon(borderPoly);
+      if(fillTris.length>=9){
+        const fillVBO=gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER,fillVBO);
+        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(fillTris),gl.STATIC_DRAW);
+        const fc=hexToRgb(pol.color);
+        territoryFillVBOs.push({
+          vbo:fillVBO, count:fillTris.length/3,
+          color:[fc[0]/255,fc[1]/255,fc[2]/255]
+        });
+      }
     }
 
-    /* === Solid fill texture from medium-res grid — NO blur, crisp edges === */
-    const fillRes=512;
-    const fillOwn=computeOwnership(fillRes);
-    const fillRaw=new Uint8Array(fillRes*fillRes*4);
-    for(let gi=0;gi<fillRes*fillRes;gi++){
-      const pid=fillOwn.ownerGrid[gi];
-      if(!pid) continue;
-      const pol=polMap.get(pid);
-      if(!pol) continue;
-      const c=hexToRgb(pol.color);
-      const idx=gi*4;
-      fillRaw[idx]=c[0]; fillRaw[idx+1]=c[1]; fillRaw[idx+2]=c[2];
-      fillRaw[idx+3]=255;
-    }
+    /* Store fill VBOs globally so the render loop can use them */
+    window._territoryFillVBOs=territoryFillVBOs;
 
+    /* No longer need the texture-based fill, but keep the texture object
+       initialized to avoid null checks in render. Create a 1x1 transparent texture. */
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,fillRes,fillRes,0,gl.RGBA,gl.UNSIGNED_BYTE,fillRaw);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   }
 
   function buildTerritoryQuad(){
@@ -1374,21 +1356,25 @@ void main(){
     gl.disableVertexAttribArray(aP); gl.disableVertexAttribArray(aC); gl.disableVertexAttribArray(aS);
 
     /* 3. Territory */
-    if(territoryTexture&&polities.length>0){
-      /* 3a. Fill wash */
+    if(polities.length>0){
       gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-      gl.useProgram(progTerritory);
-      gl.uniformMatrix4fv(gl.getUniformLocation(progTerritory,'uMVP'),false,mvp);
-      gl.uniform1f(gl.getUniformLocation(progTerritory,'uTime'),wallTime);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-      gl.uniform1i(gl.getUniformLocation(progTerritory,'uTex'),0);
-      gl.bindBuffer(gl.ARRAY_BUFFER,territoryQuadVBO);
-      const tP=gl.getAttribLocation(progTerritory,'position'), tU=gl.getAttribLocation(progTerritory,'aUV');
-      gl.enableVertexAttribArray(tP); gl.vertexAttribPointer(tP,3,gl.FLOAT,false,20,0);
-      gl.enableVertexAttribArray(tU); gl.vertexAttribPointer(tU,2,gl.FLOAT,false,20,12);
-      gl.drawArrays(gl.TRIANGLES,0,6);
-      gl.disableVertexAttribArray(tP); gl.disableVertexAttribArray(tU);
+
+      /* 3a. Fill polygons — solid flat color per polity */
+      const fills=window._territoryFillVBOs||[];
+      if(fills.length>0){
+        gl.useProgram(progLines); /* reuse the simple color shader */
+        gl.uniformMatrix4fv(gl.getUniformLocation(progLines,'uMVP'),false,mvp);
+        const aFP=gl.getAttribLocation(progLines,'position');
+        for(const f of fills){
+          if(f.count<3) continue;
+          gl.bindBuffer(gl.ARRAY_BUFFER,f.vbo);
+          gl.enableVertexAttribArray(aFP);
+          gl.vertexAttribPointer(aFP,3,gl.FLOAT,false,0,0);
+          gl.uniform4f(gl.getUniformLocation(progLines,'uColor'),f.color[0],f.color[1],f.color[2],0.18);
+          gl.drawArrays(gl.TRIANGLES,0,f.count);
+          gl.disableVertexAttribArray(aFP);
+        }
+      }
 
       /* 3b. Border lines — solid clean stroke like Stellaris */
       gl.useProgram(progLines);
