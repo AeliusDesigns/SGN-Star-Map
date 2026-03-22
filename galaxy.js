@@ -855,7 +855,7 @@ void main(){
 
     /* ═══ Border lines: Voronoi edges where the two Delaunay-edge endpoints have different owners ═══ */
     const borderByPolity=new Map(); /* polityId -> [[x1,z1,x2,z2], ...] */
-    const BORDER_OFFSET=0.4; /* world units to shift each nation's line toward its own stars */
+    const BORDER_OFFSET=0.08; /* world units to shift each nation's line toward its own stars */
 
     /* Helper: offset a Voronoi edge segment toward a given star */
     function offsetEdgeToward(ccA, ccB, starPos, amount){
