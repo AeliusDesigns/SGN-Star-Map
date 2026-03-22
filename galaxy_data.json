@@ -1,7 +1,7 @@
 {
   "meta": {
     "total_systems": 4984,
-    "total_polities": 1
+    "total_polities": 2
   },
   "polities": [
     {
@@ -9,6 +9,13 @@
       "name": "Arandorë Eldainë",
       "color": "#ffc221",
       "strokeColor": "#364fa3",
+      "description": ""
+    },
+    {
+      "id": "POL-MN18FBPT",
+      "name": "Golden Cohort",
+      "color": "#dfae56",
+      "strokeColor": "#a18154",
       "description": ""
     }
   ],
@@ -20016,7 +20023,7 @@
     {
       "id": "SGN-SYS-1251",
       "name": "System 1251",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -20352,7 +20359,7 @@
     {
       "id": "SGN-SYS-1272",
       "name": "System 1272",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -21616,7 +21623,7 @@
     {
       "id": "SGN-SYS-1351",
       "name": "System 1351",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -21984,7 +21991,7 @@
     {
       "id": "SGN-SYS-1374",
       "name": "System 1374",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -22928,7 +22935,7 @@
     {
       "id": "SGN-SYS-1433",
       "name": "System 1433",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -22944,7 +22951,7 @@
     {
       "id": "SGN-SYS-1434",
       "name": "System 1434",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -23568,7 +23575,7 @@
     {
       "id": "SGN-SYS-1473",
       "name": "System 1473",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -23840,7 +23847,7 @@
     {
       "id": "SGN-SYS-1490",
       "name": "System 1490",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -24272,7 +24279,7 @@
     {
       "id": "SGN-SYS-1517",
       "name": "System 1517",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -24592,7 +24599,7 @@
     {
       "id": "SGN-SYS-1537",
       "name": "System 1537",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -24912,7 +24919,7 @@
     {
       "id": "SGN-SYS-1557",
       "name": "System 1557",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -24928,7 +24935,7 @@
     {
       "id": "SGN-SYS-1558",
       "name": "System 1558",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -25248,7 +25255,7 @@
     {
       "id": "SGN-SYS-1578",
       "name": "System 1578",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -25872,7 +25879,7 @@
     {
       "id": "SGN-SYS-1617",
       "name": "System 1617",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -25888,7 +25895,7 @@
     {
       "id": "SGN-SYS-1618",
       "name": "System 1618",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -26448,7 +26455,7 @@
     {
       "id": "SGN-SYS-1653",
       "name": "System 1653",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -26816,7 +26823,7 @@
     {
       "id": "SGN-SYS-1676",
       "name": "System 1676",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "A",
       "tags": [],
       "coords": {
@@ -27136,7 +27143,7 @@
     {
       "id": "SGN-SYS-1696",
       "name": "System 1696",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -27152,7 +27159,7 @@
     {
       "id": "SGN-SYS-1697",
       "name": "System 1697",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -27168,7 +27175,7 @@
     {
       "id": "SGN-SYS-1698",
       "name": "System 1698",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -27904,7 +27911,7 @@
     {
       "id": "SGN-SYS-1744",
       "name": "System 1744",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -28288,7 +28295,7 @@
     {
       "id": "SGN-SYS-1768",
       "name": "System 1768",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -28304,7 +28311,7 @@
     {
       "id": "SGN-SYS-1769",
       "name": "System 1769",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "B",
       "tags": [],
       "coords": {
@@ -28960,7 +28967,7 @@
     {
       "id": "SGN-SYS-1810",
       "name": "System 1810",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -28976,7 +28983,7 @@
     {
       "id": "SGN-SYS-1811",
       "name": "System 1811",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -29472,7 +29479,7 @@
     {
       "id": "SGN-SYS-1842",
       "name": "System 1842",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -29824,7 +29831,7 @@
     {
       "id": "SGN-SYS-1864",
       "name": "System 1864",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -29840,7 +29847,7 @@
     {
       "id": "SGN-SYS-1865",
       "name": "System 1865",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -30144,7 +30151,7 @@
     {
       "id": "SGN-SYS-1884",
       "name": "System 1884",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -30496,7 +30503,7 @@
     {
       "id": "SGN-SYS-1906",
       "name": "System 1906",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -30928,7 +30935,7 @@
     {
       "id": "SGN-SYS-1933",
       "name": "System 1933",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -31296,7 +31303,7 @@
     {
       "id": "SGN-SYS-1956",
       "name": "System 1956",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -31616,7 +31623,7 @@
     {
       "id": "SGN-SYS-1976",
       "name": "System 1976",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -31632,7 +31639,7 @@
     {
       "id": "SGN-SYS-1977",
       "name": "System 1977",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -31904,7 +31911,7 @@
     {
       "id": "SGN-SYS-1994",
       "name": "System 1994",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -32256,7 +32263,7 @@
     {
       "id": "SGN-SYS-2016",
       "name": "System 2016",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -32272,7 +32279,7 @@
     {
       "id": "SGN-SYS-2017",
       "name": "System 2017",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -32832,7 +32839,7 @@
     {
       "id": "SGN-SYS-2052",
       "name": "System 2052",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -33216,7 +33223,7 @@
     {
       "id": "SGN-SYS-2076",
       "name": "System 2076",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -33232,7 +33239,7 @@
     {
       "id": "SGN-SYS-2077",
       "name": "System 2077",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -33520,7 +33527,7 @@
     {
       "id": "SGN-SYS-2095",
       "name": "System 2095",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -33904,7 +33911,7 @@
     {
       "id": "SGN-SYS-2119",
       "name": "System 2119",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -34448,7 +34455,7 @@
     {
       "id": "SGN-SYS-2153",
       "name": "System 2153",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -34704,7 +34711,7 @@
     {
       "id": "SGN-SYS-2169",
       "name": "System 2169",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -34720,7 +34727,7 @@
     {
       "id": "SGN-SYS-2170",
       "name": "System 2170",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -35056,7 +35063,7 @@
     {
       "id": "SGN-SYS-2191",
       "name": "System 2191",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "N",
       "tags": [],
       "coords": {
@@ -35504,7 +35511,7 @@
     {
       "id": "SGN-SYS-2219",
       "name": "System 2219",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -35760,7 +35767,7 @@
     {
       "id": "SGN-SYS-2235",
       "name": "System 2235",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -36176,7 +36183,7 @@
     {
       "id": "SGN-SYS-2261",
       "name": "System 2261",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -36368,7 +36375,7 @@
     {
       "id": "SGN-SYS-2273",
       "name": "System 2273",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -36384,7 +36391,7 @@
     {
       "id": "SGN-SYS-2274",
       "name": "System 2274",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -37136,7 +37143,7 @@
     {
       "id": "SGN-SYS-2321",
       "name": "System 2321",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -37456,7 +37463,7 @@
     {
       "id": "SGN-SYS-2341",
       "name": "System 2341",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -37904,7 +37911,7 @@
     {
       "id": "SGN-SYS-2369",
       "name": "System 2369",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -38128,7 +38135,7 @@
     {
       "id": "SGN-SYS-2383",
       "name": "System 2383",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "A",
       "tags": [],
       "coords": {
@@ -38144,7 +38151,7 @@
     {
       "id": "SGN-SYS-2384",
       "name": "System 2384",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -38560,7 +38567,7 @@
     {
       "id": "SGN-SYS-2410",
       "name": "System 2410",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -39104,7 +39111,7 @@
     {
       "id": "SGN-SYS-2444",
       "name": "System 2444",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -39120,7 +39127,7 @@
     {
       "id": "SGN-SYS-2445",
       "name": "System 2445",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -39456,7 +39463,7 @@
     {
       "id": "SGN-SYS-2466",
       "name": "System 2466",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -39472,7 +39479,7 @@
     {
       "id": "SGN-SYS-2467",
       "name": "System 2467",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -40224,7 +40231,7 @@
     {
       "id": "SGN-SYS-2514",
       "name": "System 2514",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "O",
       "tags": [],
       "coords": {
@@ -40240,7 +40247,7 @@
     {
       "id": "SGN-SYS-2515",
       "name": "System 2515",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -40656,7 +40663,7 @@
     {
       "id": "SGN-SYS-2541",
       "name": "System 2541",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -40848,7 +40855,7 @@
     {
       "id": "SGN-SYS-2553",
       "name": "System 2553",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -41264,7 +41271,7 @@
     {
       "id": "SGN-SYS-2579",
       "name": "System 2579",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -41920,7 +41927,7 @@
     {
       "id": "SGN-SYS-2620",
       "name": "System 2620",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -41936,7 +41943,7 @@
     {
       "id": "SGN-SYS-2621",
       "name": "System 2621",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -42256,7 +42263,7 @@
     {
       "id": "SGN-SYS-2641",
       "name": "System 2641",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -42816,7 +42823,7 @@
     {
       "id": "SGN-SYS-2676",
       "name": "System 2676",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -43472,7 +43479,7 @@
     {
       "id": "SGN-SYS-2717",
       "name": "System 2717",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -44048,7 +44055,7 @@
     {
       "id": "SGN-SYS-2753",
       "name": "System 2753",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -78112,7 +78119,7 @@
     {
       "id": "SGN-SYS-4882",
       "name": "System 4882",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -79168,7 +79175,7 @@
     {
       "id": "SGN-SYS-4948",
       "name": "System 4948",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -79248,7 +79255,7 @@
     {
       "id": "SGN-SYS-4953",
       "name": "System 4953",
-      "owner": "unassigned",
+      "owner": "POL-MN18FBPT",
       "starType": "G",
       "tags": [],
       "coords": {
