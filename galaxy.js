@@ -793,7 +793,7 @@ void main(){
     const ownerGrid=new Array(res*res);
     const sdfGrid=new Float32Array(res*res);
     const searchMaxR=CLAIM_R*3+cellSize;
-    const smoothK=CLAIM_R*0.8;
+    const smoothK=CLAIM_R*1.5; /* larger = rounder, more organic merges */
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
@@ -812,8 +812,7 @@ void main(){
           if(d<bestDist){ bestDist=d; bestOwner=sys.owner; }
         }
 
-        /* Unowned SDF (metaball blend of all nearby unowned systems).
-           Uses the same claim radius so unowned systems "push back" equally. */
+        /* Unowned SDF with same blending */
         const nearUnowned=nearbyFromHash(hashUnowned,wx,wz,searchMaxR);
         let unownedSdf=999;
         for(const sys of nearUnowned){
@@ -825,12 +824,12 @@ void main(){
 
         const gi=gy*res+gx;
 
-        /* Territory exists where owned field is stronger (more negative) than unowned.
-           The border naturally curves along the equidistant line between them. */
         if(bestOwner&&ownedSdf<0&&ownedSdf<unownedSdf){
           ownerGrid[gi]=bestOwner;
-          /* Use the difference as the effective SDF so edges are smooth */
-          sdfGrid[gi]=Math.min(ownedSdf, ownedSdf-unownedSdf);
+          /* Store the owned SDF directly for smooth edge fading.
+             The competition with unowned only determines the boundary decision,
+             not the edge smoothness. */
+          sdfGrid[gi]=ownedSdf;
         } else {
           ownerGrid[gi]=null;
           sdfGrid[gi]=Math.max(ownedSdf,0);
