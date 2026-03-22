@@ -718,272 +718,271 @@ void main(){
   function buildTerritoryTexture(){
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
-
     const terrY=-0.5;
 
-    /* ═══ Collect stars per polity ═══ */
-    const polStars=new Map();
-    for(const sys of systems){
-      if(!sys.owner||sys.owner==='unassigned') continue;
-      if(hiddenPolities.has(sys.owner)) continue;
-      if(!polStars.has(sys.owner)) polStars.set(sys.owner,[]);
-      polStars.get(sys.owner).push([sys._worldPos[0], sys._worldPos[2]]);
-    }
+    /* ═══ Delaunay triangulation (Bowyer-Watson) ═══ */
+    /* Works on 2D points [x,z]. Returns array of triangles {a,b,c} as indices. */
+    function delaunay(points){
+      const n=points.length;
+      if(n<2) return [];
 
-    /* ═══ Geometry utilities ═══ */
+      /* Super-triangle that contains all points */
+      let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9;
+      for(const p of points){ if(p[0]<minX)minX=p[0]; if(p[0]>maxX)maxX=p[0]; if(p[1]<minZ)minZ=p[1]; if(p[1]>maxZ)maxZ=p[1]; }
+      const dx=maxX-minX, dz=maxZ-minZ;
+      const dmax=Math.max(dx,dz)*2;
+      const midX=(minX+maxX)*0.5, midZ=(minZ+maxZ)*0.5;
 
-    /* Convex hull (Andrew's monotone chain) — returns CCW polygon */
-    function convexHull(points){
-      if(points.length<3) return points.slice();
-      const pts=points.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
-      const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
-      const lower=[];
-      for(const p of pts){ while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop(); lower.push(p); }
-      const upper=[];
-      for(let i=pts.length-1;i>=0;i--){ const p=pts[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop(); upper.push(p); }
-      lower.pop(); upper.pop();
-      return lower.concat(upper);
-    }
+      /* Add super-triangle vertices at end of points array */
+      const stA=n, stB=n+1, stC=n+2;
+      const allPts=points.slice();
+      allPts.push([midX-dmax*2, midZ-dmax]);
+      allPts.push([midX+dmax*2, midZ-dmax]);
+      allPts.push([midX, midZ+dmax*2]);
 
-    /* Concave hull via edge-splitting: start from convex hull, recursively
-       split long edges toward the nearest interior point to create concavities.
-       maxEdgeLen controls how detailed the hull becomes. */
-    function concaveHull(points, maxEdgeLen){
-      if(points.length<3) return points.slice();
-      const hull=convexHull(points);
-      if(hull.length<3) return hull;
-
-      /* Build a set of hull point indices for fast lookup */
-      const ptSet=new Set();
-      for(const p of hull) ptSet.add(p[0]+','+p[1]);
-
-      /* Interior points not on the hull */
-      const interior=points.filter(p=>!ptSet.has(p[0]+','+p[1]));
-      if(interior.length===0) return hull;
-
-      /* Iteratively refine: split edges that are too long by pulling toward nearest interior point */
-      let result=hull.slice();
-      const maxIter=8;
-      for(let iter=0;iter<maxIter;iter++){
-        let changed=false;
-        const next=[];
-        for(let i=0;i<result.length;i++){
-          const a=result[i];
-          const b=result[(i+1)%result.length];
-          next.push(a);
-
-          const edx=b[0]-a[0], edz=b[1]-a[1];
-          const edgeLen=Math.sqrt(edx*edx+edz*edz);
-          if(edgeLen<maxEdgeLen) continue;
-
-          /* Find the interior point closest to the edge midpoint that is also
-             on the interior side (right side of edge for CCW polygon) */
-          const mx=(a[0]+b[0])*0.5, mz=(a[1]+b[1])*0.5;
-          /* Normal pointing inward (right of CCW edge) */
-          const nx=-edz/edgeLen, nz=edx/edgeLen;
-
-          let bestPt=null, bestDist=1e9;
-          for(const p of interior){
-            /* Must be on interior side of edge */
-            const toP0=p[0]-a[0], toP1=p[1]-a[1];
-            const side=toP0*nx+toP1*nz;
-            if(side<1.0) continue; /* must be meaningfully inside */
-
-            /* Distance to edge midpoint */
-            const dx=p[0]-mx, dz=p[1]-mz;
-            const d=Math.sqrt(dx*dx+dz*dz);
-            /* Only consider points within half the edge length of the midpoint */
-            if(d<edgeLen*0.6&&d<bestDist){ bestDist=d; bestPt=p; }
-          }
-
-          if(bestPt){
-            next.push([bestPt[0],bestPt[1]]);
-            changed=true;
-          }
-        }
-        result=next;
-        if(!changed) break;
+      /* Circumcircle test */
+      function circumTest(tri, px, pz){
+        const ax=allPts[tri.a][0], az=allPts[tri.a][1];
+        const bx=allPts[tri.b][0], bz=allPts[tri.b][1];
+        const cx=allPts[tri.c][0], cz=allPts[tri.c][1];
+        const D=2*(ax*(bz-cz)+bx*(cz-az)+cx*(az-bz));
+        if(Math.abs(D)<1e-12) return false;
+        const ux=((ax*ax+az*az)*(bz-cz)+(bx*bx+bz*bz)*(cz-az)+(cx*cx+cz*cz)*(az-bz))/D;
+        const uz=((ax*ax+az*az)*(cx-bx)+(bx*bx+bz*bz)*(ax-cx)+(cx*cx+cz*cz)*(bx-ax))/D;
+        const r2=(ax-ux)*(ax-ux)+(az-uz)*(az-uz);
+        return (px-ux)*(px-ux)+(pz-uz)*(pz-uz)<r2;
       }
-      return result;
-    }
 
-    /* Offset/inflate a polygon outward by 'dist' units.
-       For each edge, compute the outward normal and shift vertices.
-       Returns the offset polygon. */
-    function offsetPolygon(poly, dist){
-      const n=poly.length;
-      if(n<3) return poly;
+      let triangles=[{a:stA,b:stB,c:stC}];
 
-      /* Compute outward edge normals */
-      const normals=[];
+      /* Insert points one at a time */
       for(let i=0;i<n;i++){
-        const a=poly[i], b=poly[(i+1)%n];
-        const dx=b[0]-a[0], dz=b[1]-a[1];
-        const len=Math.sqrt(dx*dx+dz*dz)||1e-10;
-        /* Outward normal for CCW polygon: rotate edge direction 90° clockwise */
-        normals.push([dz/len, -dx/len]);
-      }
+        const px=allPts[i][0], pz=allPts[i][1];
+        const bad=[], good=[];
 
-      /* For each vertex, compute the intersection of its two adjacent offset edges */
-      const offset=[];
-      for(let i=0;i<n;i++){
-        const prev=(i-1+n)%n;
-        /* Offset edge 'prev' and edge 'i' */
-        const n1=normals[prev], n2=normals[i];
-        const p1a=[poly[prev][0]+n1[0]*dist, poly[prev][1]+n1[1]*dist];
-        const p1b=[poly[i][0]+n1[0]*dist, poly[i][1]+n1[1]*dist];
-        const p2a=[poly[i][0]+n2[0]*dist, poly[i][1]+n2[1]*dist];
-        const p2b=[poly[(i+1)%n][0]+n2[0]*dist, poly[(i+1)%n][1]+n2[1]*dist];
-
-        /* Line-line intersection */
-        const d1x=p1b[0]-p1a[0], d1z=p1b[1]-p1a[1];
-        const d2x=p2b[0]-p2a[0], d2z=p2b[1]-p2a[1];
-        const cross=d1x*d2z-d1z*d2x;
-        if(Math.abs(cross)<1e-10){
-          /* Parallel edges, just offset the vertex */
-          offset.push([poly[i][0]+n2[0]*dist, poly[i][1]+n2[1]*dist]);
-        } else {
-          const t=((p2a[0]-p1a[0])*d2z-(p2a[1]-p1a[1])*d2x)/cross;
-          /* Clamp miter to avoid extreme spikes */
-          const clamped=Math.max(-3,Math.min(3,t));
-          offset.push([p1a[0]+d1x*clamped, p1a[1]+d1z*clamped]);
+        for(const tri of triangles){
+          if(circumTest(tri,px,pz)) bad.push(tri);
+          else good.push(tri);
         }
-      }
-      return offset;
-    }
 
-    /* Triangulate a simple polygon (ear clipping) for fill rendering */
-    function triangulatePolygon(poly){
-      if(poly.length<3) return [];
-      const tris=[];
-      const pts=poly.map((p,i)=>({x:p[0],z:p[1],idx:i}));
-      const verts=pts.slice();
-
-      function cross(o,a,b){ return (a.x-o.x)*(b.z-o.z)-(a.z-o.z)*(b.x-o.x); }
-      function isEar(prev,cur,next,rest){
-        if(cross(prev,cur,next)<=0) return false; /* not convex */
-        for(const p of rest){
-          if(p===prev||p===cur||p===next) continue;
-          /* Point in triangle test */
-          const d1=cross(prev,cur,p), d2=cross(cur,next,p), d3=cross(next,prev,p);
-          const hasNeg=(d1<0)||(d2<0)||(d3<0);
-          const hasPos=(d1>0)||(d2>0)||(d3>0);
-          if(!(hasNeg&&hasPos)) return false;
-        }
-        return true;
-      }
-
-      let safety=verts.length*3;
-      while(verts.length>2&&safety-->0){
-        let earFound=false;
-        for(let i=0;i<verts.length;i++){
-          const prev=verts[(i-1+verts.length)%verts.length];
-          const cur=verts[i];
-          const next=verts[(i+1)%verts.length];
-          if(isEar(prev,cur,next,verts)){
-            tris.push(prev.x,terrY,prev.z, cur.x,terrY,cur.z, next.x,terrY,next.z);
-            verts.splice(i,1);
-            earFound=true;
-            break;
+        /* Find boundary polygon of the hole */
+        const edges=[];
+        for(const tri of bad){
+          const te=[[tri.a,tri.b],[tri.b,tri.c],[tri.c,tri.a]];
+          for(const [ea,eb] of te){
+            /* Edge is boundary if it's not shared with another bad triangle */
+            let shared=false;
+            for(const other of bad){
+              if(other===tri) continue;
+              const oe=[[other.a,other.b],[other.b,other.c],[other.c,other.a]];
+              for(const [oa,ob] of oe){
+                if((ea===oa&&eb===ob)||(ea===ob&&eb===oa)){ shared=true; break; }
+              }
+              if(shared) break;
+            }
+            if(!shared) edges.push([ea,eb]);
           }
         }
-        if(!earFound) break;
+
+        /* Re-triangulate hole with new point */
+        triangles=good;
+        for(const [ea,eb] of edges){
+          triangles.push({a:i,b:ea,c:eb});
+        }
       }
-      return tris;
+
+      /* Remove triangles that reference super-triangle vertices */
+      return triangles.filter(t=>t.a<n&&t.b<n&&t.c<n);
     }
 
-    /* ═══ Build territory data per polity ═══ */
+    /* ═══ Compute circumcenter of a triangle ═══ */
+    function circumcenter(ax,az,bx,bz,cx,cz){
+      const D=2*(ax*(bz-cz)+bx*(cz-az)+cx*(az-bz));
+      if(Math.abs(D)<1e-12) return [(ax+bx+cx)/3,(az+bz+cz)/3];
+      const ux=((ax*ax+az*az)*(bz-cz)+(bx*bx+bz*bz)*(cz-az)+(cx*cx+cz*cz)*(az-bz))/D;
+      const uz=((ax*ax+az*az)*(cx-bx)+(bx*bx+bz*bz)*(ax-cx)+(cx*cx+cz*cz)*(bx-ax))/D;
+      return [ux,uz];
+    }
+
+    /* ═══ Collect all star 2D positions and build owner lookup ═══ */
+    const pts2D=[];    /* [x,z] per system index */
+    const ownerOf=[];  /* polity id per system index */
+    const sysIdx=new Map(); /* system id -> index in pts2D */
+
+    for(let i=0;i<systems.length;i++){
+      const sys=systems[i];
+      pts2D.push([sys._worldPos[0], sys._worldPos[2]]);
+      const own=(sys.owner&&sys.owner!=='unassigned'&&!hiddenPolities.has(sys.owner))?sys.owner:null;
+      ownerOf.push(own);
+      sysIdx.set(sys.id,i);
+    }
+
+    /* ═══ Run Delaunay ═══ */
+    const tris=delaunay(pts2D);
+
+    /* ═══ Build Voronoi edges and cell polygons ═══ */
+
+    /* Galaxy bounds for clipping */
+    const clipMinX=-GALAXY_SPREAD_X/2-15, clipMaxX=GALAXY_SPREAD_X/2+15;
+    const clipMinZ=-GALAXY_SPREAD_Z/2-15, clipMaxZ=GALAXY_SPREAD_Z/2+15;
+
+    function clampPt(p){
+      return [Math.max(clipMinX,Math.min(clipMaxX,p[0])), Math.max(clipMinZ,Math.min(clipMaxZ,p[1]))];
+    }
+
+    /* For each triangle, compute circumcenter */
+    const ccList=tris.map(t=>{
+      const cc=circumcenter(
+        pts2D[t.a][0],pts2D[t.a][1],
+        pts2D[t.b][0],pts2D[t.b][1],
+        pts2D[t.c][0],pts2D[t.c][1]
+      );
+      return clampPt(cc);
+    });
+
+    /* Build edge->triangle adjacency: for each undirected edge (i,j), which triangles share it */
+    function edgeKey(a,b){ return a<b?a+','+b:b+','+a; }
+    const edgeTris=new Map(); /* edgeKey -> [triIdx, triIdx] */
+    for(let ti=0;ti<tris.length;ti++){
+      const t=tris[ti];
+      const edges=[[t.a,t.b],[t.b,t.c],[t.c,t.a]];
+      for(const [ea,eb] of edges){
+        const k=edgeKey(ea,eb);
+        if(!edgeTris.has(k)) edgeTris.set(k,[]);
+        edgeTris.get(k).push(ti);
+      }
+    }
+
+    /* ═══ Border lines: Voronoi edges where the two Delaunay-edge endpoints have different owners ═══ */
+    const borderByPolity=new Map(); /* polityId -> [[x1,z1,x2,z2], ...] */
+
+    for(const [ek, triIndices] of edgeTris){
+      if(triIndices.length!==2) continue; /* boundary edge, skip */
+      const [sa,sb]=ek.split(',').map(Number);
+      const owA=ownerOf[sa], owB=ownerOf[sb];
+      if(owA===owB) continue; /* same owner: interior edge, no border */
+
+      /* Voronoi edge connects circumcenters of the two adjacent triangles */
+      const ccA=ccList[triIndices[0]], ccB=ccList[triIndices[1]];
+
+      /* Add border for each owned polity on this edge */
+      for(const ow of [owA,owB]){
+        if(!ow) continue;
+        if(!borderByPolity.has(ow)) borderByPolity.set(ow,[]);
+        borderByPolity.get(ow).push([ccA[0],ccA[1],ccB[0],ccB[1]]);
+      }
+    }
+
+    /* Also add borders for boundary edges (Delaunay edges with only 1 triangle)
+       where the star is owned — project outward from circumcenter */
+    for(const [ek, triIndices] of edgeTris){
+      if(triIndices.length!==1) continue;
+      const [sa,sb]=ek.split(',').map(Number);
+      const owA=ownerOf[sa], owB=ownerOf[sb];
+      if(owA===owB&&owA===null) continue;
+
+      const cc=ccList[triIndices[0]];
+      /* Project outward: midpoint of the Delaunay edge, then extend perpendicular */
+      const mx=(pts2D[sa][0]+pts2D[sb][0])*0.5;
+      const mz=(pts2D[sa][1]+pts2D[sb][1])*0.5;
+      const dx=pts2D[sb][0]-pts2D[sa][0], dz=pts2D[sb][1]-pts2D[sa][1];
+      const len=Math.sqrt(dx*dx+dz*dz)||1;
+      /* Perpendicular direction (outward from triangle) */
+      const nx=-dz/len, nz=dx/len;
+      /* Extend far enough to reach the galaxy edge */
+      const farPt=clampPt([mx+nx*200, mz+nz*200]);
+      const farPt2=clampPt([mx-nx*200, mz-nz*200]);
+      /* Pick the far point that's on the same side as the circumcenter */
+      const ccSide=(cc[0]-mx)*nx+(cc[1]-mz)*nz;
+      const endPt=ccSide>=0?farPt:farPt2;
+
+      if(owA!==owB){
+        for(const ow of [owA,owB]){
+          if(!ow) continue;
+          if(!borderByPolity.has(ow)) borderByPolity.set(ow,[]);
+          borderByPolity.get(ow).push([cc[0],cc[1],endPt[0],endPt[1]]);
+        }
+      } else if(owA){
+        /* Both same owned polity on boundary: this is an outer border */
+        if(!borderByPolity.has(owA)) borderByPolity.set(owA,[]);
+        borderByPolity.get(owA).push([cc[0],cc[1],endPt[0],endPt[1]]);
+      }
+    }
+
+    /* ═══ Build border VBOs ═══ */
     territoryBorderColors=[];
-    let territoryFillVBOs=[];
-
-    /* Determine hull edge length based on average inter-star distance */
-    const allPts=[];
-    for(const [,pts] of polStars) for(const p of pts) allPts.push(p);
-
-    for(const [pid, stars] of polStars){
+    for(const [pid,segs] of borderByPolity){
       const pol=polMap.get(pid);
       if(!pol) continue;
-      if(stars.length<1) continue;
-
-      /* For single-star polities, create a small diamond */
-      let borderPoly;
-      if(stars.length===1){
-        const s=stars[0];
-        const r=TERRITORY_RADIUS*3;
-        borderPoly=[[s[0]+r,s[1]], [s[0],s[1]+r], [s[0]-r,s[1]], [s[0],s[1]-r]];
-      } else if(stars.length===2){
-        const a=stars[0], b=stars[1];
-        const dx=b[0]-a[0], dz=b[1]-a[1];
-        const len=Math.sqrt(dx*dx+dz*dz)||1;
-        const nx=-dz/len*TERRITORY_RADIUS*2, nz=dx/len*TERRITORY_RADIUS*2;
-        const pad=TERRITORY_RADIUS*2;
-        borderPoly=[
-          [a[0]-dx/len*pad+nx, a[1]-dz/len*pad+nz],
-          [b[0]+dx/len*pad+nx, b[1]+dz/len*pad+nz],
-          [b[0]+dx/len*pad-nx, b[1]+dz/len*pad-nz],
-          [a[0]-dx/len*pad-nx, a[1]-dz/len*pad-nz]
-        ];
-      } else {
-        /* Compute average nearest-neighbor distance for concave hull threshold */
-        let avgNN=0;
-        for(const s of stars){
-          let minD=1e9;
-          for(const t of stars){
-            if(s===t) continue;
-            const d=Math.sqrt((s[0]-t[0])**2+(s[1]-t[1])**2);
-            if(d<minD) minD=d;
-          }
-          avgNN+=minD;
-        }
-        avgNN/=stars.length;
-
-        /* Concave hull: use a generous edge threshold so the hull stays mostly
-           convex but can indent around large gaps. 4x NN prevents pinching. */
-        const maxEdge=Math.max(avgNN*4, 20);
-        const hull=concaveHull(stars, maxEdge);
-
-        /* Offset outward: half the average NN distance gives a natural buffer
-           that extends just past the midpoint between owned and unowned stars */
-        const offsetDist=Math.max(avgNN*0.5, TERRITORY_RADIUS*1.5);
-        borderPoly=offsetPolygon(hull, offsetDist);
+      const verts=[];
+      for(const s of segs){
+        verts.push(s[0],terrY,s[1], s[2],terrY,s[3]);
       }
-
-      if(borderPoly.length<3) continue;
-
-      /* ── Build border line VBO (LINE_LOOP as LINE pairs) ── */
-      const borderVerts=[];
-      for(let i=0;i<borderPoly.length;i++){
-        const a=borderPoly[i], b=borderPoly[(i+1)%borderPoly.length];
-        borderVerts.push(a[0],terrY,a[1], b[0],terrY,b[1]);
-      }
-      const borderVBO=gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER,borderVBO);
-      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(borderVerts),gl.STATIC_DRAW);
+      if(verts.length<6) continue;
+      const vbo=gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
       const sc=hexToRgb(pol.strokeColor||pol.color);
-      territoryBorderColors.push({
-        vbo:borderVBO, count:borderVerts.length/3,
-        color:[sc[0]/255,sc[1]/255,sc[2]/255]
-      });
+      territoryBorderColors.push({ vbo, count:verts.length/3, color:[sc[0]/255,sc[1]/255,sc[2]/255] });
+    }
 
-      /* ── Build fill triangle VBO ── */
-      const fillTris=triangulatePolygon(borderPoly);
-      if(fillTris.length>=9){
-        const fillVBO=gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER,fillVBO);
-        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(fillTris),gl.STATIC_DRAW);
-        const fc=hexToRgb(pol.color);
-        territoryFillVBOs.push({
-          vbo:fillVBO, count:fillTris.length/3,
-          color:[fc[0]/255,fc[1]/255,fc[2]/255]
-        });
+    /* ═══ Fill: build Voronoi cell polygons per star, then merge per polity ═══ */
+
+    /* For each star, collect its Voronoi cell vertices (circumcenters of adjacent triangles, ordered) */
+    const starTris=new Array(pts2D.length); /* starIdx -> [triIdx, ...] */
+    for(let i=0;i<pts2D.length;i++) starTris[i]=[];
+    for(let ti=0;ti<tris.length;ti++){
+      starTris[tris[ti].a].push(ti);
+      starTris[tris[ti].b].push(ti);
+      starTris[tris[ti].c].push(ti);
+    }
+
+    /* Order triangles around each star by angle */
+    function orderTrisAroundStar(si){
+      const adj=starTris[si];
+      if(adj.length===0) return [];
+      const sx=pts2D[si][0], sz=pts2D[si][1];
+      /* Sort by angle of circumcenter relative to star */
+      return adj.slice().sort((a,b)=>{
+        const ca=ccList[a], cb=ccList[b];
+        return Math.atan2(ca[1]-sz,ca[0]-sx)-Math.atan2(cb[1]-sz,cb[0]-sx);
+      });
+    }
+
+    /* Build fill triangles per polity (fan from star position through ordered circumcenters) */
+    const fillByPolity=new Map();
+    for(let si=0;si<pts2D.length;si++){
+      const ow=ownerOf[si];
+      if(!ow) continue;
+      const ordered=orderTrisAroundStar(si);
+      if(ordered.length<2) continue;
+
+      if(!fillByPolity.has(ow)) fillByPolity.set(ow,[]);
+      const verts=fillByPolity.get(ow);
+      const sx=pts2D[si][0], sz=pts2D[si][1];
+
+      /* Fan triangulation: star center -> consecutive circumcenter pairs */
+      for(let i=0;i<ordered.length;i++){
+        const ccA=ccList[ordered[i]];
+        const ccB=ccList[ordered[(i+1)%ordered.length]];
+        verts.push(sx,terrY,sz, ccA[0],terrY,ccA[1], ccB[0],terrY,ccB[1]);
       }
     }
 
-    /* Store fill VBOs globally so the render loop can use them */
+    /* Build fill VBOs */
+    const territoryFillVBOs=[];
+    for(const [pid,verts] of fillByPolity){
+      const pol=polMap.get(pid);
+      if(!pol||verts.length<9) continue;
+      const vbo=gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
+      const fc=hexToRgb(pol.color);
+      territoryFillVBOs.push({ vbo, count:verts.length/3, color:[fc[0]/255,fc[1]/255,fc[2]/255] });
+    }
     window._territoryFillVBOs=territoryFillVBOs;
 
-    /* No longer need the texture-based fill, but keep the texture object
-       initialized to avoid null checks in render. Create a 1x1 transparent texture. */
+    /* Dummy texture to avoid null checks */
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
