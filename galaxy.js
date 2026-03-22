@@ -779,85 +779,61 @@ void main(){
       return result;
     }
 
-    function nearestFromHash(hash,wx,wz,maxR){
-      const nearby=nearbyFromHash(hash,wx,wz,maxR);
-      let best=1e9, bestSys=null;
-      for(const sys of nearby){
-        const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
-        const d=dx*dx+dz*dz;
-        if(d<best){ best=d; bestSys=sys; }
-      }
-      return bestSys?{sys:bestSys,dist:Math.sqrt(best)}:null;
-    }
-
     function smoothMin(a, b, k){
       const h=Math.max(0, Math.min(1, 0.5 + 0.5*(b-a)/k));
       return b*(1-h) + a*h - k*h*(1-h);
     }
 
-    /* Pass 1: Smooth-union SDF for owned systems (metaballs) */
+    /* SDF ownership grid.
+       Compute two competing SDFs:
+       1. Owned SDF: smooth-union of circles around all owned systems
+       2. Unowned SDF: smooth-union of circles around all unowned systems
+       Territory exists where ownedSDF < unownedSDF (owned systems are closer).
+       This creates smooth curved borders that naturally avoid unowned systems. */
     const ownerGrid=new Array(res*res);
     const sdfGrid=new Float32Array(res*res);
-    const searchMaxR=CLAIM_R+cellSize;
+    const searchMaxR=CLAIM_R*3+cellSize;
     const smoothK=CLAIM_R*0.8;
 
     for(let gy=0;gy<res;gy++){
       for(let gx=0;gx<res;gx++){
         const wx=(gx/(res-1))*worldW - extX;
         const wz=(gy/(res-1))*worldH - extZ;
-        const nearby=nearbyFromHash(hashOwned,wx,wz,searchMaxR);
 
-        let sdf=999;
+        /* Owned SDF (metaball blend of all nearby owned systems) */
+        const nearOwned=nearbyFromHash(hashOwned,wx,wz,searchMaxR);
+        let ownedSdf=999;
         let bestOwner=null, bestDist=1e9;
-        for(const sys of nearby){
+        for(const sys of nearOwned){
           const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
           const d=Math.sqrt(dx*dx+dz*dz);
           const sysSdf=d-CLAIM_R;
-          sdf=smoothMin(sdf, sysSdf, smoothK);
+          ownedSdf=smoothMin(ownedSdf, sysSdf, smoothK);
           if(d<bestDist){ bestDist=d; bestOwner=sys.owner; }
         }
 
+        /* Unowned SDF (metaball blend of all nearby unowned systems).
+           Uses the same claim radius so unowned systems "push back" equally. */
+        const nearUnowned=nearbyFromHash(hashUnowned,wx,wz,searchMaxR);
+        let unownedSdf=999;
+        for(const sys of nearUnowned){
+          const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
+          const d=Math.sqrt(dx*dx+dz*dz);
+          const sysSdf=d-CLAIM_R;
+          unownedSdf=smoothMin(unownedSdf, sysSdf, smoothK);
+        }
+
         const gi=gy*res+gx;
-        if(bestOwner&&sdf<0){
+
+        /* Territory exists where owned field is stronger (more negative) than unowned.
+           The border naturally curves along the equidistant line between them. */
+        if(bestOwner&&ownedSdf<0&&ownedSdf<unownedSdf){
           ownerGrid[gi]=bestOwner;
-          sdfGrid[gi]=sdf;
+          /* Use the difference as the effective SDF so edges are smooth */
+          sdfGrid[gi]=Math.min(ownedSdf, ownedSdf-unownedSdf);
         } else {
           ownerGrid[gi]=null;
-          sdfGrid[gi]=Math.max(sdf,0);
-        }
-      }
-    }
-
-    /* Pass 2: Carve out territory near unowned systems.
-       For each territory pixel, check if the nearest ALL system (owned or unowned)
-       is actually unowned. If so, this pixel is too close to an unowned star
-       and should be carved out. This preserves the smooth contiguous shape
-       but creates clean cutouts around neutral systems at the frontier. */
-    const CARVE_R=CLAIM_R*0.6; /* how close to an unowned system triggers carving */
-    for(let gy=0;gy<res;gy++){
-      for(let gx=0;gx<res;gx++){
-        const gi=gy*res+gx;
-        if(!ownerGrid[gi]) continue;
-
-        const wx=(gx/(res-1))*worldW - extX;
-        const wz=(gy/(res-1))*worldH - extZ;
-
-        const nearUn=nearestFromHash(hashUnowned,wx,wz,CLAIM_R*2);
-        if(!nearUn) continue;
-
-        /* Only carve if the unowned system is genuinely close */
-        if(nearUn.dist>CARVE_R) continue;
-
-        /* Check if there's an owned system even closer - if so, don't carve */
-        const nearOwn=nearestFromHash(hashOwned,wx,wz,CLAIM_R*2);
-        if(nearOwn&&nearOwn.dist<nearUn.dist) continue;
-
-        /* This pixel is closer to an unowned system than any owned one: carve it out.
-           Use a smooth falloff so the cutout has rounded edges too. */
-        const carveDepth=1.0 - nearUn.dist/CARVE_R;
-        if(carveDepth>0.3){
-          ownerGrid[gi]=null;
-          sdfGrid[gi]=0;
+          sdfGrid[gi]=Math.max(ownedSdf,0);
         }
       }
     }
