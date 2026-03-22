@@ -211,8 +211,7 @@ varying vec2 vUV;
 void main(){
   vec4 fill=texture2D(uTex,vUV);
   if(fill.a<0.01) discard;
-  float fillA=fill.a*0.35;
-  gl_FragColor=vec4(fill.rgb, fillA);
+  gl_FragColor=vec4(fill.rgb, 0.30);
 }`;
 
   /* Lane lines — same as main.js */
@@ -781,10 +780,6 @@ void main(){
       return {ownerGrid, polIdGrid, polIdMap, res};
     }
 
-    /* Low-res grid for fill texture (blur works well at low res) */
-    const loRes=128;
-    const lo=computeOwnership(loRes);
-
     /* === Border lines: low-res marching squares → chain → Douglas-Peucker simplification
        This produces clean straight-line polygon borders like Stellaris === */
 
@@ -959,6 +954,14 @@ void main(){
       const verts=[];
 
       for(const chain of chains){
+        /* Filter out short artifact chains — must have meaningful length */
+        let chainLen=0;
+        for(let i=0;i<chain.length-1;i++){
+          const dx=chain[i+1][0]-chain[i][0], dz=chain[i+1][1]-chain[i][1];
+          chainLen+=Math.sqrt(dx*dx+dz*dz);
+        }
+        if(chain.length<4 || chainLen<5.0) continue;
+
         /* Simplify to clean straight-line segments */
         const simplified=douglasPeucker(chain, dpEpsilon);
         if(simplified.length<2) continue;
@@ -980,51 +983,24 @@ void main(){
       });
     }
 
-    /* === Fill texture from low-res grid with heavy blur === */
-    const fillRaw=new Uint8Array(loRes*loRes*4);
-    for(let gi=0;gi<loRes*loRes;gi++){
-      const pid=lo.ownerGrid[gi];
+    /* === Solid fill texture from medium-res grid — NO blur, crisp edges === */
+    const fillRes=512;
+    const fillOwn=computeOwnership(fillRes);
+    const fillRaw=new Uint8Array(fillRes*fillRes*4);
+    for(let gi=0;gi<fillRes*fillRes;gi++){
+      const pid=fillOwn.ownerGrid[gi];
       if(!pid) continue;
       const pol=polMap.get(pid);
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
       fillRaw[idx]=c[0]; fillRaw[idx+1]=c[1]; fillRaw[idx+2]=c[2];
-      fillRaw[idx+3]=220;
+      fillRaw[idx+3]=255;
     }
-    /* Heavy blur (3 passes) at low res eliminates all stair-stepping */
-    const kernel=[1,4,6,4,1], kSum=16, kR=2;
-    function blurPass(src, bRes){
-      const temp=new Uint8Array(src.length);
-      for(let y=0;y<bRes;y++) for(let x=0;x<bRes;x++){
-        let r=0,g=0,b=0,a=0;
-        for(let k=-kR;k<=kR;k++){
-          const sx=Math.max(0,Math.min(bRes-1,x+k));
-          const i=(y*bRes+sx)*4; const w=kernel[k+kR];
-          r+=src[i]*w; g+=src[i+1]*w; b+=src[i+2]*w; a+=src[i+3]*w;
-        }
-        const i=(y*bRes+x)*4;
-        temp[i]=r/kSum; temp[i+1]=g/kSum; temp[i+2]=b/kSum; temp[i+3]=a/kSum;
-      }
-      const out=new Uint8Array(src.length);
-      for(let y=0;y<bRes;y++) for(let x=0;x<bRes;x++){
-        let r=0,g=0,b=0,a=0;
-        for(let k=-kR;k<=kR;k++){
-          const sy=Math.max(0,Math.min(bRes-1,y+k));
-          const i=(sy*bRes+x)*4; const w=kernel[k+kR];
-          r+=temp[i]*w; g+=temp[i+1]*w; b+=temp[i+2]*w; a+=temp[i+3]*w;
-        }
-        const i=(y*bRes+x)*4;
-        out[i]=r/kSum; out[i+1]=g/kSum; out[i+2]=b/kSum; out[i+3]=a/kSum;
-      }
-      return out;
-    }
-    let fillData=fillRaw;
-    for(let p=0;p<3;p++) fillData=blurPass(fillData, loRes);
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,loRes,loRes,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,fillRes,fillRes,0,gl.RGBA,gl.UNSIGNED_BYTE,fillRaw);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
