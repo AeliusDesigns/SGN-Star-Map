@@ -1482,7 +1482,8 @@ void main(){
       const strokeCol=pol.strokeColor||pol.color;
       const ls=Math.max(1, Math.round(fontSize*0.25));
 
-      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${rotation}deg);text-shadow:0 0 ${Math.round(fontSize*0.5)}px ${strokeCol}50, 0 0 ${Math.round(fontSize*0.3)}px ${pol.color}40, 0 2px 4px rgba(0,0,0,0.8);">${pol.name}</div>`;
+      const strokeW=Math.max(0.5, Math.min(2, fontSize*0.06));
+      html+=`<div class="polity-label" style="left:${sx}px;top:${sy}px;font-size:${fontSize}px;letter-spacing:${ls}px;color:${strokeCol};opacity:${opacity.toFixed(2)};transform:translate(-50%,-50%) rotate(${rotation}deg);-webkit-text-stroke:${strokeW.toFixed(1)}px rgba(255,255,255,0.7);text-shadow:0 0 ${Math.round(fontSize*0.4)}px rgba(255,255,255,0.3), 0 0 ${Math.round(fontSize*0.8)}px ${strokeCol}40, 0 2px 6px rgba(0,0,0,0.9);">${pol.name}</div>`;
     }
     container.innerHTML=html;
   }
@@ -1581,10 +1582,6 @@ void main(){
     refreshBulkPolityOptions();
     updateEditorLock();
     initInput();
-
-    /* Lanes toggle button */
-    const lanesBtn=document.getElementById('btn-toggle-lanes');
-    if(lanesBtn) lanesBtn.addEventListener('click',toggleLanes);
 
     /* Start render */
     requestAnimationFrame(render);
