@@ -937,12 +937,14 @@ void main(){
         }
         avgNN/=stars.length;
 
-        /* Concave hull with edge length = 2x average NN distance */
-        const maxEdge=Math.max(avgNN*2, 10);
+        /* Concave hull: use a generous edge threshold so the hull stays mostly
+           convex but can indent around large gaps. 4x NN prevents pinching. */
+        const maxEdge=Math.max(avgNN*4, 20);
         const hull=concaveHull(stars, maxEdge);
 
-        /* Offset outward — small padding just beyond the outermost stars */
-        const offsetDist=Math.min(avgNN*0.35, 4.0);
+        /* Offset outward: half the average NN distance gives a natural buffer
+           that extends just past the midpoint between owned and unowned stars */
+        const offsetDist=Math.max(avgNN*0.5, TERRITORY_RADIUS*1.5);
         borderPoly=offsetPolygon(hull, offsetDist);
       }
 
