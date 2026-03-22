@@ -937,12 +937,12 @@ void main(){
         }
         avgNN/=stars.length;
 
-        /* Concave hull with edge length = 3x average NN distance */
-        const maxEdge=Math.max(avgNN*3, 15);
+        /* Concave hull with edge length = 2x average NN distance */
+        const maxEdge=Math.max(avgNN*2, 10);
         const hull=concaveHull(stars, maxEdge);
 
-        /* Offset outward to create border padding */
-        const offsetDist=Math.max(avgNN*0.6, TERRITORY_RADIUS*2.5);
+        /* Offset outward — small padding just beyond the outermost stars */
+        const offsetDist=Math.min(avgNN*0.35, 4.0);
         borderPoly=offsetPolygon(hull, offsetDist);
       }
 
