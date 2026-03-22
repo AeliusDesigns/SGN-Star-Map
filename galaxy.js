@@ -721,138 +721,123 @@ void main(){
     const extX=GALAXY_SPREAD_X/2+20;
     const extZ=GALAXY_SPREAD_Z/2+20;
     const worldW=extX*2, worldH=extZ*2;
-    const CLAIM_R=TERRITORY_RADIUS;
 
     const polMap=new Map();
     for(const p of polities) polMap.set(p.id, p);
-    const ownedSystems=systems.filter(s=>s.owner&&s.owner!=='unassigned'&&!hiddenPolities.has(s.owner));
-    const unownedSystems=systems.filter(s=>!s.owner||s.owner==='unassigned'||hiddenPolities.has(s.owner));
 
-    const cellSize=Math.max(CLAIM_R*2, 4);
-    const hashOwned=new Map();
-    const hashUnowned=new Map();
+    /* Spatial hash of ALL systems (owned + unowned) for Voronoi */
+    const cellSize=4;
+    const hashAll=new Map();
     function cellKey(wx,wz){ return Math.floor(wx/cellSize)+','+Math.floor(wz/cellSize); }
     function insertHash(hash,sys){
       const k=cellKey(sys._worldPos[0],sys._worldPos[2]);
       if(!hash.has(k)) hash.set(k,[]);
       hash.get(k).push(sys);
     }
-    for(const sys of ownedSystems) insertHash(hashOwned,sys);
-    for(const sys of unownedSystems) insertHash(hashUnowned,sys);
+    for(const sys of systems) insertHash(hashAll,sys);
 
-    function nearbyFromHash(hash,wx,wz,maxR){
+    function nearestSystem(wx,wz){
       const cx=Math.floor(wx/cellSize), cz=Math.floor(wz/cellSize);
-      const searchR=Math.ceil(maxR/cellSize);
-      const result=[];
-      for(let dz=-searchR;dz<=searchR;dz++){
-        for(let dx=-searchR;dx<=searchR;dx++){
-          const bucket=hash.get((cx+dx)+','+(cz+dz));
-          if(bucket) for(const sys of bucket) result.push(sys);
+      let best=1e9, bestSys=null;
+      /* Search expanding rings until we find something */
+      for(let ring=0;ring<=5;ring++){
+        for(let dz=-ring;dz<=ring;dz++){
+          for(let dx=-ring;dx<=ring;dx++){
+            if(Math.abs(dx)<ring&&Math.abs(dz)<ring) continue; /* skip inner cells already checked */
+            const bucket=hashAll.get((cx+dx)+','+(cz+dz));
+            if(!bucket) continue;
+            for(const sys of bucket){
+              const ddx=sys._worldPos[0]-wx, ddz=sys._worldPos[2]-wz;
+              const d2=ddx*ddx+ddz*ddz;
+              if(d2<best){ best=d2; bestSys=sys; }
+            }
+          }
         }
+        if(bestSys&&ring>0) break; /* found in previous ring, one more ring to be sure */
       }
-      return result;
+      return bestSys;
     }
 
-    function smoothMin(a, b, k){
-      const h=Math.max(0, Math.min(1, 0.5 + 0.5*(b-a)/k));
-      return b*(1-h) + a*h - k*h*(1-h);
-    }
+    /* Pass 1: Voronoi ownership grid.
+       Each pixel finds its nearest system. If that system is owned, the pixel
+       belongs to that polity. This is a true Voronoi diagram. */
+    const ownerGrid=new Array(res*res); /* polity id or null */
+    const polIdGrid=new Int32Array(res*res); /* numeric polity index for fast comparison */
+    const polIdMap=new Map(); /* polity id string -> numeric index */
+    let nextPolIdx=1;
+    for(const p of polities){ polIdMap.set(p.id, nextPolIdx++); }
 
-    /* Compute SDF on grid */
-    const sdfRes=256; /* lower res for SDF - contour extraction smooths it */
-    const sdf=new Float32Array(sdfRes*sdfRes);
-    const ownerAt=new Array(sdfRes*sdfRes);
-    const searchMaxR=CLAIM_R*3+cellSize;
-    const smoothK=CLAIM_R*1.5;
-
-    for(let gy=0;gy<sdfRes;gy++){
-      for(let gx=0;gx<sdfRes;gx++){
-        const wx=(gx/(sdfRes-1))*worldW - extX;
-        const wz=(gy/(sdfRes-1))*worldH - extZ;
-
-        const nearOwned=nearbyFromHash(hashOwned,wx,wz,searchMaxR);
-        let ownedSdf=999, bestOwner=null, bestDist=1e9;
-        for(const sys of nearOwned){
-          const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
-          const d=Math.sqrt(dx*dx+dz*dz);
-          ownedSdf=smoothMin(ownedSdf, d-CLAIM_R, smoothK);
-          if(d<bestDist){ bestDist=d; bestOwner=sys.owner; }
-        }
-
-        const nearUnowned=nearbyFromHash(hashUnowned,wx,wz,searchMaxR);
-        let unownedSdf=999;
-        for(const sys of nearUnowned){
-          const dx=sys._worldPos[0]-wx, dz=sys._worldPos[2]-wz;
-          const d=Math.sqrt(dx*dx+dz*dz);
-          unownedSdf=smoothMin(unownedSdf, d-CLAIM_R, smoothK);
-        }
-
-        const gi=gy*sdfRes+gx;
-        if(bestOwner&&ownedSdf<0&&ownedSdf<unownedSdf){
-          sdf[gi]=ownedSdf; /* negative = inside */
-          ownerAt[gi]=bestOwner;
+    for(let gy=0;gy<res;gy++){
+      for(let gx=0;gx<res;gx++){
+        const wx=(gx/(res-1))*worldW - extX;
+        const wz=(gy/(res-1))*worldH - extZ;
+        const nearest=nearestSystem(wx,wz);
+        const gi=gy*res+gx;
+        if(nearest&&nearest.owner&&nearest.owner!=='unassigned'&&!hiddenPolities.has(nearest.owner)){
+          ownerGrid[gi]=nearest.owner;
+          polIdGrid[gi]=polIdMap.get(nearest.owner)||0;
         } else {
-          sdf[gi]=Math.max(ownedSdf, 0.01); /* positive = outside */
-          ownerAt[gi]=null;
+          ownerGrid[gi]=null;
+          polIdGrid[gi]=0;
         }
       }
     }
 
-    /* Marching squares: extract contour lines at sdf=0.
-       For each cell of 4 pixels, check if the zero-crossing passes through.
-       Use linear interpolation along edges for sub-pixel smooth vertex positions. */
-    const borderVerts=[]; /* flat array of [x,y,z, x,y,z, ...] line segments */
-    const borderPolIds=[]; /* polity id per segment for coloring */
-    const cellW=worldW/(sdfRes-1);
-    const cellH=worldH/(sdfRes-1);
-    const terrY=-0.5; /* same Y as territory quad */
+    /* Pass 2: Marching squares on ownership boundary.
+       Extract contour lines where ownership changes (owned->unowned or polity A->polity B). */
+    const borderVerts=[];
+    const borderPolIds=[];
+    const cellW=worldW/(res-1);
+    const cellH=worldH/(res-1);
+    const terrY=-0.5;
 
-    for(let gy=0;gy<sdfRes-1;gy++){
-      for(let gx=0;gx<sdfRes-1;gx++){
-        const i00=gy*sdfRes+gx;
-        const i10=i00+1;
-        const i01=i00+sdfRes;
-        const i11=i01+1;
-        const v00=sdf[i00], v10=sdf[i10], v01=sdf[i01], v11=sdf[i11];
+    for(let gy=0;gy<res-1;gy++){
+      for(let gx=0;gx<res-1;gx++){
+        const i00=gy*res+gx, i10=i00+1, i01=i00+res, i11=i01+1;
+        const p00=polIdGrid[i00], p10=polIdGrid[i10], p01=polIdGrid[i01], p11=polIdGrid[i11];
 
-        /* Classify corners: inside (negative) = 1, outside = 0 */
-        const c = (v00<0?1:0)|(v10<0?2:0)|(v01<0?4:0)|(v11<0?8:0);
-        if(c===0||c===15) continue; /* all same side, no contour */
-
-        /* World positions of corners */
+        /* Check each edge for ownership changes */
         const x0=-extX+gx*cellW, x1=x0+cellW;
         const z0=-extZ+gy*cellH, z1=z0+cellH;
 
-        /* Interpolate zero-crossing position along an edge */
+        /* Get the owned polity in this cell (for coloring) */
+        const pid=ownerGrid[i00]||ownerGrid[i10]||ownerGrid[i01]||ownerGrid[i11];
+        if(!pid) continue; /* no owned corners at all */
+
+        /* For each cell, treat it as binary: is this corner owned by 'pid'? */
+        const ref=polIdMap.get(pid)||0;
+        const v00=(p00===ref)?-1:1;
+        const v10=(p10===ref)?-1:1;
+        const v01=(p01===ref)?-1:1;
+        const v11=(p11===ref)?-1:1;
+
+        const c=(v00<0?1:0)|(v10<0?2:0)|(v01<0?4:0)|(v11<0?8:0);
+        if(c===0||c===15) continue;
+
         function lerp(va,vb,pa,pb){
           const t=va/(va-vb);
           return [pa[0]+(pb[0]-pa[0])*t, pa[1]+(pb[1]-pa[1])*t];
         }
 
-        /* Edge midpoints where contour crosses */
-        const edgeTop=lerp(v00,v10,[x0,z0],[x1,z0]);
-        const edgeBot=lerp(v01,v11,[x0,z1],[x1,z1]);
-        const edgeLeft=lerp(v00,v01,[x0,z0],[x0,z1]);
-        const edgeRight=lerp(v10,v11,[x1,z0],[x1,z1]);
+        const eT=lerp(v00,v10,[x0,z0],[x1,z0]);
+        const eB=lerp(v01,v11,[x0,z1],[x1,z1]);
+        const eL=lerp(v00,v01,[x0,z0],[x0,z1]);
+        const eR=lerp(v10,v11,[x1,z0],[x1,z1]);
 
-        /* Get polity for this cell */
-        const pid=ownerAt[i00]||ownerAt[i10]||ownerAt[i01]||ownerAt[i11];
-
-        /* Marching squares lookup - which edges to connect */
         function addSeg(a,b){
           borderVerts.push(a[0],terrY,a[1], b[0],terrY,b[1]);
           borderPolIds.push(pid);
         }
 
         switch(c){
-          case 1: case 14: addSeg(edgeTop,edgeLeft); break;
-          case 2: case 13: addSeg(edgeTop,edgeRight); break;
-          case 4: case 11: addSeg(edgeLeft,edgeBot); break;
-          case 8: case 7:  addSeg(edgeRight,edgeBot); break;
-          case 3: case 12: addSeg(edgeLeft,edgeRight); break;
-          case 5: case 10: addSeg(edgeTop,edgeBot); break;
-          case 6:  addSeg(edgeTop,edgeLeft); addSeg(edgeRight,edgeBot); break;
-          case 9:  addSeg(edgeTop,edgeRight); addSeg(edgeLeft,edgeBot); break;
+          case 1: case 14: addSeg(eT,eL); break;
+          case 2: case 13: addSeg(eT,eR); break;
+          case 4: case 11: addSeg(eL,eB); break;
+          case 8: case 7:  addSeg(eR,eB); break;
+          case 3: case 12: addSeg(eL,eR); break;
+          case 5: case 10: addSeg(eT,eB); break;
+          case 6:  addSeg(eT,eL); addSeg(eR,eB); break;
+          case 9:  addSeg(eT,eR); addSeg(eL,eB); break;
         }
       }
     }
@@ -865,7 +850,7 @@ void main(){
       if(!pid) continue;
       if(!polBorderVerts.has(pid)) polBorderVerts.set(pid,[]);
       const arr=polBorderVerts.get(pid);
-      const vi=i*6; /* 2 verts * 3 floats */
+      const vi=i*6;
       arr.push(
         borderVerts[vi],borderVerts[vi+1],borderVerts[vi+2],
         borderVerts[vi+3],borderVerts[vi+4],borderVerts[vi+5]
@@ -881,29 +866,26 @@ void main(){
       const sc=hexToRgb(pol.strokeColor||pol.color);
       territoryBorderColors.push({
         vbo, count:verts.length/3,
-        color:[sc[0]/255,sc[1]/255,sc[2]/255],
-        fillColor:hexToRgb(pol.color).map(v=>v/255)
+        color:[sc[0]/255,sc[1]/255,sc[2]/255]
       });
     }
 
-    /* Simple fill texture (low res is fine, borders are geometry now) */
-    const fillRes=256;
-    const fillData=new Uint8Array(fillRes*fillRes*4);
-    /* Reuse the SDF grid (already 256) */
-    for(let gi=0;gi<sdfRes*sdfRes;gi++){
-      const pid=ownerAt[gi];
-      if(!pid||sdf[gi]>=0) continue;
+    /* Fill texture from Voronoi ownership */
+    const fillData=new Uint8Array(res*res*4);
+    for(let gi=0;gi<res*res;gi++){
+      const pid=ownerGrid[gi];
+      if(!pid) continue;
       const pol=polMap.get(pid);
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-      fillData[idx+3]=Math.round(Math.min(1, -sdf[gi]*2)*200);
+      fillData[idx+3]=200;
     }
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,fillRes,fillRes,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,res,res,0,gl.RGBA,gl.UNSIGNED_BYTE,fillData);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
