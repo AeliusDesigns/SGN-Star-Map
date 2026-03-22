@@ -218,8 +218,8 @@ void main(){
   float da_dy=dFdy(fill.a);
   float gradient=length(vec2(da_dx, da_dy));
 
-  /* Edge strength: strong where alpha transitions sharply (at the border) */
-  float edge=smoothstep(0.0, 0.15, gradient) * step(0.02, fill.a);
+  /* Edge strength: smoothstep over a wider range for softer, rounder borders */
+  float edge=smoothstep(0.01, 0.08, gradient) * step(0.02, fill.a);
 
   if(fill.a<0.01&&edge<0.01) discard;
 
@@ -839,6 +839,8 @@ void main(){
 
     /* Fill texture */
     const fillData=new Uint8Array(res*res*4);
+    /* Edge transition width in world units - spread over enough pixels for smooth dFdx */
+    const edgeWidth=Math.max(pxSize*8, 0.5);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
       if(!pid) continue;
@@ -847,7 +849,7 @@ void main(){
       const c=hexToRgb(pol.color);
       const idx=gi*4;
       const depth=-sdfGrid[gi];
-      const edgeSmooth=Math.min(1.0, depth/(pxSize*2));
+      const edgeSmooth=Math.min(1.0, depth/edgeWidth);
       fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
       fillData[idx+3]=Math.round(edgeSmooth*255);
     }
