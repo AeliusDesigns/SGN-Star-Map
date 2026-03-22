@@ -1475,7 +1475,7 @@ void main(){
     if(btn){
       btn.textContent=showLanes?'LANES ON':'LANES OFF';
       btn.style.color=showLanes?'var(--cyan)':'var(--text-muted)';
-      btn.style.borderColor=showLanes?'var(--cyan-dim)':'var(--border)';
+      btn.style.textShadow=showLanes?'0 0 8px rgba(56,232,255,.5)':'none';
     }
   }
 
@@ -1485,7 +1485,7 @@ void main(){
     if(btn){
       btn.textContent=showNames?'NAMES ON':'NAMES OFF';
       btn.style.color=showNames?'var(--cyan)':'var(--text-muted)';
-      btn.style.borderColor=showNames?'var(--cyan-dim)':'var(--border)';
+      btn.style.textShadow=showNames?'0 0 8px rgba(56,232,255,.5)':'none';
     }
     const container=document.getElementById('polity-names');
     if(container) container.style.display=showNames?'block':'none';
