@@ -855,6 +855,20 @@ void main(){
 
     /* ═══ Border lines: Voronoi edges where the two Delaunay-edge endpoints have different owners ═══ */
     const borderByPolity=new Map(); /* polityId -> [[x1,z1,x2,z2], ...] */
+    const BORDER_OFFSET=0.4; /* world units to shift each nation's line toward its own stars */
+
+    /* Helper: offset a Voronoi edge segment toward a given star */
+    function offsetEdgeToward(ccA, ccB, starPos, amount){
+      /* Edge direction */
+      const edx=ccB[0]-ccA[0], edz=ccB[1]-ccA[1];
+      const elen=Math.sqrt(edx*edx+edz*edz)||1;
+      /* Perpendicular toward the star */
+      const mx=(ccA[0]+ccB[0])*0.5, mz=(ccA[1]+ccB[1])*0.5;
+      const toStar=[starPos[0]-mx, starPos[1]-mz];
+      const toLen=Math.sqrt(toStar[0]*toStar[0]+toStar[1]*toStar[1])||1;
+      const nx=toStar[0]/toLen, nz=toStar[1]/toLen;
+      return [ccA[0]+nx*amount, ccA[1]+nz*amount, ccB[0]+nx*amount, ccB[1]+nz*amount];
+    }
 
     for(const [ek, triIndices] of edgeTris){
       if(triIndices.length!==2) continue; /* boundary edge, skip */
@@ -865,11 +879,28 @@ void main(){
       /* Voronoi edge connects circumcenters of the two adjacent triangles */
       const ccA=ccList[triIndices[0]], ccB=ccList[triIndices[1]];
 
+      const bothOwned=owA&&owB;
+
       /* Add border for each owned polity on this edge */
-      for(const ow of [owA,owB]){
-        if(!ow) continue;
-        if(!borderByPolity.has(ow)) borderByPolity.set(ow,[]);
-        borderByPolity.get(ow).push([ccA[0],ccA[1],ccB[0],ccB[1]]);
+      if(owA){
+        if(!borderByPolity.has(owA)) borderByPolity.set(owA,[]);
+        if(bothOwned){
+          /* Offset toward star A so both nations' lines are visible */
+          const seg=offsetEdgeToward(ccA,ccB,pts2D[sa],BORDER_OFFSET);
+          borderByPolity.get(owA).push(seg);
+        } else {
+          borderByPolity.get(owA).push([ccA[0],ccA[1],ccB[0],ccB[1]]);
+        }
+      }
+      if(owB){
+        if(!borderByPolity.has(owB)) borderByPolity.set(owB,[]);
+        if(bothOwned){
+          /* Offset toward star B */
+          const seg=offsetEdgeToward(ccA,ccB,pts2D[sb],BORDER_OFFSET);
+          borderByPolity.get(owB).push(seg);
+        } else {
+          borderByPolity.get(owB).push([ccA[0],ccA[1],ccB[0],ccB[1]]);
+        }
       }
     }
 
@@ -897,10 +928,16 @@ void main(){
       const endPt=ccSide>=0?farPt:farPt2;
 
       if(owA!==owB){
-        for(const ow of [owA,owB]){
+        const bothOwned=owA&&owB;
+        for(const [ow,si] of [[owA,sa],[owB,sb]]){
           if(!ow) continue;
           if(!borderByPolity.has(ow)) borderByPolity.set(ow,[]);
-          borderByPolity.get(ow).push([cc[0],cc[1],endPt[0],endPt[1]]);
+          if(bothOwned){
+            const seg=offsetEdgeToward(cc,endPt,pts2D[si],BORDER_OFFSET);
+            borderByPolity.get(ow).push(seg);
+          } else {
+            borderByPolity.get(ow).push([cc[0],cc[1],endPt[0],endPt[1]]);
+          }
         }
       } else if(owA){
         /* Both same owned polity on boundary: this is an outer border */
