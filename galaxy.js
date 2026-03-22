@@ -871,7 +871,7 @@ void main(){
     }
 
     /* Fill texture from Voronoi ownership */
-    const fillData=new Uint8Array(res*res*4);
+    const fillRaw=new Uint8Array(res*res*4);
     for(let gi=0;gi<res*res;gi++){
       const pid=ownerGrid[gi];
       if(!pid) continue;
@@ -879,9 +879,41 @@ void main(){
       if(!pol) continue;
       const c=hexToRgb(pol.color);
       const idx=gi*4;
-      fillData[idx]=c[0]; fillData[idx+1]=c[1]; fillData[idx+2]=c[2];
-      fillData[idx+3]=200;
+      fillRaw[idx]=c[0]; fillRaw[idx+1]=c[1]; fillRaw[idx+2]=c[2];
+      fillRaw[idx+3]=200;
     }
+
+    /* Multi-pass Gaussian blur to smooth the fill edges.
+       This eliminates the stair-step look on the territory boundary.
+       The border lines (GL_LINES) provide the crisp edge on top. */
+    const kernel=[1,4,6,4,1], kSum=16, kR=2;
+    function blurPass(src){
+      const temp=new Uint8Array(src.length);
+      for(let y=0;y<res;y++) for(let x=0;x<res;x++){
+        let r=0,g=0,b=0,a=0;
+        for(let k=-kR;k<=kR;k++){
+          const sx=Math.max(0,Math.min(res-1,x+k));
+          const i=(y*res+sx)*4; const w=kernel[k+kR];
+          r+=src[i]*w; g+=src[i+1]*w; b+=src[i+2]*w; a+=src[i+3]*w;
+        }
+        const i=(y*res+x)*4;
+        temp[i]=r/kSum; temp[i+1]=g/kSum; temp[i+2]=b/kSum; temp[i+3]=a/kSum;
+      }
+      const out=new Uint8Array(src.length);
+      for(let y=0;y<res;y++) for(let x=0;x<res;x++){
+        let r=0,g=0,b=0,a=0;
+        for(let k=-kR;k<=kR;k++){
+          const sy=Math.max(0,Math.min(res-1,y+k));
+          const i=(sy*res+x)*4; const w=kernel[k+kR];
+          r+=temp[i]*w; g+=temp[i+1]*w; b+=temp[i+2]*w; a+=temp[i+3]*w;
+        }
+        const i=(y*res+x)*4;
+        out[i]=r/kSum; out[i+1]=g/kSum; out[i+2]=b/kSum; out[i+3]=a/kSum;
+      }
+      return out;
+    }
+    /* Two blur passes for smoother edges */
+    const fillData=blurPass(blurPass(fillRaw));
 
     if(!territoryTexture) territoryTexture=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,territoryTexture);
