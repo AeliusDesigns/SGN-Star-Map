@@ -475,6 +475,8 @@
       'personnel.html': 'PERSONNEL',
       'orbat.html':     'ORBAT',
       'language.html':  'LANGUAGE FORGE'
+      'briefing.html':  'BRIEFING'
+      'galaxy.html':  'GALAXY MAP'
     };
 
     document.addEventListener('click', e => {
