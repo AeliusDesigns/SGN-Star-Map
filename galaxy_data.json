@@ -27952,7 +27952,9 @@
       "name": "System 1746",
       "owner": "POL-MN0U8OSV",
       "starType": "M",
-      "tags": [],
+      "tags": [
+        "capital"
+      ],
       "coords": {
         "x_norm": 0.739,
         "y_norm": 0.432857
