@@ -1,7 +1,7 @@
 {
   "meta": {
     "total_systems": 4984,
-    "total_polities": 2
+    "total_polities": 3
   },
   "polities": [
     {
@@ -16,6 +16,13 @@
       "name": "Golden Cohort",
       "color": "#dfae56",
       "strokeColor": "#a18154",
+      "description": ""
+    },
+    {
+      "id": "POL-MN2KV844",
+      "name": "Union of Lavinian Systems",
+      "color": "#000080",
+      "strokeColor": "#ffffff",
       "description": ""
     }
   ],
@@ -11559,7 +11566,7 @@
     {
       "id": "SGN-SYS-0722",
       "name": "System 0722",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "O",
       "tags": [],
       "coords": {
@@ -11959,7 +11966,7 @@
     {
       "id": "SGN-SYS-0747",
       "name": "System 0747",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "B",
       "tags": [],
       "coords": {
@@ -11975,7 +11982,7 @@
     {
       "id": "SGN-SYS-0748",
       "name": "System 0748",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -12439,7 +12446,7 @@
     {
       "id": "SGN-SYS-0777",
       "name": "System 0777",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -12455,7 +12462,7 @@
     {
       "id": "SGN-SYS-0778",
       "name": "System 0778",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -12919,7 +12926,7 @@
     {
       "id": "SGN-SYS-0807",
       "name": "System 0807",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -12935,7 +12942,7 @@
     {
       "id": "SGN-SYS-0808",
       "name": "System 0808",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -12951,7 +12958,7 @@
     {
       "id": "SGN-SYS-0809",
       "name": "System 0809",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -13207,7 +13214,7 @@
     {
       "id": "SGN-SYS-0825",
       "name": "System 0825",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -13223,7 +13230,7 @@
     {
       "id": "SGN-SYS-0826",
       "name": "System 0826",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -13527,7 +13534,7 @@
     {
       "id": "SGN-SYS-0845",
       "name": "System 0845",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -13543,7 +13550,7 @@
     {
       "id": "SGN-SYS-0846",
       "name": "System 0846",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -13559,7 +13566,7 @@
     {
       "id": "SGN-SYS-0847",
       "name": "System 0847",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "A",
       "tags": [],
       "coords": {
@@ -13751,7 +13758,7 @@
     {
       "id": "SGN-SYS-0859",
       "name": "System 0859",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -13767,7 +13774,7 @@
     {
       "id": "SGN-SYS-0860",
       "name": "System 0860",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -13783,7 +13790,7 @@
     {
       "id": "SGN-SYS-0861",
       "name": "System 0861",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -13799,7 +13806,7 @@
     {
       "id": "SGN-SYS-0862",
       "name": "System 0862",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -13815,7 +13822,7 @@
     {
       "id": "SGN-SYS-0863",
       "name": "System 0863",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -14279,7 +14286,7 @@
     {
       "id": "SGN-SYS-0892",
       "name": "System 0892",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -14295,7 +14302,7 @@
     {
       "id": "SGN-SYS-0893",
       "name": "System 0893",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -14503,7 +14510,7 @@
     {
       "id": "SGN-SYS-0906",
       "name": "System 0906",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -14519,7 +14526,7 @@
     {
       "id": "SGN-SYS-0907",
       "name": "System 0907",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -14535,7 +14542,7 @@
     {
       "id": "SGN-SYS-0908",
       "name": "System 0908",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -14871,7 +14878,7 @@
     {
       "id": "SGN-SYS-0929",
       "name": "System 0929",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -15111,7 +15118,7 @@
     {
       "id": "SGN-SYS-0944",
       "name": "System 0944",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -15127,7 +15134,7 @@
     {
       "id": "SGN-SYS-0945",
       "name": "System 0945",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -15143,7 +15150,7 @@
     {
       "id": "SGN-SYS-0946",
       "name": "System 0946",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -15511,7 +15518,7 @@
     {
       "id": "SGN-SYS-0969",
       "name": "System 0969",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -15527,7 +15534,7 @@
     {
       "id": "SGN-SYS-0970",
       "name": "System 0970",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -15543,7 +15550,7 @@
     {
       "id": "SGN-SYS-0971",
       "name": "System 0971",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -15863,7 +15870,7 @@
     {
       "id": "SGN-SYS-0991",
       "name": "System 0991",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -16087,7 +16094,7 @@
     {
       "id": "SGN-SYS-1005",
       "name": "System 1005",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -16359,7 +16366,7 @@
     {
       "id": "SGN-SYS-1022",
       "name": "System 1022",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -16663,7 +16670,7 @@
     {
       "id": "SGN-SYS-1041",
       "name": "System 1041",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -16951,7 +16958,7 @@
     {
       "id": "SGN-SYS-1059",
       "name": "System 1059",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -16967,7 +16974,7 @@
     {
       "id": "SGN-SYS-1060",
       "name": "System 1060",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -17271,7 +17278,7 @@
     {
       "id": "SGN-SYS-1079",
       "name": "System 1079",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -17287,7 +17294,7 @@
     {
       "id": "SGN-SYS-1080",
       "name": "System 1080",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -17831,7 +17838,7 @@
     {
       "id": "SGN-SYS-1114",
       "name": "System 1114",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -17847,7 +17854,7 @@
     {
       "id": "SGN-SYS-1115",
       "name": "System 1115",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -18119,7 +18126,7 @@
     {
       "id": "SGN-SYS-1132",
       "name": "System 1132",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -18135,7 +18142,7 @@
     {
       "id": "SGN-SYS-1133",
       "name": "System 1133",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -18151,7 +18158,7 @@
     {
       "id": "SGN-SYS-1134",
       "name": "System 1134",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -18167,7 +18174,7 @@
     {
       "id": "SGN-SYS-1135",
       "name": "System 1135",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -18327,7 +18334,7 @@
     {
       "id": "SGN-SYS-1145",
       "name": "System 1145",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -18711,7 +18718,7 @@
     {
       "id": "SGN-SYS-1169",
       "name": "System 1169",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -18999,7 +19006,7 @@
     {
       "id": "SGN-SYS-1187",
       "name": "System 1187",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -19015,7 +19022,7 @@
     {
       "id": "SGN-SYS-1188",
       "name": "System 1188",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -19287,7 +19294,7 @@
     {
       "id": "SGN-SYS-1205",
       "name": "System 1205",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -19575,7 +19582,7 @@
     {
       "id": "SGN-SYS-1223",
       "name": "System 1223",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -19927,7 +19934,7 @@
     {
       "id": "SGN-SYS-1245",
       "name": "System 1245",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "K",
       "tags": [],
       "coords": {
@@ -20199,7 +20206,7 @@
     {
       "id": "SGN-SYS-1262",
       "name": "System 1262",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -20215,7 +20222,7 @@
     {
       "id": "SGN-SYS-1263",
       "name": "System 1263",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -20231,7 +20238,7 @@
     {
       "id": "SGN-SYS-1264",
       "name": "System 1264",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -21847,7 +21854,7 @@
     {
       "id": "SGN-SYS-1365",
       "name": "System 1365",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "F",
       "tags": [],
       "coords": {
@@ -22791,7 +22798,7 @@
     {
       "id": "SGN-SYS-1424",
       "name": "System 1424",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
@@ -22807,7 +22814,7 @@
     {
       "id": "SGN-SYS-1425",
       "name": "System 1425",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "G",
       "tags": [],
       "coords": {
@@ -23159,7 +23166,7 @@
     {
       "id": "SGN-SYS-1447",
       "name": "System 1447",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "A",
       "tags": [],
       "coords": {
@@ -78471,7 +78478,7 @@
     {
       "id": "SGN-SYS-4904",
       "name": "System 4904",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "B",
       "tags": [],
       "coords": {
@@ -79735,7 +79742,7 @@
     {
       "id": "SGN-SYS-4983",
       "name": "System 4983",
-      "owner": "unassigned",
+      "owner": "POL-MN2KV844",
       "starType": "M",
       "tags": [],
       "coords": {
