@@ -163,7 +163,7 @@
       { prefix: '',       text: '<span class="boot-ready">AEN TERMINAL READY</span> <span class="boot-ok">\u00B7 ALL SYSTEMS NOMINAL \u00B7</span> <span class="boot-dim">Alcar i Arandor\u00EB</span>' }
     ];
 
-    var html = '<img src="./symbol.png" alt="" class="boot-watermark">';
+    var html = '<img src="./SYMBOL.png" alt="" class="boot-watermark">';
     html += '<div class="boot-console" id="boot-console">';
     for (var i = 0; i < lines.length; i++) {
       var l = lines[i];
