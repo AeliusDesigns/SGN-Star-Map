@@ -71,14 +71,12 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        font-family: 'Rajdhani', sans-serif;
-        font-weight: 700;
-        font-size: 80px;
-        letter-spacing: 20px;
-        color: rgba(56,232,255,.03);
         pointer-events: none;
         user-select: none;
-        white-space: nowrap;
+        opacity: 0.04;
+        width: 320px;
+        height: 320px;
+        object-fit: contain;
       }
 
       .boot-console {
@@ -277,15 +275,14 @@
   }
 
   function getStardateString() {
-    /* Replicate stardate calculation inline so boot doesn't depend on stardate.js loading first */
     const ANCHOR = new Date('2026-03-14T00:00:00Z').getTime();
     const YEAR = 4180;
     const REAL_SEC_PER_YEAR = 604800;
     const DAYS_PER_YEAR = 360;
     const REAL_SEC_PER_DAY = REAL_SEC_PER_YEAR / DAYS_PER_YEAR;
     const MONTHS = [
-      'Luinavas','Silquendil','Tirnvarë','Lissuinion','Valandarië','Urithiel',
-      'Narviondë','Fanyamarë','Myndarial','Rilyarion','Morilthië','Vanyasilmë'
+      'Luinavas','Silquendil','Tirnvar\u00eb','Lissuinion','Valandaril\u00eb','Urithiel',
+      'Narviond\u00eb','Fanyamar\u00eb','Myndarial','Rilyarion','Morilthil\u00eb','Vanyasilm\u00eb'
     ];
 
     const realSec = (Date.now() - ANCHOR) / 1000;
@@ -327,7 +324,7 @@
 
     const lines = [
       { prefix: '[SYS]',  text: `Establishing link to AEN Command Network`,      cursor: true },
-      { prefix: '[NET]',  text: `Connection secured \u00b7 Encryption: <span class="boot-cyan">VALARINDË AUTHORITY</span>`, ok: true },
+      { prefix: '[NET]',  text: `Connection secured \u00b7 Encryption: <span class="boot-cyan">VALARIND\u00cb AUTHORITY</span>`, ok: true },
       { prefix: '[AUTH]', text: `Authenticating terminal credentials`,            cursor: true },
       { prefix: '[AUTH]', text: `Clearance verified \u00b7 Tier: <span class="boot-gold">COMMAND</span>`, ok: true },
       { prefix: '[SYNC]', text: `Synchronizing datacore \u00b7 ${syncStr}`,      cursor: true },
@@ -337,7 +334,7 @@
     ];
 
     overlay.innerHTML = `
-      <div class="boot-watermark">AEN</div>
+      <img src="./symbol.png" alt="" class="boot-watermark">
       <div class="boot-console" id="boot-console">
         ${lines.map((l, i) => `
           <div class="boot-line" data-idx="${i}">
@@ -474,9 +471,9 @@
       'wiki.html':      'CODEX',
       'personnel.html': 'PERSONNEL',
       'orbat.html':     'ORBAT',
-      'language.html':  'LANGUAGE FORGE'
-      'briefing.html':  'BRIEFING'
-      'galaxy.html':  'GALAXY MAP'
+      'language.html':  'LANGUAGE FORGE',
+      'briefing.html':  'BRIEFING',
+      'galaxy.html':    'GALAXY MAP'
     };
 
     document.addEventListener('click', e => {
