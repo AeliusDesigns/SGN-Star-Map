@@ -13789,10 +13789,12 @@
     },
     {
       "id": "SGN-SYS-0861",
-      "name": "System 0861",
+      "name": "Lucerna",
       "owner": "POL-MN2KV844",
-      "starType": "K",
-      "tags": [],
+      "starType": "G",
+      "tags": [
+        "capital"
+      ],
       "coords": {
         "x_norm": 0.447,
         "y_norm": 0.338571
