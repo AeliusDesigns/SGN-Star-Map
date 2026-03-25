@@ -1,27 +1,25 @@
 [
   {
-    "id": "PER_MN4WN45R_327",
-    "name": "Thalanwë",
-    "branch": "nobility",
-    "rank": "Lady",
+    "id": "PER_MMR6RA2B_2JW",
+    "name": "Sylion Aurendal",
+    "branch": "diplomacy",
+    "rank": "Ambassador",
     "rankTitle": "",
     "status": "Active",
     "faction": "Arandorë Eldainë",
-    "posting": "Drow Liaison to The Valarindë",
-    "system": "Nythravain",
-    "command": "House Telynar",
-    "yearsOfService": "357",
-    "bio": "",
+    "posting": "Ambassador to the Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Alarion",
+    "yearsOfService": "51",
+    "bio": "A noble of House Alarion that was nominated and chosen by the High King to be the Ambassador and Chief representative of the High Realm to the Galactic Assembly.",
     "tags": [
       "Noble",
-      "Politician",
-      "Scholar",
-      "Spymaster"
+      "Ambassador"
     ],
     "serviceRecord": [
       {
-        "date": "3827.07.13",
-        "text": "Appointed liaison to the Matriarchal Council of the Drow"
+        "date": "4129.02.29",
+        "text": "Nominated Ambassador to the Galactic Assembly"
       }
     ],
     "relationships": [
@@ -30,9 +28,72 @@
         "detail": "",
         "targetId": "PER_MMR6YFLB_FJS",
         "targetName": ""
+      },
+      {
+        "type": "Subordinate",
+        "detail": "",
+        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetName": ""
+      },
+      {
+        "type": "Subordinate",
+        "detail": "",
+        "targetId": "PER_MMR9ZIUI_2MT",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MN624UFC_9LK",
+        "targetName": ""
       }
     ],
-    "updated": 1774374512621
+    "updated": 1774444245252
+  },
+  {
+    "id": "PER_MMR9ZIUI_2MT",
+    "name": "Talanor Lirathen",
+    "branch": "diplomacy",
+    "rank": "Foreign Service Officer",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Sylvaris",
+    "yearsOfService": "51",
+    "bio": "A commoner of House Sylvaris that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
+    "tags": [
+      "Diplomat",
+      "Advisor"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Superior",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MN624UFC_9LK",
+        "targetName": ""
+      }
+    ],
+    "updated": 1774444217258
   },
   {
     "id": "PER_MMR9QJ4G_UVU",
@@ -73,48 +134,97 @@
         "detail": "",
         "targetId": "PER_MMR9ZIUI_2MT",
         "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MN624UFC_9LK",
+        "targetName": ""
       }
     ],
-    "updated": 1773891692174
+    "updated": 1774444208123
   },
   {
-    "id": "PER_MMR9ZIUI_2MT",
-    "name": "Talanor Lirathen",
+    "id": "PER_MN624UFC_9LK",
+    "name": "Caelthar Eäcalion",
     "branch": "diplomacy",
-    "rank": "Foreign Service Officer",
+    "rank": "Speaker of the Galactic Assembly",
     "rankTitle": "",
     "status": "Active",
-    "faction": "Arandorë Eldainë",
-    "posting": "Foreign Service Officer - Embassy, Galactic Assembly",
+    "faction": "Galactic Assembly",
+    "posting": "Office of the Speaker of the Galactic Assembly",
     "system": "Nolvarin Expanse",
-    "command": "House Sylvaris",
+    "command": "",
     "yearsOfService": "51",
-    "bio": "A commoner of House Sylvaris that was hired and appointed to the position of Foreign Service Officer for the Arandorë Eldainë Embassy to the Galactic Assembly.",
+    "bio": "",
     "tags": [
+      "Politician",
       "Diplomat",
-      "Advisor"
+      "Ambassador",
+      "Scholar"
     ],
     "serviceRecord": [
       {
         "date": "4129.02.29",
-        "text": "Appointed FSO to the Arandorë Eldainë Embassy to the Galactic Assembly"
+        "text": "Appointed Speaker of the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9ZIUI_2MT",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      }
+    ],
+    "updated": 1774444195544
+  },
+  {
+    "id": "PER_MN4WN45R_327",
+    "name": "Thalanwë",
+    "branch": "nobility",
+    "rank": "Lady",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "Drow Liaison to The Valarindë",
+    "system": "Nythravain",
+    "command": "House Telynar",
+    "yearsOfService": "357",
+    "bio": "",
+    "tags": [
+      "Noble",
+      "Politician",
+      "Scholar",
+      "Spymaster"
+    ],
+    "serviceRecord": [
+      {
+        "date": "3827.07.13",
+        "text": "Appointed liaison to the Matriarchal Council of the Drow"
       }
     ],
     "relationships": [
       {
         "type": "Superior",
         "detail": "",
-        "targetId": "PER_MMR6RA2B_2JW",
-        "targetName": ""
-      },
-      {
-        "type": "Peer",
-        "detail": "",
-        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetId": "PER_MMR6YFLB_FJS",
         "targetName": ""
       }
     ],
-    "updated": 1773603203241
+    "updated": 1774374512621
   },
   {
     "id": "PER_MMRAMPI2_RWG",
@@ -177,39 +287,6 @@
     ],
     "relationships": [],
     "updated": 1773551186859
-  },
-  {
-    "id": "PER_MMR6RA2B_2JW",
-    "name": "Sylion Aurendal",
-    "branch": "diplomacy",
-    "rank": "Ambassador",
-    "rankTitle": "",
-    "status": "Active",
-    "faction": "Arandorë Eldainë",
-    "posting": "Ambassador to the Galactic Assembly",
-    "system": "Nolvarin Expanse",
-    "command": "House Alarion",
-    "yearsOfService": "51",
-    "bio": "A noble of House Alarion that was nominated and chosen by the High King to be the Ambassador and Chief representative of the High Realm to the Galactic Assembly.",
-    "tags": [
-      "Noble",
-      "Ambassador"
-    ],
-    "serviceRecord": [
-      {
-        "date": "4129.02.29",
-        "text": "Nominated Ambassador to the Galactic Assembly"
-      }
-    ],
-    "relationships": [
-      {
-        "type": "Superior",
-        "detail": "",
-        "targetId": "PER_MMR6YFLB_FJS",
-        "targetName": ""
-      }
-    ],
-    "updated": 1773546449778
   },
   {
     "id": "PER_MMR6YFLB_FJS",
