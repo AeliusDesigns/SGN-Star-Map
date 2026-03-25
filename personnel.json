@@ -1,5 +1,52 @@
 [
   {
+    "id": "PER_MN624UFC_9LK",
+    "name": "Caelthar Eäcalion",
+    "branch": "diplomacy",
+    "rank": "Speaker of the Galactic Assembly",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "Galactic Assembly",
+    "posting": "Office of the Speaker of the Galactic Assembly",
+    "system": "Nolvarin Expanse",
+    "command": "House Vilyanor",
+    "yearsOfService": "51",
+    "bio": "",
+    "tags": [
+      "Politician",
+      "Diplomat",
+      "Ambassador",
+      "Scholar"
+    ],
+    "serviceRecord": [
+      {
+        "date": "4129.02.29",
+        "text": "Appointed Speaker of the Galactic Assembly"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9QJ4G_UVU",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR9ZIUI_2MT",
+        "targetName": ""
+      },
+      {
+        "type": "Peer",
+        "detail": "",
+        "targetId": "PER_MMR6RA2B_2JW",
+        "targetName": ""
+      }
+    ],
+    "updated": 1774445630798
+  },
+  {
     "id": "PER_MMR6RA2B_2JW",
     "name": "Sylion Aurendal",
     "branch": "diplomacy",
@@ -143,53 +190,6 @@
       }
     ],
     "updated": 1774444208123
-  },
-  {
-    "id": "PER_MN624UFC_9LK",
-    "name": "Caelthar Eäcalion",
-    "branch": "diplomacy",
-    "rank": "Speaker of the Galactic Assembly",
-    "rankTitle": "",
-    "status": "Active",
-    "faction": "Galactic Assembly",
-    "posting": "Office of the Speaker of the Galactic Assembly",
-    "system": "Nolvarin Expanse",
-    "command": "",
-    "yearsOfService": "51",
-    "bio": "",
-    "tags": [
-      "Politician",
-      "Diplomat",
-      "Ambassador",
-      "Scholar"
-    ],
-    "serviceRecord": [
-      {
-        "date": "4129.02.29",
-        "text": "Appointed Speaker of the Galactic Assembly"
-      }
-    ],
-    "relationships": [
-      {
-        "type": "Peer",
-        "detail": "",
-        "targetId": "PER_MMR9QJ4G_UVU",
-        "targetName": ""
-      },
-      {
-        "type": "Peer",
-        "detail": "",
-        "targetId": "PER_MMR9ZIUI_2MT",
-        "targetName": ""
-      },
-      {
-        "type": "Peer",
-        "detail": "",
-        "targetId": "PER_MMR6RA2B_2JW",
-        "targetName": ""
-      }
-    ],
-    "updated": 1774444195544
   },
   {
     "id": "PER_MN4WN45R_327",
