@@ -1,5 +1,29 @@
 [
   {
+    "id": "PER_MN97MP4M_957",
+    "name": "Varathar Kael",
+    "branch": "nobility",
+    "rank": "The Unyielding, He Who Cannot Be Broken",
+    "rankTitle": "Durvanthar",
+    "status": "Deceased",
+    "faction": "Arandorë Eldainë",
+    "posting": "Varathar Kael, Durvanthar of the Varantharindë",
+    "system": "Calvareth, Varanthas",
+    "command": "Varantharindë Clans",
+    "yearsOfService": "Unknown",
+    "bio": "Varathar Kael is the most significant figure in the recorded and oral history of the Varantharindë, the only individual to have held the title of Durvanthar, and the only elf in any tradition to have ridden a grandfather Varath. The title has not been held by anyone since his death.\n\nHe was born into a period when the Varantharindë clans were fractured across both continents, operating independently and in frequent conflict over water rights, aquifer access, and basin crossing routes. The divisions were old and the grievances on all sides were real. Varathar Kael spent the first portion of his life as a crossing guide of exceptional skill and reputation, a figure known across clan boundaries at a time when very little else crossed them freely.\n\nWhen an external threat arrived on Varanthas, the nature of which is preserved in the memory-singer records in full but summarized here simply as a force that the clans could not meet individually and survive, Varathar Kael did what no one had done before or has done since. He descended into the deep basin alone, located a grandfather Varath, and rode it. The accounts of how he accomplished this are not fully consistent across the various clan traditions, and the memory-singers of different clans emphasize different details. What every account agrees on is that he emerged from the basin on the creature's back, drove it toward the threat, and that what followed ended the threat and demonstrated to every clan leader present that the question of who spoke for the Varantharindë had answered itself.\n\nThe unification of the clans under his leadership followed within a generation. He served as both political authority and spiritual figurehead until his death, the two roles being inseparable in Varantharindë tradition in a way they had not been before him though they have since returned to their divided ways in the centuries after his death.",
+    "tags": [
+      "Noble",
+      "Regent",
+      "War Hero",
+      "Legendary",
+      "Elder"
+    ],
+    "serviceRecord": [],
+    "relationships": [],
+    "updated": 1774635001276
+  },
+  {
     "id": "PER_MN624UFC_9LK",
     "name": "Caelthar Eäcalion",
     "branch": "diplomacy",
