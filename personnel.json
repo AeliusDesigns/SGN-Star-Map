@@ -1,5 +1,23 @@
 [
   {
+    "id": "PER_MNB7SIGK_ETZ",
+    "name": "Caelindorë Mirithor",
+    "branch": "nobility",
+    "rank": "Lord",
+    "rankTitle": "",
+    "status": "Active",
+    "faction": "",
+    "posting": "",
+    "system": "",
+    "command": "",
+    "yearsOfService": "",
+    "bio": "",
+    "tags": [],
+    "serviceRecord": [],
+    "relationships": [],
+    "updated": 1774755829248
+  },
+  {
     "id": "PER_MN97MP4M_957",
     "name": "Varathar Kael",
     "branch": "nobility",
