@@ -156,7 +156,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .dv2.dim{color:var(--text-dim);font-weight:400;font-size:12px;}
 
 /* Location cards */
-.loc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0;}
+.loc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:18px 0;}
 .loc{border:1px solid var(--border);border-radius:3px;padding:14px 16px;background:var(--surface);position:relative;overflow:hidden;}
 .loc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;}
 .loc.hw::before{background:var(--gold);}.loc.mil::before{background:var(--cyan);}.loc.ind::before{background:var(--green);}.loc.fort::before{background:var(--red);}
