@@ -699,8 +699,31 @@ body.edit-mode .key-hint{display:block;}
     // Restore Aelvar level
     if(data['aelvar_level'] !== undefined){
       var allRL = document.querySelectorAll('.rl');
+      var ci = data['aelvar_level'];
+      var levelElvish = ['Serelum','Tiriondal','Vaerandur','Naurgalad','Dagorath'];
+      var romanNumerals = ['V','IV','III','II','I'];
+      var pulseColors = ['#5cdb7a','#38e8ff','#f5c542','#ff9e44','#ff3b3b'];
+      var borderColors = ['rgba(92,219,122,.12)','rgba(56,232,255,.12)','rgba(245,197,66,.12)','rgba(255,158,68,.12)','rgba(255,59,59,.12)'];
+      var bgColors = ['rgba(92,219,122,.03)','rgba(56,232,255,.03)','rgba(245,197,66,.03)','rgba(255,158,68,.03)','rgba(255,59,59,.03)'];
+      
       allRL.forEach(function(r){ r.classList.remove('rl-active'); });
-      if(allRL[data['aelvar_level']]) allRL[data['aelvar_level']].click();
+      if(allRL[ci]) allRL[ci].classList.add('rl-active');
+      
+      var adHead = document.querySelector('.ad-head');
+      var adPulse = document.querySelector('.ad-pulse');
+      var adDetail = document.querySelector('.aelvar-detail');
+      if(adHead){
+        adHead.textContent = 'AELVAR ' + romanNumerals[ci] + ' \u2014 ' + levelElvish[ci].toUpperCase();
+        adHead.style.color = pulseColors[ci];
+      }
+      if(adPulse){
+        adPulse.style.background = pulseColors[ci];
+        adPulse.style.boxShadow = '0 0 10px ' + pulseColors[ci];
+      }
+      if(adDetail){
+        adDetail.style.borderColor = borderColors[ci];
+        adDetail.style.background = bgColors[ci];
+      }
     }
     
     // Restore Aelvar detail text
