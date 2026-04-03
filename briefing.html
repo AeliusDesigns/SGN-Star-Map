@@ -611,20 +611,52 @@ body.edit-mode .key-hint{display:block;}
   });
 
   function saveState(){
-    var content = document.querySelector('.content');
-    if(!content) return;
-    var data = content.innerHTML;
-
-    // Save to localStorage (may fail if quota exceeded)
+    // Save structured data, not raw innerHTML
+    var data = {};
+    
+    // Save all editable kt-v values by their key label
+    document.querySelectorAll('.kt-row').forEach(function(row){
+      var key = row.querySelector('.kt-k');
+      var val = row.querySelector('.kt-v');
+      if(key && val) data['kt_' + key.textContent.trim()] = val.innerHTML;
+    });
+    
+    // Save all prose sections
+    document.querySelectorAll('.prose').forEach(function(el, i){
+      data['prose_' + i] = el.innerHTML;
+    });
+    
+    // Save editable titles, descriptions, species text, etc.
+    document.querySelectorAll('.pan-text, .sp-text, .cul-text, .note-text, .ad-text, .loc-desc, .gc-text, .dh-sub, .pan-title, .cul-title, .sp-name, .loc-name, .dh-title, .ad-head').forEach(function(el, i){
+      var cls = el.className.split(' ')[0];
+      data[cls + '_' + i] = el.innerHTML;
+    });
+    
+    // Save active Aelvar level
+    var activeRL = document.querySelector('.rl.rl-active');
+    if(activeRL){
+      var allRL = document.querySelectorAll('.rl');
+      for(var i = 0; i < allRL.length; i++){
+        if(allRL[i] === activeRL){ data['aelvar_level'] = i; break; }
+      }
+    }
+    
+    // Save the Aelvar detail text
+    var aelvarDetail = document.querySelector('.aelvar-detail .ad-text');
+    if(aelvarDetail) data['aelvar_detail_text'] = aelvarDetail.innerHTML;
+    
+    var json = JSON.stringify(data);
+    
+    // Save to localStorage
     try {
-      localStorage.setItem(STORE_KEY, data);
+      localStorage.setItem(STORE_KEY, json);
     } catch(e) {
       console.warn('localStorage quota exceeded for briefing state');
     }
 
     // Save to GitHub via SGNGitHub if available
     if(typeof SGNGitHub !== 'undefined' && SGNGitHub.commitFile){
-      SGNGitHub.commitFile('briefing-state.json', JSON.stringify({ html: data, updated: Date.now() }), 'Briefing: update state')
+      SGNGitHub.commitFile('briefing-state.json', JSON.stringify({ data: data, updated: Date.now() }), 'Briefing: update state')
         .then(function(){ showToast('Saved to GitHub'); })
         .catch(function(){ showToast('GitHub save failed'); });
     } else {
@@ -637,44 +669,72 @@ body.edit-mode .key-hint{display:block;}
     toast.classList.add('show');
     setTimeout(function(){ toast.classList.remove('show'); }, 2000);
   }
+  
+  function restoreState(data){
+    if(!data || typeof data !== 'object') return;
+    
+    // Restore kt-v values
+    document.querySelectorAll('.kt-row').forEach(function(row){
+      var key = row.querySelector('.kt-k');
+      var val = row.querySelector('.kt-v');
+      if(key && val){
+        var saved = data['kt_' + key.textContent.trim()];
+        if(saved !== undefined) val.innerHTML = saved;
+      }
+    });
+    
+    // Restore prose sections
+    document.querySelectorAll('.prose').forEach(function(el, i){
+      var saved = data['prose_' + i];
+      if(saved !== undefined) el.innerHTML = saved;
+    });
+    
+    // Restore other editable elements
+    document.querySelectorAll('.pan-text, .sp-text, .cul-text, .note-text, .ad-text, .loc-desc, .gc-text, .dh-sub, .pan-title, .cul-title, .sp-name, .loc-name, .dh-title, .ad-head').forEach(function(el, i){
+      var cls = el.className.split(' ')[0];
+      var saved = data[cls + '_' + i];
+      if(saved !== undefined) el.innerHTML = saved;
+    });
+    
+    // Restore Aelvar level
+    if(data['aelvar_level'] !== undefined){
+      var allRL = document.querySelectorAll('.rl');
+      allRL.forEach(function(r){ r.classList.remove('rl-active'); });
+      if(allRL[data['aelvar_level']]) allRL[data['aelvar_level']].click();
+    }
+    
+    // Restore Aelvar detail text
+    if(data['aelvar_detail_text']){
+      var aelvarDetail = document.querySelector('.aelvar-detail .ad-text');
+      if(aelvarDetail) aelvarDetail.innerHTML = data['aelvar_detail_text'];
+    }
+  }
 
-  // Load saved state: localStorage first, then try briefing-state.json
-  // Version check: clear stale saves from before the emblem was moved out of .content
-  var STATE_VERSION = 'v4';
+  // Load saved state
+  var STATE_VERSION = 'v5';
   var savedVersion = localStorage.getItem(STORE_KEY + '_ver');
   if (savedVersion !== STATE_VERSION) {
     localStorage.removeItem(STORE_KEY);
     try { localStorage.setItem(STORE_KEY + '_ver', STATE_VERSION); } catch(e) {}
   }
 
-  function cleanRestoredHTML(html) {
-    // Strip any contenteditable attributes and editable classes from saved state
-    return html.replace(/\s*contenteditable="true"/g, '').replace(/\s*class="([^"]*)\beditable\b([^"]*)"/g, 'class="$1$2"');
-  }
-
-  function stripCoverFromHTML(html) {
-    // Remove any old cover section that might be baked into saved state
-    var tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    var oldCover = tmp.querySelector('.cover');
-    if (oldCover) oldCover.remove();
-    return tmp.innerHTML;
-  }
-
   var saved = localStorage.getItem(STORE_KEY);
   if(saved){
-    var content = document.querySelector('.content');
-    if(content) content.innerHTML = cleanRestoredHTML(stripCoverFromHTML(saved));
+    try {
+      var parsed = JSON.parse(saved);
+      restoreState(parsed);
+    } catch(e) {
+      // Old format (raw HTML) - ignore it
+      localStorage.removeItem(STORE_KEY);
+    }
   } else {
     // Try loading from repo file
     fetch('./briefing-state.json', { cache: 'no-store' })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
-        if(d && d.html){
-          var clean = cleanRestoredHTML(stripCoverFromHTML(d.html));
-          var content = document.querySelector('.content');
-          if(content) content.innerHTML = clean;
-          try { localStorage.setItem(STORE_KEY, clean); } catch(e) {}
+        if(d && d.data){
+          restoreState(d.data);
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(d.data)); } catch(e) {}
         }
       })
       .catch(function(){});
