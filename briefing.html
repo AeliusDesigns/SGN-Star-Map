@@ -56,7 +56,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .kt-row{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid rgba(26,45,70,.3);}
 .kt-row:last-child{border:none;}
 .kt-k{padding:8px 14px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);background:rgba(5,8,16,.4);border-right:1px solid rgba(26,45,70,.3);display:flex;align-items:center;}
-.kt-v{padding:8px 14px;font-size:12px;color:var(--text-dim);display:flex;align-items:center;}
+.kt-v{padding:8px 14px;font-size:12px;color:var(--text-dim);}
 .kt-v b{color:var(--text);font-weight:400;}
 .kt-v .go{color:var(--gold);}
 .kt-v .cy{color:var(--cyan);}
@@ -242,7 +242,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div class="keytable fi d2">
     <div class="kt-row"><div class="kt-k">Full Name</div><div class="kt-v"><b>Arandor&euml; Eldain&euml;</b> &mdash; The High Realm of the Elves</div></div>
     <div class="kt-row"><div class="kt-k">Capital</div><div class="kt-v"><span class="go">Anorvalas Ecumenopolis</span>, Calenor&euml; System</div></div>
-    <div class="kt-row"><div class="kt-k">Head of State</div><div class="kt-v"><b>Aelorion</b>, High King of Arandor&euml; Eldain&euml;</div></div>
+    <div class="kt-row"><div class="kt-k">Head of State</div><div class="kt-v"><b>Aelorion Alarion</b>, High King of Arandor&euml; Eldain&euml;</div></div>
     <div class="kt-row"><div class="kt-k">Governing Body</div><div class="kt-v">The <span class="go">Valarind&euml;</span>, the Council of the Seven Great Houses</div></div>
     <div class="kt-row"><div class="kt-k">Population</div><div class="kt-v">Four lineages: <b>Taralind&euml;</b> (High Elves), <b>Sylvarind&euml;</b> (Wood Elves), <b>Umbrarind&euml;</b> (Drow), <b>Varantharind&euml;</b> (Sand Elves)</div></div>
     <div class="kt-row"><div class="kt-k">Languages</div><div class="kt-v">Elenithar (High Elvish) &middot; Eldarind&euml;va (Common Elvish) &middot; Sylvalind&euml; (Wood Elvish) &middot; Varanthi (Sand Elvish)</div></div>
@@ -640,7 +640,7 @@ body.edit-mode .key-hint{display:block;}
 
   // Load saved state: localStorage first, then try briefing-state.json
   // Version check: clear stale saves from before the emblem was moved out of .content
-  var STATE_VERSION = 'v3';
+  var STATE_VERSION = 'v4';
   var savedVersion = localStorage.getItem(STORE_KEY + '_ver');
   if (savedVersion !== STATE_VERSION) {
     localStorage.removeItem(STORE_KEY);
