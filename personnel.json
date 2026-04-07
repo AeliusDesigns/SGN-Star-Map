@@ -1,5 +1,38 @@
 [
   {
+    "id": "PER_MNO0BOEB_NEB",
+    "name": "Calisilen Mirithor",
+    "branch": "navy",
+    "rank": "Admiral (O-10)",
+    "rankTitle": "Eldamar",
+    "status": "Active",
+    "faction": "Arandorë Eldainë",
+    "posting": "AEN Anorvalas Naval Command",
+    "system": "Anorvalas",
+    "command": "",
+    "yearsOfService": "327",
+    "bio": "",
+    "tags": [
+      "Officer",
+      "Noble"
+    ],
+    "serviceRecord": [
+      {
+        "date": "ANV 4183.06.10",
+        "text": "Conducted a wargame with the Ceti Administration"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Family",
+        "detail": "",
+        "targetId": "PER_MNB7SIGK_ETZ",
+        "targetName": ""
+      }
+    ],
+    "updated": 1775529487073
+  },
+  {
     "id": "PER_MN4WN45R_327",
     "name": "Thalanwë",
     "branch": "nobility",
