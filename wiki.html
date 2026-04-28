@@ -135,12 +135,36 @@
     .edit-section-title{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
 
     /* ── TOOLBAR ── */
-    .toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;background:rgba(8,13,24,.8);border:1px solid var(--border);border-bottom:none;border-radius:3px 3px 0 0;}
+    .toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;background:rgba(8,13,24,.8);border:1px solid var(--border);border-bottom:none;border-radius:3px 3px 0 0;align-items:center;}
     .tb-btn{background:transparent;border:1px solid transparent;color:var(--text-dim);width:30px;height:28px;border-radius:2px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .1s;font-family:'Share Tech Mono',monospace;}
     .tb-btn:hover{border-color:var(--border2);color:var(--cyan);background:rgba(56,232,255,.04);}
     .tb-btn.active{border-color:var(--cyan-dim);color:var(--cyan);background:rgba(56,232,255,.08);}
+    .tb-btn-wide{width:auto;padding:0 8px;font-size:10px;letter-spacing:1px;gap:4px;}
     .tb-sep{width:1px;height:20px;background:var(--border);margin:4px 4px;flex-shrink:0;}
-    .tb-btn[title]::after{content:attr(title);}
+    .tb-row-break{flex-basis:100%;height:0;margin:0;padding:0;}
+    .tb-select{background:rgba(5,8,16,.8);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 6px;border-radius:2px;height:28px;cursor:pointer;outline:none;}
+    .tb-select:hover, .tb-select:focus{border-color:var(--cyan);color:var(--cyan);}
+    .tb-color-wrap{position:relative;width:30px;height:28px;border:1px solid transparent;border-radius:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);}
+    .tb-color-wrap:hover{border-color:var(--border2);color:var(--cyan);}
+    .tb-color-wrap input[type=color]{position:absolute;inset:0;opacity:0;cursor:pointer;border:none;padding:0;background:none;}
+    .tb-color-icon{font-size:14px;font-weight:600;pointer-events:none;line-height:1;}
+    .tb-color-bar{position:absolute;bottom:3px;left:5px;right:5px;height:3px;border-radius:1px;pointer-events:none;}
+    .editor-statusbar{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;font-size:10px;color:var(--text-dim);background:rgba(8,13,24,.6);border:1px solid var(--border);border-top:none;border-radius:0 0 3px 3px;letter-spacing:1px;text-transform:uppercase;}
+    .editor-statusbar .sb-right{display:flex;gap:14px;}
+    #editor-area img.tb-selected{outline:2px solid var(--cyan);outline-offset:2px;}
+    #editor-area .sgn-chart, .post-body .sgn-chart{display:block;margin:14px auto;max-width:100%;}
+    #editor-area .sgn-chart{cursor:pointer;}
+    #editor-area .sgn-chart:hover{outline:1px dashed var(--cyan-dim);outline-offset:4px;}
+    .chart-modal-overlay{position:fixed;inset:0;background:rgba(2,4,9,.78);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:center;justify-content:center;}
+    .chart-modal{background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:22px 24px;width:620px;max-width:94vw;max-height:90vh;overflow:auto;color:var(--text);font-family:'Share Tech Mono',monospace;}
+    .chart-modal h3{color:var(--cyan);margin:0 0 14px;font-size:13px;letter-spacing:2.5px;}
+    .chart-modal label{display:block;color:var(--text-dim);font-size:10px;letter-spacing:1.5px;margin:10px 0 4px;text-transform:uppercase;}
+    .chart-modal input, .chart-modal select{background:rgba(5,8,16,.9);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:13px;padding:7px 10px;border-radius:3px;outline:none;width:100%;box-sizing:border-box;}
+    .chart-modal input:focus, .chart-modal select:focus{border-color:var(--cyan);}
+    .chart-row{display:grid;grid-template-columns:1fr 1fr 32px;gap:8px;margin-bottom:6px;}
+    .chart-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+    .chart-preview{margin:14px 0;padding:10px;background:rgba(5,8,16,.6);border:1px solid var(--border);border-radius:3px;text-align:center;}
+    .chart-preview svg{max-width:100%;height:auto;}
 
     #editor-area{border:1px solid var(--border);border-radius:0 0 3px 3px;min-height:350px;padding:16px 20px;background:rgba(5,8,16,.8);color:var(--text);font-family:'Exo 2',sans-serif;font-size:14px;line-height:1.7;outline:none;overflow-y:auto;max-height:60vh;}
     #editor-area:focus{border-color:var(--cyan-dim);}
@@ -360,6 +384,7 @@ let filterCat = 'all';
 let _editorPW = null;
 let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 let classifiedUnlocked = false;
+const acknowledgedClassified = new Set();   // entry IDs acknowledged this session
 
 /* ── Clearance helpers (new tier system + legacy compat) ──
    - new schema: e.clearance is a number 0..3 (PUBLIC..COMMAND)
@@ -592,6 +617,41 @@ async function viewEntry(id) {
     return;
   }
 
+  /* ── Acknowledgment gate for cleared viewers ──
+       Shown once per session per classified entry to anyone who DOES have
+       access. Reminds them not to disseminate the contents. The denial
+       screen above handles uncleared viewers; this is the post-clearance
+       interstitial. */
+  if (_cls > 0 && !acknowledgedClassified.has(id)) {
+    const tierLabel = (window.SGNAuth ? SGNAuth.tierName(_cls) : 'CLASSIFIED');
+    main.innerHTML = `
+      <div class="classified-screen">
+        <div class="classified-icon" style="color:var(--red-alert);">⚠</div>
+        <div class="classified-badge" style="color:var(--red-alert);border-color:var(--red-alert);">${tierLabel} · Restricted Distribution</div>
+        <div class="classified-title">${esc(e.title || 'Untitled')}</div>
+        <div class="classified-divider"></div>
+        <div class="classified-body" style="font-size:13px; line-height:1.75;">
+          <strong style="color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1.5px;">NOTICE OF CLASSIFICATION</strong><br/><br/>
+          The following document is classified at the <strong>${tierLabel}</strong> level
+          by the authority of the Valarind&euml;, the Council of the Seven Great Houses.
+          Disclosure, reproduction, or transmission of its contents to any individual
+          not holding equivalent clearance is forbidden under SGN Document Control directives.
+          <br/><br/>
+          By proceeding, you confirm your authorization to view this material and
+          acknowledge your obligation to safeguard it.
+        </div>
+        <div class="classified-divider"></div>
+        <button class="classified-unlock" id="cls-ack">Acknowledge &amp; Continue</button>
+        <div class="classified-footer">AEN Document Control // ${tierLabel} CLEARANCE · EYES ONLY</div>
+      </div>
+    `;
+    document.getElementById('cls-ack').onclick = () => {
+      acknowledgedClassified.add(id);
+      viewEntry(id);
+    };
+    return;
+  }
+
   /* ── Resolve body (decrypt if encrypted) ── */
   let bodyHTML = '';
   if (e.bodyEnc) {
@@ -816,36 +876,103 @@ function showNewEntryPicker() {
    ══════════════════════════════════════════ */
 function buildToolbar() {
   return `<div class="toolbar" id="toolbar">
-    <button class="tb-btn" data-cmd="formatBlock" data-val="h1" title="">H1</button>
-    <button class="tb-btn" data-cmd="formatBlock" data-val="h2" title="">H2</button>
-    <button class="tb-btn" data-cmd="formatBlock" data-val="h3" title="">H3</button>
-    <button class="tb-btn" data-cmd="formatBlock" data-val="h4" title="">H4</button>
-    <button class="tb-btn" data-cmd="formatBlock" data-val="p" title="">¶</button>
+    <select class="tb-select" data-action="blockstyle" title="Paragraph style" style="min-width:96px;">
+      <option value="">Style…</option>
+      <option value="p">Paragraph</option>
+      <option value="h1">Heading 1</option>
+      <option value="h2">Heading 2</option>
+      <option value="h3">Heading 3</option>
+      <option value="h4">Heading 4</option>
+      <option value="blockquote">Quote</option>
+      <option value="pre">Preformatted</option>
+    </select>
+    <select class="tb-select" data-action="fontname" title="Font" style="min-width:120px;">
+      <option value="">Font…</option>
+      <option value="'Exo 2',sans-serif">Exo 2</option>
+      <option value="'Rajdhani',sans-serif">Rajdhani</option>
+      <option value="'Share Tech Mono',monospace">Share Tech Mono</option>
+      <option value="'Courier New',monospace">Courier</option>
+      <option value="Georgia,serif">Georgia</option>
+      <option value="Arial,sans-serif">Arial</option>
+      <option value="'Times New Roman',serif">Times New Roman</option>
+    </select>
+    <select class="tb-select" data-action="fontsize" title="Size">
+      <option value="">Size…</option>
+      <option value="1">Tiny</option>
+      <option value="2">Small</option>
+      <option value="3">Normal</option>
+      <option value="4">Medium</option>
+      <option value="5">Large</option>
+      <option value="6">Larger</option>
+      <option value="7">Huge</option>
+    </select>
     <div class="tb-sep"></div>
-    <button class="tb-btn" data-cmd="bold" title=""><b>B</b></button>
-    <button class="tb-btn" data-cmd="italic" title=""><i>I</i></button>
-    <button class="tb-btn" data-cmd="underline" title=""><u>U</u></button>
-    <button class="tb-btn" data-cmd="strikeThrough" title="">S̶</button>
+    <button class="tb-btn" data-cmd="undo" title="Undo (Ctrl+Z)">↶</button>
+    <button class="tb-btn" data-cmd="redo" title="Redo (Ctrl+Y)">↷</button>
+    <div class="tb-row-break"></div>
+
+    <button class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+    <button class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+    <button class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+    <button class="tb-btn" data-cmd="strikeThrough" title="Strikethrough">S̶</button>
+    <button class="tb-btn" data-cmd="subscript" title="Subscript">x₂</button>
+    <button class="tb-btn" data-cmd="superscript" title="Superscript">x²</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" data-cmd="insertUnorderedList" title="">•</button>
-    <button class="tb-btn" data-cmd="insertOrderedList" title="">1.</button>
-    <button class="tb-btn" data-action="blockquote" title="">❝</button>
-    <button class="tb-btn" data-action="code" title="">⟨⟩</button>
+    <label class="tb-color-wrap" title="Text color">
+      <span class="tb-color-icon">A</span>
+      <span class="tb-color-bar" id="tb-fg-bar" style="background:#38e8ff;"></span>
+      <input type="color" id="tb-fg-color" value="#38e8ff" data-action="forecolor">
+    </label>
+    <label class="tb-color-wrap" title="Highlight color">
+      <span class="tb-color-icon" style="font-size:12px;">▢</span>
+      <span class="tb-color-bar" id="tb-bg-bar" style="background:#f5c542;"></span>
+      <input type="color" id="tb-bg-color" value="#f5c542" data-action="backcolor">
+    </label>
     <div class="tb-sep"></div>
-    <button class="tb-btn" data-action="table" title="">⊞</button>
-    <button class="tb-btn" data-action="hr" title="">―</button>
-    <button class="tb-btn" data-action="link" title="">🔗</button>
-    <button class="tb-btn" data-action="image-upload" title="">🖼</button>
+    <button class="tb-btn" data-cmd="justifyLeft" title="Align left">⫷</button>
+    <button class="tb-btn" data-cmd="justifyCenter" title="Align center">≡</button>
+    <button class="tb-btn" data-cmd="justifyRight" title="Align right">⫸</button>
+    <button class="tb-btn" data-cmd="justifyFull" title="Justify">≣</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" data-cmd="insertUnorderedList" title="Bulleted list">•</button>
+    <button class="tb-btn" data-cmd="insertOrderedList" title="Numbered list">1.</button>
+    <button class="tb-btn" data-cmd="outdent" title="Decrease indent">⇤</button>
+    <button class="tb-btn" data-cmd="indent" title="Increase indent">⇥</button>
+    <div class="tb-row-break"></div>
+
+    <button class="tb-btn" data-action="blockquote" title="Blockquote">❝</button>
+    <button class="tb-btn" data-action="code" title="Inline / block code">⟨⟩</button>
+    <button class="tb-btn" data-action="hr" title="Horizontal rule">―</button>
+    <button class="tb-btn" data-action="link" title="Insert link">🔗</button>
+    <button class="tb-btn" data-action="image-upload" title="Insert image">🖼</button>
     <input type="file" id="tb-img-upload" accept="image/*" style="display:none;" multiple/>
+    <button class="tb-btn" data-action="image-resize" title="Resize selected image">⤡</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" data-cmd="removeFormat" title="">✕</button>
+    <button class="tb-btn" data-action="table" title="Insert table">⊞</button>
+    <button class="tb-btn" data-action="table-row-above" title="Insert row above">⬆+</button>
+    <button class="tb-btn" data-action="table-row-below" title="Insert row below">⬇+</button>
+    <button class="tb-btn" data-action="table-col-left" title="Insert column left">⬅+</button>
+    <button class="tb-btn" data-action="table-col-right" title="Insert column right">➡+</button>
+    <button class="tb-btn" data-action="table-del-row" title="Delete row">⊟R</button>
+    <button class="tb-btn" data-action="table-del-col" title="Delete column">⊟C</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn tb-btn-wide" data-action="chart" title="Insert / edit chart">📊 CHART</button>
+    <button class="tb-btn" data-action="find" title="Find &amp; replace">🔍</button>
+    <button class="tb-btn" data-cmd="removeFormat" title="Clear formatting">✕</button>
   </div>`;
 }
 
 function wireToolbar() {
   const tb = document.getElementById('toolbar');
   if (!tb) return;
-  tb.addEventListener('mousedown', e => e.preventDefault());
+
+  /* Don't yank focus on selects/colors/file inputs — only on buttons */
+  tb.addEventListener('mousedown', e => {
+    const t = e.target;
+    if (t.tagName === 'SELECT' || t.tagName === 'OPTION' || t.tagName === 'INPUT') return;
+    e.preventDefault();
+  });
+
   tb.addEventListener('click', e => {
     const btn = e.target.closest('.tb-btn');
     if (!btn) return;
@@ -858,14 +985,9 @@ function wireToolbar() {
     } else if (cmd) {
       document.execCommand(cmd, false, null);
     } else if (action === 'table') {
-      const cols = prompt('Columns:','3'), rows = prompt('Rows:','3');
-      if (!cols || !rows) return;
-      let html = '<table><thead><tr>';
-      for (let c=0;c<+cols;c++) html += '<th>Header</th>';
-      html += '</tr></thead><tbody>';
-      for (let r=0;r<+rows;r++) { html += '<tr>'; for(let c=0;c<+cols;c++) html += '<td>&nbsp;</td>'; html += '</tr>'; }
-      html += '</tbody></table><p><br></p>';
-      document.execCommand('insertHTML', false, html);
+      tableInsertPrompt();
+    } else if (action && action.startsWith('table-')) {
+      tableModify(action.replace('table-',''));
     } else if (action === 'hr') {
       document.execCommand('insertHTML', false, '<hr><p><br></p>');
     } else if (action === 'link') {
@@ -873,6 +995,8 @@ function wireToolbar() {
       if (url) document.execCommand('createLink', false, url);
     } else if (action === 'image-upload') {
       document.getElementById('tb-img-upload').click();
+    } else if (action === 'image-resize') {
+      resizeSelectedImage();
     } else if (action === 'blockquote') {
       document.execCommand('formatBlock', false, '<blockquote>');
     } else if (action === 'code') {
@@ -886,10 +1010,46 @@ function wireToolbar() {
           document.execCommand('insertHTML', false, '<code>'+esc(text)+'</code>');
         }
       }
+    } else if (action === 'chart') {
+      openChartDialog(null);
+    } else if (action === 'find') {
+      openFindReplace();
     }
+    updateWordCount();
   });
 
-  /* ── File upload handler for images ── */
+  /* Selects (block style, font, font-size) and color inputs */
+  tb.addEventListener('change', e => {
+    const tgt = e.target;
+    const action = tgt.dataset.action;
+    const ed = document.getElementById('editor-area');
+    if (!action) return;
+    ed.focus();
+    if (action === 'blockstyle') {
+      if (tgt.value) document.execCommand('formatBlock', false, '<' + tgt.value + '>');
+      tgt.value = '';
+    } else if (action === 'fontname') {
+      if (tgt.value) document.execCommand('fontName', false, tgt.value);
+      tgt.value = '';
+    } else if (action === 'fontsize') {
+      if (tgt.value) document.execCommand('fontSize', false, tgt.value);
+      tgt.value = '';
+    } else if (action === 'forecolor') {
+      document.execCommand('foreColor', false, tgt.value);
+      const bar = document.getElementById('tb-fg-bar');
+      if (bar) bar.style.background = tgt.value;
+    } else if (action === 'backcolor') {
+      // hiliteColor works in most browsers; backColor on whole block as fallback
+      if (!document.execCommand('hiliteColor', false, tgt.value)) {
+        document.execCommand('backColor', false, tgt.value);
+      }
+      const bar = document.getElementById('tb-bg-bar');
+      if (bar) bar.style.background = tgt.value;
+    }
+    updateWordCount();
+  });
+
+  /* Image upload */
   const fileInput = document.getElementById('tb-img-upload');
   if (fileInput) {
     fileInput.addEventListener('change', () => {
@@ -898,6 +1058,390 @@ function wireToolbar() {
       fileInput.value = '';
     });
   }
+}
+
+/* ══════════════════════════════════════════
+   TABLE OPERATIONS
+   ══════════════════════════════════════════ */
+function tableInsertPrompt() {
+  const cols = +(prompt('Columns:','3') || 0);
+  const rows = +(prompt('Rows (data only — header row is added automatically):','3') || 0);
+  if (!cols || !rows) return;
+  let html = '<table><thead><tr>';
+  for (let c=0;c<cols;c++) html += '<th>Header</th>';
+  html += '</tr></thead><tbody>';
+  for (let r=0;r<rows;r++) {
+    html += '<tr>';
+    for (let c=0;c<cols;c++) html += '<td>&nbsp;</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table><p><br></p>';
+  document.execCommand('insertHTML', false, html);
+}
+
+function getCellAtCursor() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType !== 1) node = node.parentNode;
+  while (node && node !== document.body) {
+    if (node.nodeName === 'TD' || node.nodeName === 'TH') return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function tableModify(op) {
+  const cell = getCellAtCursor();
+  if (!cell) {
+    alert('Click inside a table cell first.');
+    return;
+  }
+  const row = cell.parentNode;
+  const table = cell.closest('table');
+  const colIdx = Array.prototype.indexOf.call(row.children, cell);
+
+  if (op === 'row-above' || op === 'row-below') {
+    const newRow = document.createElement('tr');
+    for (let i=0;i<row.children.length;i++) {
+      const ref = row.children[i];
+      const el = document.createElement(ref.tagName === 'TH' && op === 'row-above' ? 'th' : 'td');
+      el.innerHTML = ref.tagName === 'TH' && op === 'row-above' ? 'Header' : '&nbsp;';
+      newRow.appendChild(el);
+    }
+    if (op === 'row-above') row.parentNode.insertBefore(newRow, row);
+    else row.parentNode.insertBefore(newRow, row.nextSibling);
+  } else if (op === 'col-left' || op === 'col-right') {
+    table.querySelectorAll('tr').forEach(r => {
+      const ref = r.children[colIdx];
+      if (!ref) return;
+      const el = document.createElement(ref.tagName === 'TH' ? 'th' : 'td');
+      el.innerHTML = ref.tagName === 'TH' ? 'Header' : '&nbsp;';
+      if (op === 'col-left') r.insertBefore(el, ref);
+      else r.insertBefore(el, ref.nextSibling);
+    });
+  } else if (op === 'del-row') {
+    const section = row.parentNode;
+    if (section.children.length === 1 && table.querySelectorAll('tr').length === 1) {
+      if (confirm('Last remaining row — remove the entire table?')) table.remove();
+      return;
+    }
+    row.remove();
+  } else if (op === 'del-col') {
+    const allRows = table.querySelectorAll('tr');
+    if (allRows[0] && allRows[0].children.length === 1) {
+      if (confirm('Last remaining column — remove the entire table?')) table.remove();
+      return;
+    }
+    allRows.forEach(r => { if (r.children[colIdx]) r.children[colIdx].remove(); });
+  }
+}
+
+/* ══════════════════════════════════════════
+   IMAGE RESIZE
+   ══════════════════════════════════════════ */
+function resizeSelectedImage() {
+  const ed = document.getElementById('editor-area');
+  let img = ed.querySelector('img.tb-selected');
+  if (!img) {
+    alert('Click an image first to select it, then press resize.');
+    return;
+  }
+  const choice = prompt(
+    'Image size:\n' +
+    '  1 — Small (200px)\n' +
+    '  2 — Medium (400px)\n' +
+    '  3 — Large (640px)\n' +
+    '  4 — Full Width\n' +
+    '  or type a custom width in pixels (e.g. 350)',
+    '2'
+  );
+  if (!choice) return;
+  const v = choice.trim();
+  let width;
+  if (v === '1') width = '200px';
+  else if (v === '2') width = '400px';
+  else if (v === '3') width = '640px';
+  else if (v === '4') width = '100%';
+  else { const n = parseInt(v,10); width = (n>0?n:400) + 'px'; }
+  img.style.width = width;
+  img.style.height = 'auto';
+  img.style.maxWidth = '100%';
+}
+
+/* ══════════════════════════════════════════
+   WORD COUNT
+   ══════════════════════════════════════════ */
+function updateWordCount() {
+  const ed = document.getElementById('editor-area');
+  if (!ed) return;
+  const text = ed.innerText || ed.textContent || '';
+  const words = (text.trim().match(/\S+/g) || []).length;
+  const chars = text.length;
+  const wEl = document.getElementById('editor-words');
+  const cEl = document.getElementById('editor-chars');
+  if (wEl) wEl.textContent = words.toLocaleString() + ' words';
+  if (cEl) cEl.textContent = chars.toLocaleString() + ' chars';
+}
+
+/* ══════════════════════════════════════════
+   FIND & REPLACE  (text-node-safe)
+   ══════════════════════════════════════════ */
+function openFindReplace() {
+  const ed = document.getElementById('editor-area');
+  const term = prompt('Find:');
+  if (term === null || term === '') return;
+  const replace = prompt('Replace with (leave blank to count only):', '');
+  const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, null);
+  const nodes = []; let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  let count = 0;
+  for (const node of nodes) {
+    const v = node.nodeValue;
+    if (!v.includes(term)) continue;
+    const occurrences = v.split(term).length - 1;
+    count += occurrences;
+    if (replace !== null && replace !== '') {
+      node.nodeValue = v.split(term).join(replace);
+    } else if (replace === '') {
+      // explicit empty replace — strip the term
+      node.nodeValue = v.split(term).join('');
+    }
+  }
+  if (replace === null || (replace === '' && count === 0)) {
+    alert('Found ' + count + ' match' + (count===1?'':'es') + '.');
+  } else {
+    alert('Replaced ' + count + ' match' + (count===1?'':'es') + '.');
+  }
+  updateWordCount();
+}
+
+/* ══════════════════════════════════════════
+   CHART RENDERING + DIALOG
+   Stored as inline SVG with a data-chart JSON
+   attribute, so charts round-trip on save and
+   stay editable on click.
+   ══════════════════════════════════════════ */
+const CHART_COLORS = ['#38e8ff','#f5c542','#ff7a7a','#5cdb75','#b0c4ff','#ff9d3d','#a06bff','#3dd6c0','#ff6188','#7af0ff'];
+
+function escSvg(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderChartSVG(opts) {
+  const { title='', type='bar', data=[] } = opts || {};
+  const W = 580, H = 320;
+  const padL = 60, padR = 20, padT = title ? 38 : 18, padB = 50;
+  const cw = W - padL - padR;
+  const ch = H - padT - padB;
+  let body = '';
+
+  if (type === 'pie') {
+    const cx = padL + cw/2, cy = padT + ch/2;
+    const r = Math.min(cw, ch)/2 - 10;
+    const total = data.reduce((s,d)=>s+(+d.value||0),0) || 1;
+    let start = -Math.PI/2;
+    let legend = '';
+    data.forEach((d,i)=>{
+      const v = +d.value||0;
+      const slice = (v/total) * Math.PI*2;
+      const end = start + slice;
+      const x1 = cx + r * Math.cos(start);
+      const y1 = cy + r * Math.sin(start);
+      const x2 = cx + r * Math.cos(end);
+      const y2 = cy + r * Math.sin(end);
+      const large = slice > Math.PI ? 1 : 0;
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+      if (slice >= Math.PI*2 - 0.0001) {
+        body += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="#050810" stroke-width="2" />`;
+      } else if (slice > 0) {
+        body += `<path d="M ${cx} ${cy} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${color}" stroke="#050810" stroke-width="2" />`;
+      }
+      legend += `<g transform="translate(${W-160},${padT+i*16})"><rect width="10" height="10" fill="${color}"/><text x="14" y="9" font-size="10" fill="#c8deff" font-family="'Share Tech Mono',monospace">${escSvg(d.label)} (${v})</text></g>`;
+      start = end;
+    });
+    body += legend;
+  } else if (type === 'line') {
+    const vals = data.map(d => +d.value || 0);
+    const max = Math.max(...vals, 1);
+    const min = Math.min(...vals, 0);
+    const range = (max - min) || 1;
+    body += axesSvg(padL, padT, cw, ch, max, min);
+    if (data.length > 1) {
+      const step = cw / (data.length - 1);
+      let path = '';
+      data.forEach((d,i) => {
+        const x = padL + i * step;
+        const y = padT + ch - ((+d.value||0) - min) / range * ch;
+        path += (i===0 ? 'M ' : 'L ') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+        body += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${CHART_COLORS[0]}" />`;
+        body += `<text x="${x.toFixed(1)}" y="${(padT+ch+15).toFixed(1)}" text-anchor="middle" font-size="10" fill="#c8deff" font-family="'Share Tech Mono',monospace">${escSvg(d.label)}</text>`;
+      });
+      body += `<path d="${path}" fill="none" stroke="${CHART_COLORS[0]}" stroke-width="2" />`;
+    }
+  } else if (type === 'hbar') {
+    const vals = data.map(d => +d.value || 0);
+    const max = Math.max(...vals, 1);
+    const rowH = data.length ? (ch / data.length) : ch;
+    const barH = rowH * 0.65;
+    data.forEach((d,i) => {
+      const v = +d.value||0;
+      const bw = (v/max) * cw;
+      const y = padT + i*rowH + (rowH - barH)/2;
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+      body += `<rect x="${padL}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" fill="${color}" />`;
+      body += `<text x="${padL-6}" y="${(y+barH/2+3).toFixed(1)}" text-anchor="end" font-size="10" fill="#c8deff" font-family="'Share Tech Mono',monospace">${escSvg(d.label)}</text>`;
+      body += `<text x="${(padL+bw+4).toFixed(1)}" y="${(y+barH/2+3).toFixed(1)}" font-size="10" fill="#c8deff" font-family="'Share Tech Mono',monospace">${v}</text>`;
+    });
+    body += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+ch}" stroke="#243d5e" />`;
+    body += `<line x1="${padL}" y1="${padT+ch}" x2="${padL+cw}" y2="${padT+ch}" stroke="#243d5e" />`;
+  } else { /* bar (vertical) */
+    const vals = data.map(d => +d.value || 0);
+    const max = Math.max(...vals, 1);
+    const colW = data.length ? (cw / data.length) : cw;
+    const barW = colW * 0.65;
+    body += axesSvg(padL, padT, cw, ch, max, 0);
+    data.forEach((d,i) => {
+      const v = +d.value||0;
+      const bh = (v/max) * ch;
+      const x = padL + i*colW + (colW - barW)/2;
+      const y = padT + ch - bh;
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+      body += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" fill="${color}" />`;
+      body += `<text x="${(x+barW/2).toFixed(1)}" y="${(padT+ch+15).toFixed(1)}" text-anchor="middle" font-size="10" fill="#c8deff" font-family="'Share Tech Mono',monospace">${escSvg(d.label)}</text>`;
+      body += `<text x="${(x+barW/2).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="middle" font-size="9" fill="#c8deff" font-family="'Share Tech Mono',monospace">${v}</text>`;
+    });
+  }
+
+  const titleSvg = title
+    ? `<text x="${W/2}" y="22" text-anchor="middle" font-size="13" fill="#38e8ff" font-family="'Share Tech Mono',monospace" letter-spacing="2">${escSvg(title.toUpperCase())}</text>`
+    : '';
+  const dataAttr = escSvg(JSON.stringify({ title, type, data }));
+  return `<svg class="sgn-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" data-chart="${dataAttr}">
+    <rect width="${W}" height="${H}" fill="rgba(8,13,24,0.4)" stroke="#1a3a5a" />
+    ${titleSvg}
+    ${body}
+  </svg>`;
+}
+
+function axesSvg(padL, padT, cw, ch, max, min) {
+  return `
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+ch}" stroke="#243d5e" />
+    <line x1="${padL}" y1="${padT+ch}" x2="${padL+cw}" y2="${padT+ch}" stroke="#243d5e" />
+    <text x="${padL-6}" y="${padT+5}" text-anchor="end" font-size="9" fill="#5a7a99" font-family="'Share Tech Mono',monospace">${max}</text>
+    <text x="${padL-6}" y="${padT+ch+3}" text-anchor="end" font-size="9" fill="#5a7a99" font-family="'Share Tech Mono',monospace">${min}</text>
+  `;
+}
+
+function parseChartData(svgEl) {
+  try { return JSON.parse(svgEl.getAttribute('data-chart')); }
+  catch { return { title:'', type:'bar', data:[] }; }
+}
+
+function openChartDialog(existingSvg) {
+  const state = existingSvg
+    ? parseChartData(existingSvg)
+    : { title:'', type:'bar', data:[
+        {label:'Vanyamar', value:42},
+        {label:'Calandorë', value:28},
+        {label:'Anorvalas', value:35}
+      ]};
+
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-modal-overlay';
+  overlay.innerHTML = `
+    <div class="chart-modal" role="dialog" aria-modal="true">
+      <h3>${existingSvg ? 'EDIT CHART' : 'INSERT CHART'}</h3>
+      <label>Title (optional)</label>
+      <input type="text" id="chart-title" placeholder="e.g. Fleet Tonnage by System">
+      <label>Type</label>
+      <select id="chart-type">
+        <option value="bar">Bar (vertical)</option>
+        <option value="hbar">Bar (horizontal)</option>
+        <option value="line">Line</option>
+        <option value="pie">Pie</option>
+      </select>
+      <label>Data</label>
+      <div id="chart-rows"></div>
+      <div style="margin-top:8px;"><button class="pbtn" type="button" id="chart-add-row">+ ROW</button></div>
+      <div class="chart-preview" id="chart-preview"></div>
+      <div class="chart-actions">
+        <button class="pbtn" type="button" id="chart-cancel">CANCEL</button>
+        ${existingSvg ? '<button class="pbtn danger" type="button" id="chart-delete">DELETE</button>' : ''}
+        <button class="pbtn success" type="button" id="chart-insert">${existingSvg ? 'UPDATE' : 'INSERT'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#chart-title').value = state.title;
+  overlay.querySelector('#chart-type').value = state.type;
+
+  const rowsEl = overlay.querySelector('#chart-rows');
+  function renderRows() {
+    rowsEl.innerHTML = state.data.map((d,i) => `
+      <div class="chart-row">
+        <input type="text" placeholder="Label" data-idx="${i}" data-field="label" value="${escAttr(d.label||'')}">
+        <input type="text" placeholder="Value" data-idx="${i}" data-field="value" value="${escAttr(d.value)}">
+        <button class="pbtn danger" type="button" data-del="${i}" style="padding:0;height:32px;">×</button>
+      </div>
+    `).join('');
+  }
+  function refreshPreview() {
+    overlay.querySelector('#chart-preview').innerHTML = renderChartSVG(state);
+  }
+  renderRows(); refreshPreview();
+
+  rowsEl.addEventListener('input', e => {
+    const t = e.target;
+    const idx = +t.dataset.idx;
+    const field = t.dataset.field;
+    if (Number.isInteger(idx) && field) {
+      state.data[idx][field] = field === 'value' ? (Number(t.value) || 0) : t.value;
+      refreshPreview();
+    }
+  });
+  rowsEl.addEventListener('click', e => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      state.data.splice(+del.dataset.del, 1);
+      renderRows(); refreshPreview();
+    }
+  });
+
+  overlay.querySelector('#chart-add-row').onclick = () => {
+    state.data.push({ label:'', value:0 });
+    renderRows();
+  };
+  overlay.querySelector('#chart-title').oninput = e => { state.title = e.target.value; refreshPreview(); };
+  overlay.querySelector('#chart-type').onchange = e => { state.type = e.target.value; refreshPreview(); };
+
+  function close() { overlay.remove(); }
+  overlay.querySelector('#chart-cancel').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  const delBtn = overlay.querySelector('#chart-delete');
+  if (delBtn) delBtn.onclick = () => {
+    if (!confirm('Delete this chart?')) return;
+    if (existingSvg && existingSvg.parentNode) existingSvg.parentNode.removeChild(existingSvg);
+    close();
+    updateWordCount();
+  };
+
+  overlay.querySelector('#chart-insert').onclick = () => {
+    const svgHtml = renderChartSVG(state);
+    if (existingSvg) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = svgHtml;
+      existingSvg.parentNode.replaceChild(tmp.firstElementChild, existingSvg);
+    } else {
+      const ed = document.getElementById('editor-area');
+      if (ed) ed.focus();
+      document.execCommand('insertHTML', false, svgHtml + '<p><br></p>');
+    }
+    close();
+    updateWordCount();
+  };
 }
 
 /* ── Image utilities ── */
@@ -966,6 +1510,22 @@ function setupEditorImageHandlers(editorEl) {
     const html = ev.clipboardData.getData('text/html') || ev.clipboardData.getData('text/plain');
     document.execCommand('insertHTML', false, html);
   });
+
+  /* ── Image click selection (for resize) + chart click-to-edit ── */
+  editorEl.addEventListener('click', e => {
+    const chart = e.target.closest && e.target.closest('svg.sgn-chart');
+    if (chart && editorEl.contains(chart)) {
+      e.preventDefault();
+      openChartDialog(chart);
+      return;
+    }
+    editorEl.querySelectorAll('img.tb-selected').forEach(i => i.classList.remove('tb-selected'));
+    if (e.target.tagName === 'IMG') e.target.classList.add('tb-selected');
+  });
+
+  /* ── Live word count ── */
+  editorEl.addEventListener('input', updateWordCount);
+  editorEl.addEventListener('keyup', updateWordCount);
 }
 
 /* ══════════════════════════════════════════
@@ -1176,6 +1736,13 @@ async function editEntry(id, tpl) {
         <div class="edit-section-title">${bodyLabel}</div>
         ${buildToolbar()}
         <div contenteditable="true" id="editor-area">${_editBody||'<p><br></p>'}</div>
+        <div class="editor-statusbar">
+          <span class="sb-left">Tip: click an image to select it · click a chart to edit it</span>
+          <span class="sb-right">
+            <span id="editor-words">0 words</span>
+            <span id="editor-chars">0 chars</span>
+          </span>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px;">
         <button class="pbtn success" id="ed-save" style="flex:1;padding:8px;">✓ ${isNew?'CREATE':'SAVE'}</button>
@@ -1265,6 +1832,7 @@ async function editEntry(id, tpl) {
   };
 
   setupEditorImageHandlers(document.getElementById('editor-area'));
+  updateWordCount();
 }
 
 function statRow(key, val, idx) {
