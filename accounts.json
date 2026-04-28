@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "tiers": [
+    "DIPLOMATIC",
+    "MILITARY",
+    "COMMAND"
+  ],
+  "accounts": [
+    {
+      "username": "Aelius",
+      "level": 4,
+      "salt": "cmpx9k27vmDA/vHmHlgQsA==",
+      "keyringIv": "zXs8FkKpYU3V3O1W",
+      "keyringEnc": "iQYj/DJQf3fnG5N0jgsPDhO76FJgbD17CsLW0ZBee4tVJd0mxqwJWbFE8HzQ13+9UXT9zgmiqZtghuns/MuPt2ECG1u6VI3VKfFhGp5IDhpKJIp/7CxdNTeNAX3REWZ0nl3f8ZLYmqMtHfJ9iw4RnVsMGgF6Kx5HAxQWte9kTzKpCGw7HgQwuIdeLO4jhI5LU6TpHZu9I5XrMsAQ7d46InUI3Fsw2/MtiUs="
+    },
+    {
+      "username": "envoy",
+      "level": 1,
+      "salt": "LGggNquJebm9Vsmtb/MZ8w==",
+      "keyringIv": "uqYp5kTpFtVozTSw",
+      "keyringEnc": "q6LGW12w6d8AQLRnxhSxNhFqvl3E3gFlHxeAN9fm0mGpkzMh6tL+fQ342y/u16MHa8ElIAMnuE8CrStE0JsH3IBBHTA="
+    },
+    {
+      "username": "liaison",
+      "level": 2,
+      "salt": "JlhY1v5N+XthHilcD0amKQ==",
+      "keyringIv": "dv117t1bQaRogf9Y",
+      "keyringEnc": "6/ry5wX6ZaO1w6YT9SfGLKjnJHKnjwEldNJZI+gWv+pOQP5ZEYIP2hfCjIzAkkGBjol7ktit9nxQMbIY93CQgCq0tgPHEWSlbB3152Ndp3B2ibbaFg/ROX7KmJjAxZmNgDdPy2vIUCROqWGdBPbyKtja3gUOy+M="
+    },
+    {
+      "username": "command-eyes",
+      "level": 3,
+      "salt": "C25UwPdNMP5tYMvEi9f1nA==",
+      "keyringIv": "X8nsiUDshv5N3xhR",
+      "keyringEnc": "jdDLGhaLiLhzo2vggFFY1EGbZBv9OZhoywvIwL8L8srFayl18jqp1fRliCHKHMUFefmHDwXV67fWlLxe8weDDu6MoGxpPbk56yRelWv02euuwOrUeNMJXefBTZqSi+PPllW2gkNWqnnqsERK7AD3s1lepLmoWaweN9/u7LKf5ZrDeCoRNdY+UhGHbEWXIKJmCIUGSLeLgfrPR3LVFuT66BAyEuwD/mPzRZQ="
+    }
+  ]
+}
