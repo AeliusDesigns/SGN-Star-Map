@@ -21,7 +21,7 @@
    only ciphertext + hashes — safe to publish):
      {
        "version": 1,
-       "tiers":   [DIPLOMATIC, MILITARY, COMMAND],
+       "tiers":   [DIPLOMATIC, MILITARY, COMMAND, ADMIN],
        "accounts": [
          {
            "username":   "admin",
@@ -31,13 +31,19 @@
            "keyringEnc": "<base64>"
          },
          ...
-       ]
+       ],
+       "githubTokenEnc": "<base64>",   // optional — AES-GCM(PAT) under tier-4 key
+       "githubTokenIv":  "<base64>"
      }
 
    The encrypted keyring decrypts to a JSON object
    mapping tier-level → base64 raw 32-byte AES-GCM
    key. A logged-in user only has the keys their
-   tier grants them.
+   tier grants them. Tier 4 (ADMIN) is held only
+   by admin accounts; it doubles as the wrap key
+   for the optional GitHub PAT stored in the repo
+   so the admin can commit from any device after
+   signing in.
    ══════════════════════════════════════════ */
 
 window.SGNAuth = (function () {
@@ -60,6 +66,7 @@ window.SGNAuth = (function () {
 
   /* ── Storage keys ── */
   const SESSION_KEY = 'sgn_auth_v1';
+  const GH_TOKEN_KEY = 'sgn_github_token';   // shared with github-save.js
   const LEGACY_FLAGS = ['starmap_editor_ok', 'galaxy_editor_ok'];
 
   /* ── State ── */
@@ -175,6 +182,22 @@ window.SGNAuth = (function () {
     }
 
     _user = { username: acct.username, level: acct.level, tierKeys };
+
+    /* Admin-only: decrypt the stored GitHub PAT (if present) so the user
+       can commit from any device just by signing in. */
+    if (tierKeys[TIER.ADMIN] && data.githubTokenEnc && data.githubTokenIv) {
+      try {
+        const pt = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: b64decode(data.githubTokenIv) },
+          tierKeys[TIER.ADMIN],
+          b64decode(data.githubTokenEnc)
+        );
+        sessionStorage.setItem(GH_TOKEN_KEY, new TextDecoder().decode(pt));
+      } catch (e) {
+        // bad ciphertext — leave any existing token alone
+      }
+    }
+
     await _persistSession();
     _emit();
     return { username: _user.username, level: _user.level };
@@ -184,6 +207,7 @@ window.SGNAuth = (function () {
   function logout() {
     _user = null;
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(GH_TOKEN_KEY);
     LEGACY_FLAGS.forEach(k => sessionStorage.removeItem(k));
     _emit();
   }
@@ -273,6 +297,58 @@ window.SGNAuth = (function () {
     }
   }
 
+  /* ── Admin-only: encrypt the GitHub PAT with the tier-4 key ──
+       Mutates the passed-in accountsData in place (adds githubTokenEnc /
+       githubTokenIv) and stashes the plaintext token in sessionStorage so
+       github-save.js picks it up immediately. The admin still has to
+       commit accounts.json afterwards for the change to persist. */
+  async function setGithubToken(token, accountsData) {
+    if (!_user || _user.level < TIER.ADMIN) throw new Error('Not signed in as admin.');
+    if (!_user.tierKeys[TIER.ADMIN]) {
+      throw new Error('ADMIN tier-4 key missing from your keyring. Run the keyring upgrade first.');
+    }
+    if (!token || !String(token).trim()) throw new Error('Token is empty.');
+    if (!accountsData || !Array.isArray(accountsData.accounts)) {
+      throw new Error('accountsData missing.');
+    }
+    const trimmed = String(token).trim();
+    const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+    const ct = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      _user.tierKeys[TIER.ADMIN],
+      new TextEncoder().encode(trimmed)
+    );
+    accountsData.githubTokenEnc = b64encode(new Uint8Array(ct));
+    accountsData.githubTokenIv = b64encode(iv);
+    sessionStorage.setItem(GH_TOKEN_KEY, trimmed);
+    return accountsData;
+  }
+
+  /* ── Forget the stored token (in repo + this session) ── */
+  function clearStoredGithubToken(accountsData) {
+    if (accountsData) {
+      delete accountsData.githubTokenEnc;
+      delete accountsData.githubTokenIv;
+    }
+    sessionStorage.removeItem(GH_TOKEN_KEY);
+    return accountsData;
+  }
+
+  function hasStoredGithubToken(accountsData) {
+    return !!(accountsData && accountsData.githubTokenEnc && accountsData.githubTokenIv);
+  }
+
+  /* ── Internal: import a fresh tier key into the active session
+       (used by the admin keyring upgrade so the new tier-4 key is
+       usable immediately without a full re-login). ── */
+  async function _importTierKeyIntoSession(level, keyB64) {
+    if (!_user) throw new Error('Not signed in.');
+    _user.tierKeys[Number(level)] = await crypto.subtle.importKey(
+      'raw', b64decode(keyB64), { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']
+    );
+    await _persistSession();
+  }
+
   /* ── Change subscription ── */
   function _emit() {
     _listeners.forEach(fn => { try { fn(currentUser()); } catch (e) {} });
@@ -301,6 +377,9 @@ window.SGNAuth = (function () {
     /* Content crypto */
     encryptForTier, decryptBlob,
 
+    /* GitHub PAT storage (admin-only) */
+    setGithubToken, clearStoredGithubToken, hasStoredGithubToken,
+
     /* Events */
     onChange,
 
@@ -311,7 +390,9 @@ window.SGNAuth = (function () {
       generateTierKeyB64,
       buildAccountRecord,
       loadAccounts,
-      PBKDF2_ITERS, SALT_BYTES, IV_BYTES, KEY_BITS
+      importTierKeyIntoSession: _importTierKeyIntoSession,
+      PBKDF2_ITERS, SALT_BYTES, IV_BYTES, KEY_BITS,
+      GH_TOKEN_KEY
     }
   };
 })();

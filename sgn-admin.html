@@ -68,6 +68,18 @@
     button.danger:hover { background: rgba(255,80,80,.08); }
     button.muted { color: var(--dim); border-color: var(--border); }
     button.muted:hover { color: var(--text); border-color: var(--border2); background: transparent; }
+    button.primary { color: var(--bg); background: var(--cyan); border-color: var(--cyan); font-weight: 600; }
+    button.primary:hover { background: #6df1ff; border-color: #6df1ff; }
+    button.primary:disabled { background: rgba(56,232,255,.25); border-color: rgba(56,232,255,.25); color: var(--bg); }
+
+    .status-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 2px;
+      font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+      vertical-align: middle; margin-left: 8px;
+    }
+    .pill-on  { background: rgba(92,219,117,.12); color: var(--green); border: 1px solid rgba(92,219,117,.4); }
+    .pill-off { background: rgba(245,197,66,.10); color: var(--amber); border: 1px solid rgba(245,197,66,.4); }
+    .pill-warn{ background: rgba(255,80,80,.10);  color: var(--red);   border: 1px solid rgba(255,80,80,.4); }
 
     .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
     .row > * { flex: 1; min-width: 0; }
@@ -195,6 +207,54 @@
        ────────────────────────────────────── -->
   <div id="manage-section" class="hidden">
 
+    <!-- Keyring upgrade — only shown if admin's keyring lacks tier-4 -->
+    <div class="panel warn hidden" id="upgrade-panel">
+      <div class="panel-title">Keyring Upgrade Required</div>
+      <p style="font-size:12px; color:var(--text); margin:0 0 8px;">
+        Your admin keyring was generated before the ADMIN-tier (level 4) key existed.
+        That key is needed to encrypt the GitHub token stored in the repo.
+      </p>
+      <div class="hint" style="margin-bottom:10px;">
+        Re-enter your admin password below. A fresh tier-4 key is generated locally,
+        added to your keyring, and your account record is re-encrypted. You'll then
+        need to commit the updated <code>accounts.json</code>.
+      </div>
+      <label>Admin password</label>
+      <input type="password" id="upgrade-pw" autocomplete="current-password">
+      <div class="row" style="margin-top:14px;">
+        <button id="upgrade-go" class="primary">Upgrade Keyring</button>
+      </div>
+      <div class="err" id="upgrade-err"></div>
+      <div class="ok-msg" id="upgrade-ok"></div>
+    </div>
+
+    <!-- GitHub Token storage -->
+    <div class="panel" id="token-panel">
+      <div class="panel-title">
+        GitHub Token
+        <span id="token-status" class="status-pill pill-off">not stored</span>
+      </div>
+      <p style="font-size:12px; color:var(--dim); margin:0 0 12px;">
+        Encrypted with your ADMIN key and saved in <code>accounts.json</code>.
+        Only ADMIN sign-ins can decrypt it. Once stored, every page in the
+        repo can commit changes after you sign in — from any device — without
+        ever pasting the token again.
+      </p>
+      <p style="font-size:11px; color:var(--dim); margin:0 0 12px;">
+        Generate a fine-scoped <strong>classic</strong> Personal Access Token at
+        github.com/settings/tokens with the <code>repo</code> scope. Paste it
+        below; the plaintext never leaves this browser tab.
+      </p>
+      <label>GitHub Personal Access Token</label>
+      <input type="password" id="gh-token" autocomplete="off" placeholder="ghp_…">
+      <div class="row" style="margin-top:14px;">
+        <button id="gh-token-save" class="primary">Save Token</button>
+        <button id="gh-token-clear" class="danger" style="display:none;">Clear Token</button>
+      </div>
+      <div class="err" id="gh-token-err"></div>
+      <div class="ok-msg" id="gh-token-ok"></div>
+    </div>
+
     <div class="panel">
       <div class="panel-title">Existing Accounts</div>
       <div id="acct-list"></div>
@@ -271,13 +331,13 @@
       <textarea id="json-out" readonly spellcheck="false"></textarea>
 
       <div class="row" style="margin-top:14px;">
-        <button id="copy-json">Copy JSON</button>
-        <button id="download-json">Download accounts.json</button>
-        <button id="commit-json" class="muted">Commit to GitHub</button>
+        <button id="commit-json" class="primary">Commit to GitHub</button>
+        <button id="download-json" class="muted">Download</button>
+        <button id="copy-json" class="muted">Copy JSON</button>
       </div>
       <div class="hint">
-        After saving, drop <code>accounts.json</code> into the repo root next to
-        <code>index.html</code> and commit. Once it's deployed, sign-in works for everyone.
+        Commit pushes the file straight to the repo using the stored GitHub token.
+        Download / Copy are fallbacks if you'd rather paste it in by hand.
       </div>
       <div class="err" id="out-err"></div>
       <div class="ok-msg" id="out-ok"></div>
@@ -315,12 +375,16 @@
       return hex.match(/.{4}/g).join('-');
     }
 
-    /* ── Build keyring object for a given tier ── */
+    /* ── Build keyring object for a given tier ──
+         Each user gets every tier key at-or-below their level.
+         Tier 4 (ADMIN) is included only for ADMIN accounts and doubles
+         as the wrap key for the optional repo-stored GitHub PAT. */
     function keyringForLevel(level, tierKeysB64) {
-      // user gets keys for every tier 1..min(level, 3) that exists
       const out = {};
-      for (let lvl = 1; lvl <= 3; lvl++) {
-        if (level >= lvl) out[String(lvl)] = tierKeysB64[String(lvl)];
+      for (let lvl = 1; lvl <= 4; lvl++) {
+        if (level >= lvl && tierKeysB64[String(lvl)]) {
+          out[String(lvl)] = tierKeysB64[String(lvl)];
+        }
       }
       return out;
     }
@@ -377,15 +441,17 @@
 
       $('bs-go').disabled = true;
       try {
-        // 1. generate three tier keys (DIPLOMATIC, MILITARY, COMMAND)
+        // 1. generate four tier keys (DIPLOMATIC, MILITARY, COMMAND, ADMIN)
         const tierKeys = {
           '1': await _i.generateTierKeyB64(),
           '2': await _i.generateTierKeyB64(),
-          '3': await _i.generateTierKeyB64()
+          '3': await _i.generateTierKeyB64(),
+          '4': await _i.generateTierKeyB64()
         };
 
-        // 2. admin record (all keys)
-        const adminRec = await _i.buildAccountRecord(pw1, tierKeys);
+        // 2. admin record (all four keys; tier-4 wraps the GitHub PAT later)
+        const adminRing = keyringForLevel(TIER.ADMIN, tierKeys);
+        const adminRec = await _i.buildAccountRecord(pw1, adminRing);
         const accounts = [{
           username: user, level: TIER.ADMIN,
           salt: adminRec.salt, keyringIv: adminRec.keyringIv, keyringEnc: adminRec.keyringEnc
@@ -408,7 +474,7 @@
 
         _accountsData = {
           version: 1,
-          tiers: ['DIPLOMATIC', 'MILITARY', 'COMMAND'],
+          tiers: ['DIPLOMATIC', 'MILITARY', 'COMMAND', 'ADMIN'],
           accounts: accounts
         };
 
@@ -443,7 +509,131 @@
       $('output-section').classList.add('hidden');
       renderAccountList();
       refreshMigrationStatus();
+      refreshTokenPanel();
     }
+
+    function adminHasTier4() {
+      return !!(_adminTierKeys && _adminTierKeys['4']);
+    }
+
+    /* Toggle the keyring upgrade prompt + lock the token panel until tier-4 exists. */
+    function refreshTokenPanel() {
+      const has4 = adminHasTier4();
+      $('upgrade-panel').classList.toggle('hidden', has4);
+
+      const tokenStored = SGNAuth.hasStoredGithubToken(_accountsData);
+      const pill = $('token-status');
+      pill.classList.remove('pill-on', 'pill-off', 'pill-warn');
+
+      if (!has4) {
+        pill.textContent = 'upgrade required';
+        pill.classList.add('pill-warn');
+      } else if (tokenStored) {
+        pill.textContent = 'stored in repo';
+        pill.classList.add('pill-on');
+      } else {
+        pill.textContent = 'not stored';
+        pill.classList.add('pill-off');
+      }
+
+      $('gh-token-save').disabled = !has4;
+      $('gh-token').disabled = !has4;
+      $('gh-token-clear').style.display = (has4 && tokenStored) ? '' : 'none';
+      $('gh-token').placeholder = tokenStored
+        ? '(token already stored — paste a new one to replace)'
+        : 'ghp_…';
+    }
+
+    /* ─────────── KEYRING UPGRADE ─────────── */
+    $('upgrade-go').addEventListener('click', async () => {
+      const err = $('upgrade-err'); err.textContent = '';
+      const ok = $('upgrade-ok'); ok.textContent = '';
+      const pw = $('upgrade-pw').value;
+      if (!pw) { err.textContent = 'Enter your admin password.'; return; }
+
+      $('upgrade-go').disabled = true;
+      try {
+        const u = SGNAuth.currentUser();
+        if (!u) throw new Error('Not signed in.');
+        const acct = _accountsData.accounts.find(a => a.username === u.username);
+        if (!acct) throw new Error('Admin account not in accounts.json.');
+
+        // Verify password by decrypting the existing keyring blob
+        const salt = _i.b64decode(acct.salt);
+        const pwKey = await _i.derivePwKey(pw, salt);
+        let keyringObj;
+        try {
+          const pt = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: _i.b64decode(acct.keyringIv) },
+            pwKey,
+            _i.b64decode(acct.keyringEnc)
+          );
+          keyringObj = JSON.parse(new TextDecoder().decode(pt));
+        } catch {
+          throw new Error('Wrong password.');
+        }
+
+        // Generate the new tier-4 key, add to keyring, re-encrypt with same pwKey
+        const tier4B64 = await _i.generateTierKeyB64();
+        keyringObj['4'] = tier4B64;
+        const iv = crypto.getRandomValues(new Uint8Array(_i.IV_BYTES));
+        const ct = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv },
+          pwKey,
+          new TextEncoder().encode(JSON.stringify(keyringObj))
+        );
+        acct.keyringIv = _i.b64encode(iv);
+        acct.keyringEnc = _i.b64encode(new Uint8Array(ct));
+
+        // Reflect ADMIN in the schema's tier list
+        if (Array.isArray(_accountsData.tiers) && _accountsData.tiers.indexOf('ADMIN') < 0) {
+          _accountsData.tiers.push('ADMIN');
+        }
+
+        // Push the new key into the live session so encryptForTier(4) works now
+        await _i.importTierKeyIntoSession(4, tier4B64);
+        _adminTierKeys = await collectAdminTierKeys();
+
+        ok.textContent = 'Keyring upgraded. Commit accounts.json below to persist.';
+        $('upgrade-pw').value = '';
+        refreshTokenPanel();
+        renderOutput([], false);
+      } catch (e) {
+        err.textContent = (e && e.message) || 'Upgrade failed.';
+      } finally {
+        $('upgrade-go').disabled = false;
+      }
+    });
+
+    /* ─────────── GITHUB TOKEN PANEL ─────────── */
+    $('gh-token-save').addEventListener('click', async () => {
+      const err = $('gh-token-err'); err.textContent = '';
+      const ok = $('gh-token-ok'); ok.textContent = '';
+      const tok = $('gh-token').value.trim();
+      if (!tok) { err.textContent = 'Paste a token first.'; return; }
+
+      $('gh-token-save').disabled = true;
+      try {
+        await SGNAuth.setGithubToken(tok, _accountsData);
+        $('gh-token').value = '';
+        ok.textContent = 'Token encrypted and stashed locally. Commit accounts.json below to publish it.';
+        refreshTokenPanel();
+        renderOutput([], false);
+      } catch (e) {
+        err.textContent = (e && e.message) || 'Failed to store token.';
+      } finally {
+        $('gh-token-save').disabled = false;
+      }
+    });
+
+    $('gh-token-clear').addEventListener('click', () => {
+      if (!confirm('Remove the stored GitHub token from accounts.json?')) return;
+      SGNAuth.clearStoredGithubToken(_accountsData);
+      $('gh-token-ok').textContent = 'Token removed. Commit accounts.json below to publish.';
+      $('gh-token-err').textContent = '';
+      refreshTokenPanel();
+      renderOutput([], false);
+    });
 
     function renderAccountList() {
       const list = $('acct-list');
@@ -649,11 +839,15 @@
       try {
         $('commit-json').disabled = true;
         const target = _outputTarget;
+        $('out-ok').textContent = 'Committing ' + target + '…';
         await SGNGitHub.commitFile(
           target, $('json-out').value,
           'SGN: update ' + target
         );
-        $('out-ok').textContent = 'Committed ' + target + ' to repo. Allow a minute for GitHub Pages to redeploy.';
+        $('out-ok').textContent = 'Committed ' + target + ' to repo. Allow ~1 min for GitHub Pages to redeploy.';
+        // The first commit of a fresh accounts.json is what actually lets the
+        // stored PAT persist across devices, so refresh the pill once it's live.
+        if (target === 'accounts.json') refreshTokenPanel();
       } catch (e) {
         $('out-err').textContent = (e && e.message) || 'Commit failed.';
       } finally {
