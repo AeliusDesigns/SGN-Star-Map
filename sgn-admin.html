@@ -205,9 +205,10 @@
       <div class="panel-title">Codex Classification Migration</div>
       <p style="font-size:12px; color:var(--dim); margin:0 0 12px;">
         Re-encrypt legacy <code style="color:var(--cyan)">classified: true</code> codex
-        entries with the COMMAND tier key so their body text is no longer plaintext
+        entries with the MILITARY tier key so their body text is no longer plaintext
         in the repo. New <code style="color:var(--cyan)">clearance</code> field
         replaces the boolean toggle. Run this once after adding the new system.
+        Each entry can be reclassified individually afterward via the wiki editor.
       </p>
       <div id="migrate-status" class="hint" style="margin-bottom:10px;">Scanning codex.json...</div>
       <div class="row">
@@ -561,10 +562,10 @@
         let migrated = 0;
         for (const e of codex) {
           if (e && e.classified === true && !e.bodyEnc) {
-            const blob = await SGNAuth.encryptForTier(e.body || '', TIER.COMMAND);
+            const blob = await SGNAuth.encryptForTier(e.body || '', TIER.MILITARY);
             e.bodyEnc = blob.enc;
             e.bodyIv = blob.iv;
-            e.clearance = TIER.COMMAND;
+            e.clearance = TIER.MILITARY;
             delete e.body;
             delete e.classified;
             migrated++;

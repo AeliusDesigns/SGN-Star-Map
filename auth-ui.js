@@ -18,12 +18,44 @@ window.SGNAuthUI = (function () {
   let _badgeEl = null;
   const _resolvers = [];
 
+  /* ── Detect legacy admin (any *_editor_ok flag in sessionStorage) ── */
+  function _isLegacyAdmin() {
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.endsWith('_editor_ok') && sessionStorage.getItem(k) === '1') return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  /* ── Maintain body.sgn-admin class (CSS uses it to gate edit UI) ── */
+  function _refreshAdminClass() {
+    if (!document.body) return;
+    const sgn = window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN;
+    const legacy = _isLegacyAdmin();
+    document.body.classList.toggle('sgn-admin', !!(sgn || legacy));
+  }
+
   /* ── Inject CSS once ── */
   function _mountStyles() {
     if (document.getElementById('sgn-auth-styles')) return;
     const s = document.createElement('style');
     s.id = 'sgn-auth-styles';
     s.textContent = `
+      /* ── Hide edit / save / new buttons unless admin is signed in ── */
+      body:not(.sgn-admin) #btn-new,
+      body:not(.sgn-admin) #btn-save-repo,
+      body:not(.sgn-admin) #d-edit,
+      body:not(.sgn-admin) #d-dup,
+      body:not(.sgn-admin) #d-del,
+      body:not(.sgn-admin) #dos-edit,
+      body:not(.sgn-admin) #tree-edit-root,
+      body:not(.sgn-admin) #tree-del-orbat,
+      body:not(.sgn-admin) .sgn-admin-only {
+        display: none !important;
+      }
+
       .sgn-auth-badge {
         position: fixed; top: 14px; right: 14px; z-index: 9998;
         font-family: 'Share Tech Mono', 'Courier New', monospace;
@@ -99,7 +131,11 @@ window.SGNAuthUI = (function () {
     document.body.appendChild(el);
     _badgeEl = el;
     _renderBadge(SGNAuth.currentUser());
-    SGNAuth.onChange(_renderBadge);
+    _refreshAdminClass();
+    SGNAuth.onChange((u) => { _renderBadge(u); _refreshAdminClass(); });
+    /* Legacy editor.json admin can flip mid-session via per-file requireEditor();
+       polling is the cheapest way to pick that up without modifying every file. */
+    setInterval(_refreshAdminClass, 1000);
     el.addEventListener('click', () => {
       if (SGNAuth.currentUser()) {
         if (confirm('Log out of SGN?')) SGNAuth.logout();
