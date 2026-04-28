@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SGN Admin Console</title>
+  <link rel="icon" href="favicon.png">
+  <style>
+    :root {
+      --bg: #050810;
+      --panel: #080d18;
+      --border: #1a2d46;
+      --border2: #243d5e;
+      --cyan: #38e8ff;
+      --gold: #ffd75c;
+      --green: #5cdb75;
+      --red: #ff5050;
+      --amber: #f5c542;
+      --text: #c8deff;
+      --dim: #5a7a99;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      max-width: 880px; margin: 0 auto; padding: 40px 28px 80px;
+      line-height: 1.55;
+    }
+    h1 {
+      color: var(--cyan); font-size: 16px; letter-spacing: 4px;
+      margin: 0 0 4px; font-weight: 600;
+    }
+    .sub { color: var(--dim); font-size: 11px; letter-spacing: 1.5px;
+      text-transform: uppercase; margin-bottom: 32px; }
+    .panel {
+      border: 1px solid var(--border); background: var(--panel);
+      padding: 22px 24px; border-radius: 4px; margin-bottom: 22px;
+    }
+    .panel-title {
+      color: var(--cyan); font-size: 12px; letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 14px; font-weight: 600;
+    }
+    .panel.warn { border-color: rgba(255,80,80,.35); }
+    .panel.warn .panel-title { color: var(--red); }
+    .panel.ok { border-color: rgba(92,219,117,.35); }
+    .panel.ok .panel-title { color: var(--green); }
+
+    label { display: block; color: var(--dim); font-size: 10px;
+      letter-spacing: 1.5px; text-transform: uppercase; margin: 12px 0 5px; }
+    input, select, textarea {
+      width: 100%; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border2); border-radius: 3px;
+      padding: 9px 12px; font-family: inherit; font-size: 13px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--cyan); }
+    textarea { font-size: 11px; min-height: 220px; resize: vertical;
+      white-space: pre; overflow: auto; line-height: 1.4; }
+
+    button {
+      background: transparent; color: var(--cyan); border: 1px solid #1a7090;
+      padding: 9px 22px; font-family: inherit; font-size: 11px;
+      letter-spacing: 2px; text-transform: uppercase;
+      border-radius: 3px; cursor: pointer; transition: all .15s;
+    }
+    button:hover { background: rgba(56,232,255,.08); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.danger { color: var(--red); border-color: rgba(255,80,80,.5); }
+    button.danger:hover { background: rgba(255,80,80,.08); }
+    button.muted { color: var(--dim); border-color: var(--border); }
+    button.muted:hover { color: var(--text); border-color: var(--border2); background: transparent; }
+
+    .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 0; }
+    .row > button { flex: 0 0 auto; }
+
+    .acct-row {
+      display: grid; grid-template-columns: 1fr 130px 80px;
+      gap: 12px; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .acct-row:last-child { border-bottom: none; }
+    .acct-name { color: var(--text); }
+    .acct-tier { font-size: 10px; letter-spacing: 1.5px; }
+    .tier-1 { color: var(--green); }
+    .tier-2 { color: #b0c4ff; }
+    .tier-3 { color: #ff7a7a; }
+    .tier-4 { color: var(--gold); }
+    .acct-actions { text-align: right; }
+
+    .creds-list {
+      background: rgba(245,197,66,.06); border: 1px dashed rgba(245,197,66,.4);
+      padding: 16px; border-radius: 3px; margin-top: 10px;
+      font-size: 12px; line-height: 1.9;
+    }
+    .creds-list .k { color: var(--amber); }
+    .creds-list .v { color: var(--text); user-select: all; }
+
+    .hint { color: var(--dim); font-size: 11px; line-height: 1.7; margin-top: 8px; }
+    .hint code { color: var(--cyan); background: rgba(56,232,255,.05);
+      padding: 1px 6px; border-radius: 2px; font-size: 11px; }
+    .err { color: var(--red); font-size: 11px; min-height: 14px; margin-top: 6px; }
+    .ok-msg { color: var(--green); font-size: 11px; min-height: 14px; margin-top: 6px; }
+
+    .checkbox-row { display: flex; align-items: center; gap: 8px;
+      margin: 14px 0; font-size: 12px; color: var(--text); cursor: pointer; user-select: none; }
+    .checkbox-row input { width: auto; margin: 0; }
+
+    .nav { margin-bottom: 24px; font-size: 11px; }
+    .nav a { color: var(--dim); text-decoration: none; letter-spacing: 1.5px;
+      text-transform: uppercase; margin-right: 18px; }
+    .nav a:hover { color: var(--cyan); }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="nav">
+    <a href="index.html">← Star Chart</a>
+    <a href="wiki.html">Codex</a>
+  </div>
+
+  <h1>SGN ADMIN CONSOLE</h1>
+  <div class="sub">Account &amp; clearance management · ADMIN access only</div>
+
+  <!-- ──────────────────────────────────────
+       FIRST-RUN BOOTSTRAP
+       Shown when no accounts.json exists.
+       ────────────────────────────────────── -->
+  <div id="bootstrap-section" class="hidden">
+    <div class="panel warn">
+      <div class="panel-title">First-Run Setup</div>
+      <p style="font-size:12px; color:var(--text); margin:0 0 4px;">
+        No <code style="color:var(--cyan)">accounts.json</code> found.
+        This will generate one with your admin account plus optional sample accounts.
+      </p>
+      <div class="hint">
+        Tier keys are random and generated locally in your browser.
+        Nothing leaves your machine until you commit
+        <code>accounts.json</code> to the repo.
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Admin Account</div>
+      <label>Admin username</label>
+      <input type="text" id="bs-admin-user" value="admin" autocomplete="off">
+
+      <label>Admin password</label>
+      <input type="password" id="bs-admin-pw1" autocomplete="new-password">
+
+      <label>Confirm password</label>
+      <input type="password" id="bs-admin-pw2" autocomplete="new-password">
+
+      <div class="hint">
+        At least 10 characters recommended. Cannot be recovered if forgotten —
+        you'd have to bootstrap again from scratch.
+      </div>
+
+      <label class="checkbox-row" style="margin-top:18px;">
+        <input type="checkbox" id="bs-samples" checked>
+        <span>Also generate three sample accounts (you can replace later):
+          <code style="color:var(--green)">envoy</code> ·
+          <code style="color:#b0c4ff">liaison</code> ·
+          <code style="color:#ff7a7a">command-eyes</code>
+        </span>
+      </label>
+
+      <div class="row" style="margin-top:14px;">
+        <button id="bs-go">Initialize</button>
+      </div>
+      <div class="err" id="bs-err"></div>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────
+       LOGIN GATE
+       Shown when accounts.json exists but no
+       admin is logged in.
+       ────────────────────────────────────── -->
+  <div id="login-section" class="hidden">
+    <div class="panel">
+      <div class="panel-title">Admin Sign-In Required</div>
+      <p style="font-size:12px; color:var(--dim); margin:0 0 14px;">
+        Sign in via the badge in the top-right corner. Only ADMIN-tier
+        accounts can manage the account roster.
+      </p>
+      <button id="login-go">Open Sign-In</button>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────
+       MANAGEMENT (logged in as admin)
+       ────────────────────────────────────── -->
+  <div id="manage-section" class="hidden">
+
+    <div class="panel">
+      <div class="panel-title">Existing Accounts</div>
+      <div id="acct-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Add Account</div>
+      <div class="row">
+        <div>
+          <label>Username</label>
+          <input type="text" id="add-user" autocomplete="off">
+        </div>
+        <div>
+          <label>Tier</label>
+          <select id="add-tier">
+            <option value="1">DIPLOMATIC (allied state)</option>
+            <option value="2">MILITARY (joint operations)</option>
+            <option value="3">COMMAND (inner circle)</option>
+            <option value="4">ADMIN (full edit access)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Password</label>
+          <input type="text" id="add-pw" autocomplete="off">
+        </div>
+        <button class="muted" id="add-genpw" type="button">Random</button>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button id="add-go">Create Account</button>
+      </div>
+      <div class="err" id="add-err"></div>
+      <div class="ok-msg" id="add-ok"></div>
+    </div>
+
+  </div>
+
+  <!-- ──────────────────────────────────────
+       OUTPUT (shared by bootstrap & manage)
+       ────────────────────────────────────── -->
+  <div id="output-section" class="hidden">
+    <div class="panel ok">
+      <div class="panel-title">accounts.json — Save &amp; Commit</div>
+
+      <div id="creds-block" class="hidden">
+        <div class="hint" style="color:var(--amber);">
+          ⚠ Sample-account passwords below — written ONCE, never recoverable.
+          Copy them now if you want to keep them, or replace each account later
+          with its own password.
+        </div>
+        <div class="creds-list" id="creds-list"></div>
+      </div>
+
+      <label style="margin-top:18px;">File contents</label>
+      <textarea id="json-out" readonly spellcheck="false"></textarea>
+
+      <div class="row" style="margin-top:14px;">
+        <button id="copy-json">Copy JSON</button>
+        <button id="download-json">Download accounts.json</button>
+        <button id="commit-json" class="muted">Commit to GitHub</button>
+      </div>
+      <div class="hint">
+        After saving, drop <code>accounts.json</code> into the repo root next to
+        <code>index.html</code> and commit. Once it's deployed, sign-in works for everyone.
+      </div>
+      <div class="err" id="out-err"></div>
+      <div class="ok-msg" id="out-ok"></div>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="auth-ui.js"></script>
+  <script src="github-save.js"></script>
+  <script>
+  (async function () {
+    'use strict';
+
+    const $ = (id) => document.getElementById(id);
+    const TIER = SGNAuth.TIER;
+    const _i = SGNAuth._internal;
+
+    /* ── Working state ── */
+    let _accountsData = null;       // current accounts.json content (object)
+    let _adminTierKeys = null;      // { "1": b64, "2": b64, "3": b64 } — set after bootstrap or login
+
+    /* ── Sample account templates ── */
+    const SAMPLES = [
+      { username: 'envoy',        level: TIER.DIPLOMATIC },
+      { username: 'liaison',      level: TIER.MILITARY  },
+      { username: 'command-eyes', level: TIER.COMMAND   }
+    ];
+
+    /* ── Random password generator (readable hex chunks) ── */
+    function randomPassword(byteLen) {
+      const a = crypto.getRandomValues(new Uint8Array(byteLen || 9));
+      let hex = '';
+      for (const b of a) hex += b.toString(16).padStart(2, '0');
+      return hex.match(/.{4}/g).join('-');
+    }
+
+    /* ── Build keyring object for a given tier ── */
+    function keyringForLevel(level, tierKeysB64) {
+      // user gets keys for every tier 1..min(level, 3) that exists
+      const out = {};
+      for (let lvl = 1; lvl <= 3; lvl++) {
+        if (level >= lvl) out[String(lvl)] = tierKeysB64[String(lvl)];
+      }
+      return out;
+    }
+
+    /* ── Init: which section to show ── */
+    async function init() {
+      await SGNAuth.ready();
+      const data = await _i.loadAccounts(true);
+
+      if (!data || !Array.isArray(data.accounts) || data.accounts.length === 0) {
+        showBootstrap();
+        return;
+      }
+
+      _accountsData = data;
+
+      const u = SGNAuth.currentUser();
+      if (!u || u.level < TIER.ADMIN) {
+        showLoginGate();
+        return;
+      }
+
+      // logged-in admin: collect their tier keys for use here
+      _adminTierKeys = await collectAdminTierKeys();
+      showManage();
+    }
+
+    /* ── Re-export the in-memory tier keys to base64
+         (admin keyring covers all tiers) ── */
+    async function collectAdminTierKeys() {
+      const sess = JSON.parse(sessionStorage.getItem('sgn_auth_v1') || '{}');
+      return sess.keys || {};
+    }
+
+    /* ─────────── BOOTSTRAP FLOW ─────────── */
+    function showBootstrap() {
+      $('bootstrap-section').classList.remove('hidden');
+      $('login-section').classList.add('hidden');
+      $('manage-section').classList.add('hidden');
+      $('output-section').classList.add('hidden');
+    }
+
+    $('bs-go').addEventListener('click', async () => {
+      const err = $('bs-err'); err.textContent = '';
+      const user = $('bs-admin-user').value.trim();
+      const pw1 = $('bs-admin-pw1').value;
+      const pw2 = $('bs-admin-pw2').value;
+      const samples = $('bs-samples').checked;
+
+      if (!user) { err.textContent = 'Pick an admin username.'; return; }
+      if (!pw1) { err.textContent = 'Enter a password.'; return; }
+      if (pw1 !== pw2) { err.textContent = 'Passwords do not match.'; return; }
+      if (pw1.length < 8) { err.textContent = 'Use at least 8 characters.'; return; }
+
+      $('bs-go').disabled = true;
+      try {
+        // 1. generate three tier keys (DIPLOMATIC, MILITARY, COMMAND)
+        const tierKeys = {
+          '1': await _i.generateTierKeyB64(),
+          '2': await _i.generateTierKeyB64(),
+          '3': await _i.generateTierKeyB64()
+        };
+
+        // 2. admin record (all keys)
+        const adminRec = await _i.buildAccountRecord(pw1, tierKeys);
+        const accounts = [{
+          username: user, level: TIER.ADMIN,
+          salt: adminRec.salt, keyringIv: adminRec.keyringIv, keyringEnc: adminRec.keyringEnc
+        }];
+
+        // 3. sample accounts (each gets only the keys appropriate to their tier)
+        const sampleCreds = [];
+        if (samples) {
+          for (const s of SAMPLES) {
+            const pw = randomPassword(9);
+            const ring = keyringForLevel(s.level, tierKeys);
+            const rec = await _i.buildAccountRecord(pw, ring);
+            accounts.push({
+              username: s.username, level: s.level,
+              salt: rec.salt, keyringIv: rec.keyringIv, keyringEnc: rec.keyringEnc
+            });
+            sampleCreds.push({ username: s.username, level: s.level, password: pw });
+          }
+        }
+
+        _accountsData = {
+          version: 1,
+          tiers: ['DIPLOMATIC', 'MILITARY', 'COMMAND'],
+          accounts: accounts
+        };
+
+        renderOutput(sampleCreds, true);
+      } catch (e) {
+        err.textContent = (e && e.message) || 'Bootstrap failed.';
+      } finally {
+        $('bs-go').disabled = false;
+      }
+    });
+
+    /* ─────────── LOGIN GATE ─────────── */
+    function showLoginGate() {
+      $('bootstrap-section').classList.add('hidden');
+      $('login-section').classList.remove('hidden');
+      $('manage-section').classList.add('hidden');
+      $('output-section').classList.add('hidden');
+    }
+    $('login-go').addEventListener('click', async () => {
+      const ok = await SGNAuthUI.promptLogin(TIER.ADMIN);
+      if (ok && SGNAuth.currentLevel() >= TIER.ADMIN) {
+        _adminTierKeys = await collectAdminTierKeys();
+        showManage();
+      }
+    });
+
+    /* ─────────── MANAGE FLOW ─────────── */
+    function showManage() {
+      $('bootstrap-section').classList.add('hidden');
+      $('login-section').classList.add('hidden');
+      $('manage-section').classList.remove('hidden');
+      $('output-section').classList.add('hidden');
+      renderAccountList();
+    }
+
+    function renderAccountList() {
+      const list = $('acct-list');
+      list.innerHTML = '';
+      _accountsData.accounts.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'acct-row';
+        row.innerHTML =
+          '<div class="acct-name">' + escHtml(a.username) + '</div>' +
+          '<div class="acct-tier tier-' + a.level + '">' +
+            SGNAuth.tierName(a.level) + '</div>' +
+          '<div class="acct-actions">' +
+            (a.level >= TIER.ADMIN && countAdmins() <= 1
+              ? '<span style="color:var(--dim);font-size:10px;">last admin</span>'
+              : '<button class="danger" data-user="' + escAttr(a.username) + '">Remove</button>') +
+          '</div>';
+        list.appendChild(row);
+      });
+      list.querySelectorAll('button.danger').forEach(b =>
+        b.addEventListener('click', () => removeAccount(b.dataset.user))
+      );
+    }
+
+    function countAdmins() {
+      return _accountsData.accounts.filter(a => a.level >= TIER.ADMIN).length;
+    }
+
+    function removeAccount(username) {
+      if (!confirm('Remove account "' + username + '"?')) return;
+      _accountsData.accounts = _accountsData.accounts.filter(a => a.username !== username);
+      renderAccountList();
+      renderOutput([], false);
+    }
+
+    /* ── Add account ── */
+    $('add-genpw').addEventListener('click', () => {
+      $('add-pw').value = randomPassword(9);
+    });
+
+    $('add-go').addEventListener('click', async () => {
+      const err = $('add-err'); err.textContent = '';
+      const ok = $('add-ok'); ok.textContent = '';
+      const user = $('add-user').value.trim();
+      const level = Number($('add-tier').value);
+      const pw = $('add-pw').value;
+
+      if (!user) { err.textContent = 'Username required.'; return; }
+      if (_accountsData.accounts.some(a => a.username === user)) {
+        err.textContent = 'Username already exists.'; return;
+      }
+      if (!pw || pw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
+      if (!_adminTierKeys || !_adminTierKeys['1']) {
+        err.textContent = 'Tier keys missing from session — try logging out and back in.'; return;
+      }
+
+      $('add-go').disabled = true;
+      try {
+        const ring = keyringForLevel(level, _adminTierKeys);
+        const rec = await _i.buildAccountRecord(pw, ring);
+        _accountsData.accounts.push({
+          username: user, level: level,
+          salt: rec.salt, keyringIv: rec.keyringIv, keyringEnc: rec.keyringEnc
+        });
+        ok.textContent = 'Account "' + user + '" added. Save accounts.json below.';
+        renderAccountList();
+        renderOutput([{ username: user, level: level, password: pw }], false);
+      } catch (e) {
+        err.textContent = (e && e.message) || 'Failed to create account.';
+      } finally {
+        $('add-go').disabled = false;
+      }
+    });
+
+    /* ─────────── OUTPUT (shared) ─────────── */
+    function renderOutput(creds, isBootstrap) {
+      const sec = $('output-section');
+      sec.classList.remove('hidden');
+      $('json-out').value = JSON.stringify(_accountsData, null, 2);
+
+      if (creds && creds.length) {
+        $('creds-block').classList.remove('hidden');
+        $('creds-list').innerHTML = creds.map(c =>
+          '<div><span class="k">' + escHtml(c.username) + '</span> ' +
+          '<span style="color:var(--dim);font-size:10px;">[' +
+          SGNAuth.tierName(c.level) + ']</span>: ' +
+          '<span class="v">' + escHtml(c.password) + '</span></div>'
+        ).join('');
+      } else {
+        $('creds-block').classList.add('hidden');
+      }
+
+      $('out-err').textContent = '';
+      $('out-ok').textContent = '';
+
+      // Hide commit button if github-save isn't around
+      $('commit-json').style.display =
+        (window.SGNGitHub) ? '' : 'none';
+
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    $('copy-json').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText($('json-out').value);
+        $('out-ok').textContent = 'Copied to clipboard.';
+        $('out-err').textContent = '';
+      } catch (e) {
+        $('json-out').select(); document.execCommand('copy');
+        $('out-ok').textContent = 'Copied.';
+      }
+    });
+
+    $('download-json').addEventListener('click', () => {
+      const blob = new Blob([$('json-out').value], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'accounts.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      $('out-ok').textContent = 'Downloaded — drop it into the repo root and commit.';
+      $('out-err').textContent = '';
+    });
+
+    $('commit-json').addEventListener('click', async () => {
+      $('out-err').textContent = ''; $('out-ok').textContent = '';
+      if (!window.SGNGitHub) { $('out-err').textContent = 'GitHub commit utility not loaded.'; return; }
+      try {
+        $('commit-json').disabled = true;
+        await SGNGitHub.commitFile(
+          'accounts.json', $('json-out').value,
+          'SGN: update accounts.json'
+        );
+        $('out-ok').textContent = 'Committed to repo. Allow a minute for GitHub Pages to redeploy.';
+      } catch (e) {
+        $('out-err').textContent = (e && e.message) || 'Commit failed.';
+      } finally {
+        $('commit-json').disabled = false;
+      }
+    });
+
+    /* ── Tiny escape helpers ── */
+    function escHtml(s) {
+      const d = document.createElement('div'); d.textContent = String(s == null ? '' : s);
+      return d.innerHTML;
+    }
+    function escAttr(s) {
+      return String(s == null ? '' : s).replace(/"/g, '&quot;').replace(/&/g, '&amp;');
+    }
+
+    /* ── Re-init on auth change so the page reflects login/logout ── */
+    SGNAuth.onChange(() => { /* no-op for now; init() runs once */ });
+
+    init();
+  })();
+  </script>
+</body>
+</html>
