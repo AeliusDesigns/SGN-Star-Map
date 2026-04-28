@@ -41,5 +41,7 @@
       "keyringIv": "72KjLD/oY0dK62kK",
       "keyringEnc": "IAHIcRkTwHxt+BXbda3U6Otfc6NKR0h20U/HYiDaFir9/XbhOFq7BwZuYrBVzSsyNYjbplNPaJf6uXRqgzb4Lazh1XECM012KQ8tWIIqbFqy1A8Sv4TPxWg7QcAruGjZx3KORuttqnF5qB3bjo/Rd31ooRUsSVg="
     }
-  ]
+  ],
+  "githubTokenEnc": "a6pnRvIVGxi1AQan0feedhdLqmhBWokC47apBKp90F2mJrEWZxm4dMVoqMzNsG9yzJlgQy2DHCg=",
+  "githubTokenIv": "lzEDEJluRF/kefP4"
 }
