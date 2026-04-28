@@ -542,19 +542,30 @@ let _editorPW = null;
 })();
 
 function requireEditor() {
-  if (editorOK) return true;
-  if (_editorPW === null) {
-    alert('Editor not available.');
-    return false;
-  }
-  const pw = prompt('Enter editor password:');
-  if (pw === _editorPW) {
-    editorOK = true;
-    sessionStorage.setItem('starmap_editor_ok', '1');
-    updateHUD();
+  // 1. New auth: ADMIN-tier session?
+  if (window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN) {
+    editorOK = true; updateHUD();
     return true;
   }
-  alert('Incorrect password.');
+  if (editorOK) return true;
+  // 2. Legacy editor.json fallback (kept for local dev / transition)
+  if (_editorPW !== null) {
+    const pw = prompt('Enter editor password:');
+    if (pw === _editorPW) {
+      editorOK = true;
+      sessionStorage.setItem('starmap_editor_ok', '1');
+      updateHUD();
+      return true;
+    }
+    alert('Incorrect password.');
+    return false;
+  }
+  // 3. No legacy file: kick to login modal (async, click again after)
+  if (window.SGNAuthUI) {
+    SGNAuthUI.promptLogin(SGNAuth.TIER.ADMIN);
+    return false;
+  }
+  alert('Sign in via the badge in the top-right to edit.');
   return false;
 }
 

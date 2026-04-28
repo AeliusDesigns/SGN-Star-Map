@@ -361,6 +361,30 @@ let _editorPW = null;
 let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 let classifiedUnlocked = false;
 
+/* ── Clearance helpers (new tier system + legacy compat) ──
+   - new schema: e.clearance is a number 0..3 (PUBLIC..COMMAND)
+                 e.bodyEnc + e.bodyIv hold ciphertext for clearance > 0
+   - legacy:     e.classified === true  →  treat as COMMAND, plaintext e.body
+*/
+function entryClearance(e) {
+  if (typeof e.clearance === 'number') return e.clearance;
+  if (e.classified === true) return 3; // legacy → COMMAND
+  return 0;
+}
+function userLevel() {
+  return window.SGNAuth ? SGNAuth.currentLevel() : 0;
+}
+function adminBypass() {
+  // editorOK is true when admin is logged in via legacy editor.json flow
+  return editorOK || (window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN);
+}
+async function resolveBody(e) {
+  if (!e.bodyEnc) return e.body || '';
+  if (!window.SGNAuth) return null;
+  const pt = await SGNAuth.decryptBlob({ enc: e.bodyEnc, iv: e.bodyIv, tier: entryClearance(e) });
+  return pt;
+}
+
 async function load() {
   let fileEntries = null;
   let localEntries = null;
@@ -415,11 +439,19 @@ function genId() { return 'CX_' + Date.now().toString(36).toUpperCase() + '_' + 
 })();
 
 function requireEditor() {
+  if (window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN) {
+    editorOK = true;
+    return true;
+  }
   if (editorOK) return true;
-  if (_editorPW === null) { alert('Editor not available.'); return false; }
-  const pw = prompt('Enter editor password:');
-  if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION,'1'); return true; }
-  alert('Incorrect password.');
+  if (_editorPW !== null) {
+    const pw = prompt('Enter editor password:');
+    if (pw === _editorPW) { editorOK = true; sessionStorage.setItem(PW_SESSION,'1'); return true; }
+    alert('Incorrect password.');
+    return false;
+  }
+  if (window.SGNAuthUI) { SGNAuthUI.promptLogin(SGNAuth.TIER.ADMIN); return false; }
+  alert('Sign in via the badge in the top-right to edit.');
   return false;
 }
 
@@ -452,7 +484,7 @@ function renderList() {
 
   postList.innerHTML = items.map(e => `
     <div class="post-item${e.id===activeId?' active':''}" data-id="${e.id}">
-      <div class="post-item-title">${e.classified ? '<span class="post-item-lock">\u2B21 </span>' : ''}${esc(e.title || 'Untitled')}</div>
+      <div class="post-item-title">${entryClearance(e) > 0 ? '<span class="post-item-lock">\u2B21 </span>' : ''}${esc(e.title || 'Untitled')}</div>
       <div class="post-item-meta">
         <span class="post-item-cat ${e.category}">${(e.category||'freeform').toUpperCase()}</span>
         <span>${e.designation ? esc(e.designation) : ''}</span>
@@ -513,12 +545,14 @@ function escAttr(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&#34;')
    ══════════════════════════════════════════ */
 const main = document.getElementById('main');
 
-function viewEntry(id) {
+async function viewEntry(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
 
-  /* ── Classified gate ── */
-  if (e.classified && !classifiedUnlocked) {
+  /* ── Tier-based clearance gate (legacy "classified" maps to COMMAND) ── */
+  const _cls = entryClearance(e);
+  const _lvl = userLevel();
+  if (_cls > 0 && _lvl < _cls && !classifiedUnlocked && !adminBypass()) {
     main.innerHTML = `
       <div class="classified-screen">
         <div class="classified-icon">\u2B21</div>
@@ -538,7 +572,17 @@ function viewEntry(id) {
         <div class="classified-footer">AEN Document Control // Restricted Distribution</div>
       </div>
     `;
-    document.getElementById('cls-unlock').onclick = () => {
+    document.getElementById('cls-unlock').onclick = async () => {
+      // New flow: open login modal asking for the right tier
+      if (window.SGNAuthUI) {
+        await SGNAuthUI.promptLogin(_cls);
+        if (userLevel() >= _cls || adminBypass()) {
+          viewEntry(id);
+          toast('Access granted');
+        }
+        return;
+      }
+      // Legacy flow (editor.json present, no auth.js loaded somehow)
       if (requireEditor()) {
         classifiedUnlocked = true;
         viewEntry(id);
@@ -546,6 +590,19 @@ function viewEntry(id) {
       }
     };
     return;
+  }
+
+  /* ── Resolve body (decrypt if encrypted) ── */
+  let bodyHTML = '';
+  if (e.bodyEnc) {
+    const pt = await resolveBody(e);
+    if (pt === null) {
+      bodyHTML = '<div style="color:var(--red-alert);font-size:13px;">[ Encrypted body — sign in with appropriate clearance to view ]</div>';
+    } else {
+      bodyHTML = pt;
+    }
+  } else {
+    bodyHTML = e.body || '';
   }
 
   const cat = e.category || 'freeform';
@@ -663,7 +720,7 @@ function viewEntry(id) {
       ${loreHeaderHTML}
       ${cat !== 'species' && e.role ? `<div class="dossier-section-label">Role / Purpose</div><p style="margin-bottom:18px;color:var(--text-dim);font-size:14px;line-height:1.7;">${esc(e.role)}</p>` : ''}
       ${cat === 'species' ? speciesClassHTML : statsHTML}
-      ${e.body ? `<div class="dossier-divider${divAccent}"></div><div class="dossier-body">${e.body}</div>` : ''}
+      ${bodyHTML ? `<div class="dossier-divider${divAccent}"></div><div class="dossier-body">${bodyHTML}</div>` : ''}
       ${docFooterHTML}
       <div class="dossier-actions">
         <button class="pbtn primary" id="d-edit">✎ EDIT</button>
@@ -914,19 +971,35 @@ function setupEditorImageHandlers(editorEl) {
 /* ══════════════════════════════════════════
    EDIT ENTRY
    ══════════════════════════════════════════ */
-function editEntry(id, tpl) {
+async function editEntry(id, tpl) {
   const isNew = !id;
   const isWeaponTpl = (tpl === 'weapon');
   const saveCat = isWeaponTpl ? 'technology' : (tpl || 'freeform');
   const e = id ? entries.find(x => x.id === id) : {
     id:genId(), category:saveCat, title:'', designation:'', classification:'',
-    role:'', stats:[], body:'', updated:Date.now(), classified:false,
+    role:'', stats:[], body:'', updated:Date.now(),
+    clearance: 0,
     /* tech-specific */ opStatus:'', accessLevel:'', origin:'', docClass:'', revision:'',
     /* lore-specific */ era:'', region:'', summary:'',
     /* doctrine-specific */ distribution:'', scope:'', authority:''
   };
   const isWeaponEdit = isWeaponTpl || (e._weaponTpl === true);
   const cat = e.category || 'freeform';
+  const _curClearance = entryClearance(e);
+
+  /* Decrypt body for the editor if it's stored as ciphertext */
+  let _editBody = '';
+  if (e.bodyEnc) {
+    const pt = await resolveBody(e);
+    if (pt === null) {
+      alert('Cannot decrypt this entry — your account does not hold the key for ' +
+        SGNAuth.tierName(_curClearance) + '. Edit aborted.');
+      return;
+    }
+    _editBody = pt;
+  } else {
+    _editBody = e.body || '';
+  }
 
   let templateFields = '';
 
@@ -1088,16 +1161,21 @@ function editEntry(id, tpl) {
         <div class="edit-section-title">Identity</div>
         <div class="form-row"><span class="fl">Title</span><input id="ed-title" class="sci-input" type="text" value="${escAttr(e.title||'')}" placeholder="Entry title..."/></div>
         ${cat==='freeform' ? `<div class="form-row"><span class="fl">Subtitle</span><input id="ed-desig" class="sci-input" type="text" value="${escAttr(e.designation||'')}" placeholder="Optional subtitle..."/></div>` : ''}
-        <div class="classified-toggle${e.classified ? ' active' : ''}" id="ed-classified-toggle">
-          <div class="classified-toggle-switch"></div>
-          <span class="classified-toggle-label">Classified Document</span>
+        <div class="form-row">
+          <span class="fl">Clearance</span>
+          <select id="ed-clearance" class="sci-select" style="background:var(--bg-2);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:8px 10px;font-family:inherit;font-size:13px;">
+            <option value="0" ${_curClearance===0?'selected':''}>PUBLIC — anyone</option>
+            <option value="1" ${_curClearance===1?'selected':''}>DIPLOMATIC — allied states</option>
+            <option value="2" ${_curClearance===2?'selected':''}>MILITARY — joint operations</option>
+            <option value="3" ${_curClearance===3?'selected':''}>COMMAND — inner circle</option>
+          </select>
         </div>
       </div>
       ${templateFields}
       <div class="edit-section">
         <div class="edit-section-title">${bodyLabel}</div>
         ${buildToolbar()}
-        <div contenteditable="true" id="editor-area">${e.body||'<p><br></p>'}</div>
+        <div contenteditable="true" id="editor-area">${_editBody||'<p><br></p>'}</div>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px;">
         <button class="pbtn success" id="ed-save" style="flex:1;padding:8px;">✓ ${isNew?'CREATE':'SAVE'}</button>
@@ -1107,10 +1185,6 @@ function editEntry(id, tpl) {
   `;
 
   wireToolbar();
-
-  // classified toggle
-  const clsToggle = document.getElementById('ed-classified-toggle');
-  clsToggle?.addEventListener('click', () => clsToggle.classList.toggle('active'));
 
   // stat rows (ship/vehicle/soldier/technology/weapon)
   const statList = document.getElementById('stat-list');
@@ -1125,7 +1199,10 @@ function editEntry(id, tpl) {
   });
 
   // save
-  document.getElementById('ed-save').onclick = () => {
+  document.getElementById('ed-save').onclick = async () => {
+    const clearance = Number(document.getElementById('ed-clearance')?.value || 0);
+    const rawBody = document.getElementById('editor-area').innerHTML;
+
     const updated = {
       id: e.id,
       category: cat,
@@ -1133,13 +1210,12 @@ function editEntry(id, tpl) {
       designation: document.getElementById('ed-desig')?.value.trim() || '',
       classification: document.getElementById('ed-class')?.value.trim() || '',
       role: document.getElementById('ed-role')?.value.trim() || '',
-      classified: document.getElementById('ed-classified-toggle')?.classList.contains('active') || false,
+      clearance: clearance,
       _weaponTpl: isWeaponEdit || false,
       stats: statList ? Array.from(statList.querySelectorAll('.stat-editor-row')).map(row => ({
         key: row.querySelector('.sk').value.trim(),
         val: row.querySelector('.sv').value.trim()
       })).filter(s => s.key || s.val) : (e.stats || []),
-      body: document.getElementById('editor-area').innerHTML,
       updated: Date.now(),
       /* tech fields */
       opStatus: document.getElementById('ed-opstatus')?.value.trim() || '',
@@ -1156,6 +1232,29 @@ function editEntry(id, tpl) {
       scope: document.getElementById('ed-scope')?.value.trim() || '',
       authority: document.getElementById('ed-authority')?.value.trim() || ''
     };
+
+    /* ── Encrypt body if clearance > 0 ── */
+    if (clearance > 0) {
+      if (!window.SGNAuth || !SGNAuth.currentUser()) {
+        alert('Sign in as ADMIN to save a non-public clearance entry — the tier key is needed to encrypt.');
+        return;
+      }
+      try {
+        const blob = await SGNAuth.encryptForTier(rawBody, clearance);
+        updated.bodyEnc = blob.enc;
+        updated.bodyIv = blob.iv;
+        updated.body = '';
+      } catch (err) {
+        alert('Failed to encrypt body: ' + (err.message || err));
+        return;
+      }
+    } else {
+      updated.body = rawBody;
+      // strip any prior ciphertext
+      delete updated.bodyEnc;
+      delete updated.bodyIv;
+    }
+
     if (isNew) { entries.push(updated); } else { const idx=entries.findIndex(x=>x.id===e.id); if(idx>=0) entries[idx]=updated; }
     save(); activeId = updated.id; renderList(); viewEntry(updated.id); toast(isNew?'Entry created':'Entry saved');
   };
@@ -1185,6 +1284,8 @@ function statRow(key, val, idx) {
   updateCount();
 })();
 </script>
+<script src="./auth.js"></script>
+<script src="./auth-ui.js"></script>
 <script src="./github-save.js"></script>
 <script src="./boot.js"></script>
 <script src="./search.js"></script>

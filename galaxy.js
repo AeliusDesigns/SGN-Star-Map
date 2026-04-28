@@ -1104,11 +1104,19 @@ void main(){
   (async function(){ try{ const r=await fetch('./editor.json',{cache:'no-store'}); if(r.ok){ const d=await r.json(); if(typeof d.pw==='string'&&d.pw.length) _editorPW=d.pw; } }catch{} })();
 
   function requireEditor(){
+    if(window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN){
+      editorUnlocked = true; updateEditorLock();
+      return true;
+    }
     if(editorUnlocked) return true;
-    if(_editorPW===null){ alert('Editor not available.'); return false; }
-    const pw=prompt('Enter editor password:');
-    if(pw===_editorPW){ editorUnlocked=true; sessionStorage.setItem('galaxy_editor_ok','1'); updateEditorLock(); return true; }
-    alert('Incorrect password.'); return false;
+    if(_editorPW !== null){
+      const pw = prompt('Enter editor password:');
+      if(pw === _editorPW){ editorUnlocked = true; sessionStorage.setItem('galaxy_editor_ok','1'); updateEditorLock(); return true; }
+      alert('Incorrect password.'); return false;
+    }
+    if(window.SGNAuthUI){ SGNAuthUI.promptLogin(SGNAuth.TIER.ADMIN); return false; }
+    alert('Sign in via the badge in the top-right to edit.');
+    return false;
   }
 
   if(sessionStorage.getItem('galaxy_editor_ok')==='1') editorUnlocked=true;

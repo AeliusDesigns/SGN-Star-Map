@@ -473,6 +473,8 @@ body.edit-mode .key-hint{display:block;}
 <div class="save-toast" id="saveToast">Changes saved to local storage</div>
 <div class="key-hint" id="keyHint">ESC to exit &middot; Ctrl+S to save &middot; Click Aelvar levels to change</div>
 
+<script src="./auth.js"></script>
+<script src="./auth-ui.js"></script>
 <script src="./github-save.js"></script>
 <script>
 (function(){
@@ -506,11 +508,19 @@ body.edit-mode .key-hint{display:block;}
   })();
 
   function requireEditor(){
+    if(window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN){
+      editorOK = true;
+      return true;
+    }
     if(editorOK) return true;
-    if(_editorPW === null){ alert('Editor not available.'); return false; }
-    var pw = prompt('Enter editor password:');
-    if(pw === _editorPW){ editorOK = true; sessionStorage.setItem(PW_SESSION, '1'); return true; }
-    alert('Incorrect password.');
+    if(_editorPW !== null){
+      var pw = prompt('Enter editor password:');
+      if(pw === _editorPW){ editorOK = true; sessionStorage.setItem(PW_SESSION, '1'); return true; }
+      alert('Incorrect password.');
+      return false;
+    }
+    if(window.SGNAuthUI){ SGNAuthUI.promptLogin(SGNAuth.TIER.ADMIN); return false; }
+    alert('Sign in via the badge in the top-right to edit.');
     return false;
   }
 

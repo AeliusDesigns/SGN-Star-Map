@@ -200,6 +200,23 @@
       <div id="acct-list"></div>
     </div>
 
+    <!-- Codex migration -->
+    <div class="panel" id="migrate-panel">
+      <div class="panel-title">Codex Classification Migration</div>
+      <p style="font-size:12px; color:var(--dim); margin:0 0 12px;">
+        Re-encrypt legacy <code style="color:var(--cyan)">classified: true</code> codex
+        entries with the COMMAND tier key so their body text is no longer plaintext
+        in the repo. New <code style="color:var(--cyan)">clearance</code> field
+        replaces the boolean toggle. Run this once after adding the new system.
+      </p>
+      <div id="migrate-status" class="hint" style="margin-bottom:10px;">Scanning codex.json...</div>
+      <div class="row">
+        <button id="migrate-go" disabled>Migrate Classified Entries</button>
+      </div>
+      <div class="err" id="migrate-err"></div>
+      <div class="ok-msg" id="migrate-ok"></div>
+    </div>
+
     <div class="panel">
       <div class="panel-title">Add Account</div>
       <div class="row">
@@ -280,6 +297,7 @@
     /* ── Working state ── */
     let _accountsData = null;       // current accounts.json content (object)
     let _adminTierKeys = null;      // { "1": b64, "2": b64, "3": b64 } — set after bootstrap or login
+    let _outputTarget = 'accounts.json';  // 'accounts.json' or 'codex.json'
 
     /* ── Sample account templates ── */
     const SAMPLES = [
@@ -423,6 +441,7 @@
       $('manage-section').classList.remove('hidden');
       $('output-section').classList.add('hidden');
       renderAccountList();
+      refreshMigrationStatus();
     }
 
     function renderAccountList() {
@@ -497,8 +516,84 @@
       }
     });
 
+    /* ─────────── CODEX MIGRATION ─────────── */
+    let _migratedCodex = null;
+
+    async function refreshMigrationStatus() {
+      const status = $('migrate-status');
+      const btn = $('migrate-go');
+      try {
+        const r = await fetch('./codex.json', { cache: 'no-store' });
+        if (!r.ok) {
+          status.textContent = 'codex.json not found in repo root.';
+          btn.disabled = true; return;
+        }
+        const codex = await r.json();
+        if (!Array.isArray(codex)) {
+          status.textContent = 'codex.json is not an array — schema mismatch, skipping.';
+          btn.disabled = true; return;
+        }
+        const legacy = codex.filter(e => e && e.classified === true && !e.bodyEnc).length;
+        const alreadyMigrated = codex.filter(e => e && typeof e.clearance === 'number' && e.clearance > 0 && e.bodyEnc).length;
+        if (legacy === 0) {
+          status.innerHTML = 'No legacy classified entries to migrate. ' +
+            (alreadyMigrated ? '<span style="color:var(--green)">' + alreadyMigrated + ' already encrypted.</span>' : '');
+          btn.disabled = true;
+        } else {
+          status.innerHTML = '<span style="color:var(--amber)">' + legacy + '</span> entr' +
+            (legacy === 1 ? 'y' : 'ies') + ' marked classified with plaintext body.' +
+            (alreadyMigrated ? ' (' + alreadyMigrated + ' already encrypted.)' : '');
+          btn.disabled = false;
+        }
+      } catch (e) {
+        status.textContent = 'Failed to scan codex.json: ' + e.message;
+        btn.disabled = true;
+      }
+    }
+
+    $('migrate-go').addEventListener('click', async () => {
+      const err = $('migrate-err'); err.textContent = '';
+      const ok = $('migrate-ok'); ok.textContent = '';
+      $('migrate-go').disabled = true;
+      try {
+        const r = await fetch('./codex.json', { cache: 'no-store' });
+        const codex = await r.json();
+        let migrated = 0;
+        for (const e of codex) {
+          if (e && e.classified === true && !e.bodyEnc) {
+            const blob = await SGNAuth.encryptForTier(e.body || '', TIER.COMMAND);
+            e.bodyEnc = blob.enc;
+            e.bodyIv = blob.iv;
+            e.clearance = TIER.COMMAND;
+            delete e.body;
+            delete e.classified;
+            migrated++;
+          }
+        }
+        _migratedCodex = codex;
+        ok.textContent = 'Migrated ' + migrated + ' entr' + (migrated === 1 ? 'y' : 'ies') +
+          '. Save / commit codex.json below.';
+
+        // show the codex JSON in the output panel
+        _outputTarget = 'codex.json';
+        const sec = $('output-section');
+        sec.classList.remove('hidden');
+        $('json-out').value = JSON.stringify(codex, null, 2);
+        $('creds-block').classList.add('hidden');
+        $('out-err').textContent = '';
+        $('out-ok').textContent = 'Output is codex.json — save / commit it next.';
+        $('commit-json').style.display = window.SGNGitHub ? '' : 'none';
+        sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {
+        err.textContent = (e && e.message) || 'Migration failed.';
+      } finally {
+        $('migrate-go').disabled = false;
+      }
+    });
+
     /* ─────────── OUTPUT (shared) ─────────── */
     function renderOutput(creds, isBootstrap) {
+      _outputTarget = 'accounts.json';
       const sec = $('output-section');
       sec.classList.remove('hidden');
       $('json-out').value = JSON.stringify(_accountsData, null, 2);
@@ -540,10 +635,10 @@
       const blob = new Blob([$('json-out').value], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'accounts.json';
+      a.href = url; a.download = _outputTarget;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-      $('out-ok').textContent = 'Downloaded — drop it into the repo root and commit.';
+      $('out-ok').textContent = 'Downloaded ' + _outputTarget + ' — drop it into the repo root and commit.';
       $('out-err').textContent = '';
     });
 
@@ -552,11 +647,12 @@
       if (!window.SGNGitHub) { $('out-err').textContent = 'GitHub commit utility not loaded.'; return; }
       try {
         $('commit-json').disabled = true;
+        const target = _outputTarget;
         await SGNGitHub.commitFile(
-          'accounts.json', $('json-out').value,
-          'SGN: update accounts.json'
+          target, $('json-out').value,
+          'SGN: update ' + target
         );
-        $('out-ok').textContent = 'Committed to repo. Allow a minute for GitHub Pages to redeploy.';
+        $('out-ok').textContent = 'Committed ' + target + ' to repo. Allow a minute for GitHub Pages to redeploy.';
       } catch (e) {
         $('out-err').textContent = (e && e.message) || 'Commit failed.';
       } finally {
