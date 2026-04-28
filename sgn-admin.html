@@ -616,7 +616,7 @@
       try {
         await SGNAuth.setGithubToken(tok, _accountsData);
         $('gh-token').value = '';
-        ok.textContent = 'Token encrypted and stashed locally. Commit accounts.json below to publish it.';
+        ok.textContent = 'Token encrypted. Click Commit to GitHub below to publish it — until you do, it only exists in this tab.';
         refreshTokenPanel();
         renderOutput([], false);
       } catch (e) {
@@ -773,7 +773,7 @@
         $('creds-block').classList.add('hidden');
         $('out-err').textContent = '';
         $('out-ok').textContent = 'Output is codex.json — save / commit it next.';
-        $('commit-json').style.display = window.SGNGitHub ? '' : 'none';
+        $('commit-json').style.display = (typeof SGNGitHub !== 'undefined') ? '' : 'none';
         sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (e) {
         err.textContent = (e && e.message) || 'Migration failed.';
@@ -806,7 +806,7 @@
 
       // Hide commit button if github-save isn't around
       $('commit-json').style.display =
-        (window.SGNGitHub) ? '' : 'none';
+        (typeof SGNGitHub !== 'undefined') ? '' : 'none';
 
       sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -835,7 +835,7 @@
 
     $('commit-json').addEventListener('click', async () => {
       $('out-err').textContent = ''; $('out-ok').textContent = '';
-      if (!window.SGNGitHub) { $('out-err').textContent = 'GitHub commit utility not loaded.'; return; }
+      if (typeof SGNGitHub === 'undefined') { $('out-err').textContent = 'GitHub commit utility not loaded.'; return; }
       try {
         $('commit-json').disabled = true;
         const target = _outputTarget;
