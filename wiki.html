@@ -364,11 +364,11 @@ let classifiedUnlocked = false;
 /* ── Clearance helpers (new tier system + legacy compat) ──
    - new schema: e.clearance is a number 0..3 (PUBLIC..COMMAND)
                  e.bodyEnc + e.bodyIv hold ciphertext for clearance > 0
-   - legacy:     e.classified === true  →  treat as COMMAND, plaintext e.body
+   - legacy:     e.classified === true  →  treat as MILITARY, plaintext e.body
 */
 function entryClearance(e) {
   if (typeof e.clearance === 'number') return e.clearance;
-  if (e.classified === true) return 3; // legacy → COMMAND
+  if (e.classified === true) return 2; // legacy → MILITARY
   return 0;
 }
 function userLevel() {
