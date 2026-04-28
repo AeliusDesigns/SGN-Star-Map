@@ -188,6 +188,24 @@
 
     /* ── DOSSIER VIEW ── */
     .dossier{padding:32px 40px 40px;max-width:900px;margin:0 auto;}
+    .dossier-classified-flag{
+      position:sticky;top:0;left:0;z-index:5;
+      display:inline-flex;align-items:center;gap:10px;
+      width:fit-content;max-width:100%;
+      margin:-32px 0 18px -40px;padding:8px 18px 8px 40px;
+      font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;
+      font-weight:700;text-transform:uppercase;color:#050810;
+      background:rgba(255,59,59,.96);
+      border-bottom:2px solid rgba(255,59,59,1);border-right:2px solid rgba(255,59,59,1);
+      border-radius:0 0 4px 0;
+      box-shadow:0 3px 14px rgba(255,59,59,.32);
+      pointer-events:none;
+    }
+    .dossier-classified-flag .flag-icon{font-size:13px;line-height:1;}
+    .dossier-classified-flag .flag-divider{opacity:.5;font-weight:400;}
+    .dossier-classified-flag.tier-1{background:rgba(92,219,117,.96);border-bottom-color:#5cdb75;border-right-color:#5cdb75;box-shadow:0 3px 14px rgba(92,219,117,.32);}
+    .dossier-classified-flag.tier-2{background:rgba(176,196,255,.96);border-bottom-color:#b0c4ff;border-right-color:#b0c4ff;box-shadow:0 3px 14px rgba(176,196,255,.32);}
+    .dossier-classified-flag.tier-3{background:rgba(255,80,80,.96);border-bottom-color:#ff5050;border-right-color:#ff5050;box-shadow:0 3px 14px rgba(255,80,80,.4);}
     .dossier-class-bar{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:10px;}
     .dossier-class-tag{padding:2px 8px;border:1px solid var(--border2);border-radius:2px;}
     .dossier-class-tag.ship{border-color:rgba(56,232,255,.3);color:var(--cyan-dim);}
@@ -384,7 +402,7 @@ let filterCat = 'all';
 let _editorPW = null;
 let editorOK = sessionStorage.getItem(PW_SESSION) === '1';
 let classifiedUnlocked = false;
-const acknowledgedClassified = new Set();   // entry IDs acknowledged this session
+let classifiedAcknowledged = false;   // session-wide: one ack covers all classified docs until refresh / new session
 
 /* ── Clearance helpers (new tier system + legacy compat) ──
    - new schema: e.clearance is a number 0..3 (PUBLIC..COMMAND)
@@ -618,11 +636,11 @@ async function viewEntry(id) {
   }
 
   /* ── Acknowledgment gate for cleared viewers ──
-       Shown once per session per classified entry to anyone who DOES have
-       access. Reminds them not to disseminate the contents. The denial
-       screen above handles uncleared viewers; this is the post-clearance
-       interstitial. */
-  if (_cls > 0 && !acknowledgedClassified.has(id)) {
+       Shown ONCE per session for any cleared viewer. After they acknowledge
+       a single classified document, the warning is suppressed for every
+       other classified document until the page is refreshed / the session
+       restarts. The denial screen above still handles uncleared viewers. */
+  if (_cls > 0 && !classifiedAcknowledged) {
     const tierLabel = (window.SGNAuth ? SGNAuth.tierName(_cls) : 'CLASSIFIED');
     main.innerHTML = `
       <div class="classified-screen">
@@ -635,7 +653,7 @@ async function viewEntry(id) {
           The following document is classified at the <strong>${tierLabel}</strong> level
           by the authority of the Valarind&euml;, the Council of the Seven Great Houses.
           Disclosure, reproduction, or transmission of its contents to any individual
-          not holding equivalent clearance is forbidden under SGN Document Control directives.
+          not holding equivalent clearance is forbidden under Document Control directives.
           <br/><br/>
           By proceeding, you confirm your authorization to view this material and
           acknowledge your obligation to safeguard it.
@@ -646,7 +664,7 @@ async function viewEntry(id) {
       </div>
     `;
     document.getElementById('cls-ack').onclick = () => {
-      acknowledgedClassified.add(id);
+      classifiedAcknowledged = true;
       viewEntry(id);
     };
     return;
@@ -766,8 +784,20 @@ async function viewEntry(id) {
   /* ── Divider accent by category ── */
   const divAccent = (cat==='vehicle'||cat==='lore') ? ' gold' : (cat==='technology' ? ' purple' : (cat==='doctrine' ? ' slate' : (cat==='species' ? ' teal' : '')));
 
+  /* ── Sticky CLASSIFIED flag for cleared viewers (clearance > 0) ── */
+  const _flagTier = entryClearance(e);
+  const _flagHTML = _flagTier > 0 ? `
+    <div class="dossier-classified-flag tier-${_flagTier}">
+      <span class="flag-icon">⚠</span>
+      <span>CLASSIFIED</span>
+      <span class="flag-divider">·</span>
+      <span>${(window.SGNAuth ? SGNAuth.tierName(_flagTier) : 'RESTRICTED')}</span>
+    </div>
+  ` : '';
+
   main.innerHTML = `
     <div class="dossier">
+      ${_flagHTML}
       <div class="dossier-class-bar">
         <span class="dossier-class-tag ${cat}">${catLabel}</span>
         <span>${esc(e.id)}</span>
