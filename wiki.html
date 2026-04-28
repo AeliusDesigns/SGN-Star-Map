@@ -1001,22 +1001,64 @@ function buildToolbar() {
   </div>`;
 }
 
+/* ── Editor selection memory ──
+     Selects (block style / font / size) and the native color picker steal
+     focus from contenteditable, which clears the user's selection. We
+     capture the selection on mousedown (before focus shifts) and restore
+     it before running any toolbar command. */
+let _savedEditorRange = null;
+
+function captureEditorSelection() {
+  const sel = window.getSelection();
+  const ed = document.getElementById('editor-area');
+  if (!sel || !sel.rangeCount || !ed) return;
+  const r = sel.getRangeAt(0);
+  if (ed.contains(r.commonAncestorContainer) || r.commonAncestorContainer === ed) {
+    _savedEditorRange = r.cloneRange();
+  }
+}
+
+function restoreEditorSelection() {
+  const ed = document.getElementById('editor-area');
+  if (!ed) return false;
+  ed.focus();
+  if (!_savedEditorRange) return false;
+  try {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedEditorRange);
+    return true;
+  } catch { return false; }
+}
+
 function wireToolbar() {
   const tb = document.getElementById('toolbar');
   if (!tb) return;
 
-  /* Don't yank focus on selects/colors/file inputs — only on buttons */
+  /* Make execCommand emit CSS styles (style="color:…") instead of legacy
+     <font color> tags — those <font> tags would override heading colors
+     and other tier styling. */
+  try { document.execCommand('styleWithCSS', false, true); } catch {}
+
+  /* Capture the editor's selection BEFORE the user interacts with any
+     toolbar control, so it can be restored before the actual command runs. */
   tb.addEventListener('mousedown', e => {
     const t = e.target;
-    if (t.tagName === 'SELECT' || t.tagName === 'OPTION' || t.tagName === 'INPUT') return;
-    e.preventDefault();
+    const isSelect = t.tagName === 'SELECT' || t.tagName === 'OPTION';
+    const isColor = t.tagName === 'INPUT' || t.closest && t.closest('.tb-color-wrap');
+    if (isSelect || isColor) {
+      captureEditorSelection();
+      return;        // let focus shift to the input naturally
+    }
+    e.preventDefault();   // plain buttons: don't steal focus from editor
   });
 
   tb.addEventListener('click', e => {
     const btn = e.target.closest('.tb-btn');
     if (!btn) return;
-    const ed = document.getElementById('editor-area');
-    ed.focus();
+    /* Restore the user's last in-editor selection (focus + range) so the
+       command applies where the cursor was, not where the toolbar is. */
+    restoreEditorSelection();
     const cmd = btn.dataset.cmd;
     const action = btn.dataset.action;
     if (cmd === 'formatBlock') {
@@ -1061,9 +1103,13 @@ function wireToolbar() {
   tb.addEventListener('change', e => {
     const tgt = e.target;
     const action = tgt.dataset.action;
-    const ed = document.getElementById('editor-area');
     if (!action) return;
-    ed.focus();
+    /* Re-attach the selection that was captured on mousedown — without
+       this, the dropdown / picker focus has already cleared it. */
+    restoreEditorSelection();
+    /* Belt-and-braces: ensure styleWithCSS is on so colors/fonts are
+       applied as inline style="…" rather than legacy <font> tags. */
+    try { document.execCommand('styleWithCSS', false, true); } catch {}
     if (action === 'blockstyle') {
       if (tgt.value) document.execCommand('formatBlock', false, '<' + tgt.value + '>');
       tgt.value = '';
@@ -1085,6 +1131,9 @@ function wireToolbar() {
       const bar = document.getElementById('tb-bg-bar');
       if (bar) bar.style.background = tgt.value;
     }
+    /* Re-capture: the new selection state is now what we want to remember
+       for the next command. */
+    captureEditorSelection();
     updateWordCount();
   });
 
@@ -1562,9 +1611,10 @@ function setupEditorImageHandlers(editorEl) {
     if (e.target.tagName === 'IMG') e.target.classList.add('tb-selected');
   });
 
-  /* ── Live word count ── */
-  editorEl.addEventListener('input', updateWordCount);
-  editorEl.addEventListener('keyup', updateWordCount);
+  /* ── Live word count + selection memory ── */
+  editorEl.addEventListener('input', () => { updateWordCount(); captureEditorSelection(); });
+  editorEl.addEventListener('keyup',  () => { updateWordCount(); captureEditorSelection(); });
+  editorEl.addEventListener('mouseup', captureEditorSelection);
 }
 
 /* ══════════════════════════════════════════
