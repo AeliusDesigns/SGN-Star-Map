@@ -40,6 +40,13 @@
       "salt": "zndEdVsl6sL2Ba50aOb7hA==",
       "keyringIv": "72KjLD/oY0dK62kK",
       "keyringEnc": "IAHIcRkTwHxt+BXbda3U6Otfc6NKR0h20U/HYiDaFir9/XbhOFq7BwZuYrBVzSsyNYjbplNPaJf6uXRqgzb4Lazh1XECM012KQ8tWIIqbFqy1A8Sv4TPxWg7QcAruGjZx3KORuttqnF5qB3bjo/Rd31ooRUsSVg="
+    },
+    {
+      "username": "YUNALI",
+      "level": 2,
+      "salt": "IaU8f6o6+7rQs9GPAmQoMA==",
+      "keyringIv": "j0TD1hn6mhjr5a+X",
+      "keyringEnc": "FWoXEn1bGxAwjxXqwhU0n141GB5tjaK+J9nhMSrv9MMG64UnOZWWyRYfVv5UfZch/ZgA+ZU/MjBjWW4MsNc0wqDgIZ+K7HyW4rbbkh4vpH8DfZWik1JYZfcLPBJXzirmDNhgoE86pa5OTPDLoTt9OY9P1ZaLma8="
     }
   ],
   "githubTokenEnc": "a6pnRvIVGxi1AQan0feedhdLqmhBWokC47apBKp90F2mJrEWZxm4dMVoqMzNsG9yzJlgQy2DHCg=",
