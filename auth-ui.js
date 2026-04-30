@@ -29,12 +29,15 @@ window.SGNAuthUI = (function () {
     return false;
   }
 
-  /* ── Maintain body.sgn-admin class (CSS uses it to gate edit UI) ── */
+  /* ── Maintain body tier classes (CSS uses these to gate UI per-tier) ── */
   function _refreshAdminClass() {
     if (!document.body) return;
-    const sgn = window.SGNAuth && SGNAuth.currentLevel() >= SGNAuth.TIER.ADMIN;
+    const lvl = (window.SGNAuth ? SGNAuth.currentLevel() : 0);
+    const T = (window.SGNAuth && SGNAuth.TIER) || { MILITARY:2, COMMAND:3, ADMIN:4 };
     const legacy = _isLegacyAdmin();
-    document.body.classList.toggle('sgn-admin', !!(sgn || legacy));
+    document.body.classList.toggle('sgn-admin',     !!(lvl >= T.ADMIN || legacy));
+    document.body.classList.toggle('sgn-command',   lvl >= T.COMMAND);
+    document.body.classList.toggle('sgn-military',  lvl >= T.MILITARY || legacy);
   }
 
   /* ── Inject CSS once ── */
@@ -55,6 +58,11 @@ window.SGNAuthUI = (function () {
       body:not(.sgn-admin) .sgn-admin-only {
         display: none !important;
       }
+      /* ── Tier-scoped UI ── */
+      body:not(.sgn-military) .sgn-military-only { display: none !important; }
+      body:not(.sgn-command)  .sgn-command-only  { display: none !important; }
+      /* When the OPERATIONS nav link is hidden, also collapse the separator that precedes it */
+      body:not(.sgn-military) .hud-sep.sgn-military-sep { display: none !important; }
 
       .sgn-auth-badge {
         position: fixed; top: 14px; right: 14px; z-index: 9998;

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SGN — Joint Operations Board</title>
+<link rel="icon" href="favicon.png">
+<style>
+:root{
+  --bg:#050810; --bg-2:#080d18; --panel:#0a1220;
+  --border:#1a2d46; --border2:#243d5e;
+  --cyan:#38e8ff; --cyan-dim:#1a7090;
+  --gold:#f5c542; --amber:#ff9d3d;
+  --green:#5cdb75; --red-alert:#ff3b3b; --red-dim:#a53333;
+  --text:#c8deff; --text-dim:#8aa6c8; --text-muted:#5a7a99;
+  --slate:#7a91b0;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:'Share Tech Mono','Courier New',monospace;
+  min-height:100vh;
+}
+/* HUD nav (matches other pages) */
+#hud{
+  display:flex;align-items:center;gap:0;
+  padding:12px 22px;border-bottom:1px solid var(--border);
+  background:rgba(8,13,24,.85);backdrop-filter:blur(6px);
+  position:sticky;top:0;z-index:100;
+}
+.hud-logo{color:var(--cyan);font-weight:700;letter-spacing:3px;font-size:14px;margin-right:8px;}
+.hud-sep{width:1px;height:18px;background:var(--border2);margin:0 14px;flex-shrink:0;opacity:.6;}
+.hud-item, .hud-nav{
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--text-dim);text-decoration:none;transition:color .12s;
+}
+.hud-nav:hover{color:var(--cyan);}
+.hud-nav.active{color:var(--cyan);text-shadow:0 0 8px rgba(56,232,255,.5);}
+.hud-spacer{flex:1;}
+
+main{max-width:1200px;margin:0 auto;padding:32px 28px 80px;}
+
+h1{
+  color:var(--cyan);font-size:18px;letter-spacing:4px;
+  margin:0 0 4px;font-weight:600;
+}
+.sub{color:var(--text-muted);font-size:11px;letter-spacing:2px;
+  text-transform:uppercase;margin-bottom:24px;}
+
+.toolbar{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  padding:14px 16px;background:var(--panel);
+  border:1px solid var(--border);border-radius:4px;margin-bottom:20px;
+}
+.toolbar input, .toolbar select{
+  background:var(--bg-2);color:var(--text);
+  border:1px solid var(--border2);border-radius:3px;
+  padding:8px 10px;font-family:inherit;font-size:12px;outline:none;
+}
+.toolbar input:focus, .toolbar select:focus{border-color:var(--cyan);}
+.toolbar input{flex:1;min-width:200px;}
+.toolbar .filter-label{color:var(--text-muted);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}
+
+button{
+  background:transparent;color:var(--cyan);
+  border:1px solid var(--cyan-dim);
+  padding:8px 16px;font-family:inherit;font-size:11px;
+  letter-spacing:2px;text-transform:uppercase;
+  border-radius:3px;cursor:pointer;transition:all .12s;
+}
+button:hover{background:rgba(56,232,255,.08);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--cyan);color:var(--bg);border-color:var(--cyan);font-weight:600;}
+button.primary:hover{background:#6df1ff;}
+button.muted{color:var(--text-dim);border-color:var(--border);}
+button.muted:hover{color:var(--text);border-color:var(--border2);}
+button.danger{color:var(--red-alert);border-color:var(--red-dim);}
+button.danger:hover{background:rgba(255,59,59,.08);}
+
+.ops-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:14px;
+}
+.op-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:4px;
+  padding:16px 18px;cursor:pointer;transition:all .15s;
+  position:relative;
+  display:flex;flex-direction:column;gap:8px;
+}
+.op-card:hover{border-color:var(--cyan-dim);transform:translateY(-1px);box-shadow:0 4px 18px rgba(56,232,255,.05);}
+.op-card-title{
+  color:var(--text);font-size:14px;letter-spacing:1px;font-weight:600;
+  font-family:'Rajdhani','Share Tech Mono',sans-serif;line-height:1.3;
+}
+.op-card-summary{color:var(--text-dim);font-size:12px;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.op-card-meta{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;
+  border-top:1px solid var(--border);padding-top:8px;margin-top:auto;
+}
+.op-card-status-bar{
+  display:flex;align-items:center;gap:8px;
+}
+.op-card-status-bar select{
+  background:var(--bg-2);color:var(--text);
+  border:1px solid var(--border2);border-radius:2px;
+  padding:3px 6px;font-family:inherit;font-size:10px;letter-spacing:1.5px;
+  outline:none;cursor:pointer;
+}
+
+/* Status pill — left edge bar */
+.op-card::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+  border-radius:4px 0 0 4px;background:var(--text-muted);
+}
+.op-card[data-status="ongoing"]::before    { background:var(--cyan); }
+.op-card[data-status="planning"]::before   { background:var(--slate); }
+.op-card[data-status="paused"]::before     { background:var(--amber); }
+.op-card[data-status="hold"]::before       { background:var(--amber); }
+.op-card[data-status="closed"]::before     { background:var(--text-muted); }
+.op-card[data-status="completed"]::before  { background:var(--green); }
+.op-card[data-status="terminated"]::before { background:var(--red-alert); }
+.op-card[data-status="compromised"]::before{ background:var(--red-alert); animation:pulse-red 1.6s ease-in-out infinite; }
+
+@keyframes pulse-red{0%,100%{opacity:.7;}50%{opacity:1;}}
+
+.status-pill{
+  display:inline-block;padding:2px 8px;border-radius:2px;
+  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  border:1px solid;
+}
+.status-pill.ongoing    { color:var(--cyan);       border-color:rgba(56,232,255,.5);  background:rgba(56,232,255,.08); }
+.status-pill.planning   { color:var(--slate);      border-color:rgba(122,145,176,.5); background:rgba(122,145,176,.08); }
+.status-pill.paused, .status-pill.hold {
+  color:var(--amber);     border-color:rgba(255,157,61,.5);  background:rgba(255,157,61,.08); }
+.status-pill.closed     { color:var(--text-muted); border-color:rgba(90,122,153,.5);  background:rgba(90,122,153,.06); }
+.status-pill.completed  { color:var(--green);      border-color:rgba(92,219,117,.5);  background:rgba(92,219,117,.08); }
+.status-pill.terminated { color:var(--red-alert);  border-color:rgba(255,59,59,.5);   background:rgba(255,59,59,.08); }
+.status-pill.compromised{ color:var(--red-alert);  border-color:rgba(255,59,59,.5);   background:rgba(255,59,59,.12); }
+
+.empty-state{
+  text-align:center;padding:60px 20px;color:var(--text-muted);
+  border:1px dashed var(--border2);border-radius:4px;
+}
+.gate-state{
+  text-align:center;padding:80px 20px;color:var(--text-muted);
+  border:1px solid var(--border);background:var(--panel);border-radius:4px;
+}
+.gate-state h2{color:var(--red-alert);font-size:16px;letter-spacing:3px;margin:0 0 8px;}
+.gate-state p{font-size:12px;line-height:1.7;}
+
+/* Editor / detail page */
+.editor-page{
+  background:var(--panel);border:1px solid var(--border);border-radius:4px;
+  padding:24px 28px;
+}
+.editor-title{
+  color:var(--cyan);font-family:'Rajdhani','Share Tech Mono',sans-serif;
+  font-size:22px;letter-spacing:2px;margin:0 0 16px;font-weight:600;
+}
+.form-row{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;}
+.form-row .fl{
+  flex:0 0 130px;color:var(--text-muted);font-size:10px;letter-spacing:1.5px;
+  text-transform:uppercase;padding-top:10px;
+}
+.form-row input, .form-row select, .form-row textarea{
+  flex:1;background:var(--bg-2);color:var(--text);
+  border:1px solid var(--border2);border-radius:3px;
+  padding:9px 12px;font-family:inherit;font-size:13px;outline:none;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus{border-color:var(--cyan);}
+.form-row textarea{font-family:'Exo 2',sans-serif;font-size:14px;line-height:1.6;min-height:240px;resize:vertical;}
+
+.editor-meta{
+  display:flex;gap:18px;flex-wrap:wrap;
+  font-size:10px;letter-spacing:1.5px;color:var(--text-muted);
+  border-top:1px solid var(--border);padding-top:12px;margin-top:8px;
+  text-transform:uppercase;
+}
+.editor-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;}
+
+.detail-body{
+  font-family:'Exo 2',sans-serif;font-size:14px;line-height:1.7;color:var(--text);
+  background:var(--bg-2);border:1px solid var(--border);border-radius:3px;
+  padding:18px 20px;white-space:pre-wrap;
+}
+
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--bg-2);border:1px solid var(--cyan-dim);color:var(--cyan);
+  padding:10px 18px;border-radius:3px;font-size:11px;letter-spacing:2px;
+  box-shadow:0 4px 18px rgba(0,0,0,.4);z-index:9990;
+  opacity:0;transition:opacity .2s;pointer-events:none;
+}
+.toast.show{opacity:1;}
+.err-msg{color:var(--red-alert);font-size:11px;letter-spacing:1px;margin-top:6px;min-height:14px;}
+</style>
+</head>
+<body>
+  <div id="hud">
+    <div class="hud-logo">SGN</div>
+    <div class="hud-sep"></div>
+    <a href="./briefing.html" class="hud-item hud-nav">BRIEFING</a>
+    <div class="hud-sep"></div>
+    <a href="./index.html" class="hud-item hud-nav">STAR CHART</a>
+    <div class="hud-sep"></div>
+    <a href="./galaxy.html" class="hud-item hud-nav">GALAXY MAP</a>
+    <div class="hud-sep"></div>
+    <a href="./wiki.html" class="hud-item hud-nav">CODEX</a>
+    <div class="hud-sep"></div>
+    <a href="./personnel.html" class="hud-item hud-nav">PERSONNEL</a>
+    <div class="hud-sep"></div>
+    <a href="./orbat.html" class="hud-item hud-nav">ORBAT</a>
+    <div class="hud-sep"></div>
+    <a href="./language.html" class="hud-item hud-nav">LANGUAGE</a>
+    <div class="hud-sep sgn-military-sep"></div>
+    <a href="./operations.html" class="hud-item hud-nav active sgn-military-only">OPERATIONS</a>
+    <div class="hud-spacer"></div>
+  </div>
+
+  <main id="ops-root">
+    <h1>JOINT OPERATIONS BOARD</h1>
+    <div class="sub" id="ops-sub">Active intelligence &amp; military operations · MILITARY clearance</div>
+    <div id="view-area"></div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script src="auth-ui.js"></script>
+  <script src="github-save.js"></script>
+  <script>
+  (async function(){
+    'use strict';
+
+    const TIER = (window.SGNAuth && SGNAuth.TIER) || { PUBLIC:0, DIPLOMATIC:1, MILITARY:2, COMMAND:3, ADMIN:4 };
+    const $ = id => document.getElementById(id);
+    const view = $('view-area');
+
+    /* ── Status options (default + extra options the user can ask for later) ── */
+    const STATUS_OPTIONS = [
+      { value:'ongoing',     label:'Ongoing' },
+      { value:'planning',    label:'Planning' },
+      { value:'paused',      label:'Paused' },
+      { value:'hold',        label:'On Hold' },
+      { value:'closed',      label:'Closed' },
+      { value:'completed',   label:'Completed' },
+      { value:'terminated',  label:'Terminated' },
+      { value:'compromised', label:'Compromised' }
+    ];
+    const STATUS_LABEL = Object.fromEntries(STATUS_OPTIONS.map(s => [s.value, s.label]));
+
+    /* ── State ── */
+    let _data = { version:1, operations:[] };
+    let _filterStatus = '';
+    let _filterText = '';
+    let _activeId = null;
+    let _viewMode = 'list';   // 'list' | 'view' | 'edit' | 'new'
+
+    /* ── Helpers ── */
+    function esc(s){ const d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
+    function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+    function genId(){ return 'op_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+    function fmtDate(ts){ if(!ts) return '—'; const d = new Date(ts); return d.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+    function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+    function userLevel(){ return window.SGNAuth ? SGNAuth.currentLevel() : 0; }
+    function isAdmin(){ return userLevel() >= TIER.ADMIN; }
+    function canEdit(){ return userLevel() >= TIER.MILITARY; }
+    function userName(){ const u = window.SGNAuth && SGNAuth.currentUser(); return u ? u.username : ''; }
+
+    /* ── Encryption — operations content stored as ciphertext at MILITARY tier ── */
+    async function encryptContent(content){
+      const blob = await SGNAuth.encryptForTier(JSON.stringify(content), TIER.MILITARY);
+      return { contentEnc: blob.enc, contentIv: blob.iv };
+    }
+    async function decryptContent(op){
+      if (!op.contentEnc) return { title: op.title || 'Untitled', summary:'', body:'', tags:[] };
+      const pt = await SGNAuth.decryptBlob({ enc: op.contentEnc, iv: op.contentIv, tier: TIER.MILITARY });
+      if (pt === null) return null;
+      try { return JSON.parse(pt); } catch { return null; }
+    }
+
+    /* ── Load / save operations.json ── */
+    async function loadData(){
+      try {
+        const r = await fetch('./operations.json', { cache:'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j && Array.isArray(j.operations)) { _data = j; return; }
+        }
+      } catch {}
+      _data = { version:1, operations:[] };
+    }
+
+    async function saveData(){
+      if (typeof SGNGitHub === 'undefined') {
+        toast('GitHub commit utility unavailable.');
+        return false;
+      }
+      try {
+        await SGNGitHub.commitFile('operations.json', JSON.stringify(_data, null, 2), 'SGN: update operations.json');
+        return true;
+      } catch (e) {
+        alert('Save failed: ' + (e.message || e));
+        return false;
+      }
+    }
+
+    /* ─────────────────────────── VIEWS ─────────────────────────── */
+
+    function renderGate(){
+      view.innerHTML = `
+        <div class="gate-state">
+          <h2>RESTRICTED ACCESS</h2>
+          <p>This board is available to <strong>MILITARY</strong> clearance and above.<br/>
+          Sign in via the badge in the top-right corner with an authorized account.</p>
+        </div>
+      `;
+    }
+
+    function renderList(){
+      const decryptedCache = []; // [{op, content}]
+      const promises = _data.operations.map(async op => {
+        const content = await decryptContent(op);
+        return { op, content };
+      });
+      Promise.all(promises).then(items => {
+        view.innerHTML = `
+          <div class="toolbar">
+            <input type="text" id="flt-search" placeholder="Search title or summary..." value="${escAttr(_filterText)}">
+            <span class="filter-label">Status</span>
+            <select id="flt-status">
+              <option value="">All</option>
+              ${STATUS_OPTIONS.map(s => `<option value="${s.value}" ${_filterStatus===s.value?'selected':''}>${s.label}</option>`).join('')}
+            </select>
+            <button class="primary" id="btn-new" ${canEdit()?'':'disabled'}>+ New Operation</button>
+          </div>
+          <div id="ops-list"></div>
+        `;
+        $('flt-search').addEventListener('input', e => { _filterText = e.target.value; renderCards(items); });
+        $('flt-status').addEventListener('change', e => { _filterStatus = e.target.value; renderCards(items); });
+        $('btn-new').addEventListener('click', () => { _viewMode = 'new'; renderEditor(null); });
+        renderCards(items);
+      });
+    }
+
+    function renderCards(items){
+      const list = $('ops-list');
+      if (!list) return;
+      const term = _filterText.trim().toLowerCase();
+      const filtered = items.filter(({op, content}) => {
+        if (_filterStatus && op.status !== _filterStatus) return false;
+        if (term) {
+          const hay = ((content && (content.title + ' ' + (content.summary||''))) || op.title || '').toLowerCase();
+          if (!hay.includes(term)) return false;
+        }
+        return true;
+      });
+      if (!filtered.length) {
+        list.innerHTML = `<div class="empty-state">${_data.operations.length === 0
+          ? 'No operations on the board yet. Click <strong>+ New Operation</strong> to add one.'
+          : 'No operations match the current filters.'}</div>`;
+        return;
+      }
+      filtered.sort((a,b) => (b.op.updatedAt||0) - (a.op.updatedAt||0));
+      list.innerHTML = `<div class="ops-grid">${filtered.map(({op, content}) => {
+        const title = content ? content.title : (op.title || '[Encrypted]');
+        const summary = content ? (content.summary || '') : '[Encrypted — your account does not hold the MILITARY key]';
+        const status = op.status || 'ongoing';
+        return `
+          <div class="op-card" data-status="${escAttr(status)}" data-id="${escAttr(op.id)}">
+            <div class="op-card-status-bar">
+              <span class="status-pill ${escAttr(status)}">${esc(STATUS_LABEL[status]||status)}</span>
+              <select class="card-status-select" data-id="${escAttr(op.id)}" ${canEdit()?'':'disabled'} title="Change status">
+                ${STATUS_OPTIONS.map(s => `<option value="${s.value}" ${s.value===status?'selected':''}>${s.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="op-card-title">${esc(title || 'Untitled')}</div>
+            <div class="op-card-summary">${esc(summary)}</div>
+            <div class="op-card-meta">
+              <span>${esc(op.updatedBy || op.createdBy || '—')}</span>
+              <span>${fmtDate(op.updatedAt || op.createdAt)}</span>
+            </div>
+          </div>
+        `;
+      }).join('')}</div>`;
+
+      // Card click → view
+      list.querySelectorAll('.op-card').forEach(card => {
+        card.addEventListener('click', e => {
+          if (e.target.closest('.card-status-select')) return; // status select handled separately
+          const id = card.dataset.id;
+          _activeId = id;
+          _viewMode = 'view';
+          renderDetail(id);
+        });
+      });
+
+      // Status quick-change
+      list.querySelectorAll('.card-status-select').forEach(sel => {
+        sel.addEventListener('click', e => e.stopPropagation());
+        sel.addEventListener('change', async e => {
+          e.stopPropagation();
+          const id = sel.dataset.id;
+          const newStatus = sel.value;
+          const op = _data.operations.find(o => o.id === id);
+          if (!op) return;
+          op.status = newStatus;
+          op.updatedBy = userName();
+          op.updatedAt = Date.now();
+          if (await saveData()) {
+            toast('Status updated to ' + (STATUS_LABEL[newStatus]||newStatus));
+            renderList();
+          }
+        });
+      });
+    }
+
+    async function renderDetail(id){
+      const op = _data.operations.find(o => o.id === id);
+      if (!op) { _viewMode='list'; renderList(); return; }
+      const content = await decryptContent(op);
+      const status = op.status || 'ongoing';
+      view.innerHTML = `
+        <div class="editor-page">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div class="editor-title">${esc(content ? content.title : '[Encrypted]')}</div>
+              <span class="status-pill ${escAttr(status)}">${esc(STATUS_LABEL[status]||status)}</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="muted" id="d-back">← Back</button>
+              ${canEdit() ? '<button class="primary" id="d-edit">✎ Edit</button>' : ''}
+              ${isAdmin() ? '<button class="danger" id="d-del">✕ Delete</button>' : ''}
+            </div>
+          </div>
+          ${content ? `
+            ${content.summary ? `<div style="color:var(--text-dim);font-size:13px;margin:14px 0 18px;line-height:1.6;">${esc(content.summary)}</div>` : ''}
+            ${content.body ? `<div class="detail-body">${esc(content.body)}</div>` : '<div style="color:var(--text-muted);font-size:12px;font-style:italic;">No operation notes recorded.</div>'}
+            ${content.tags && content.tags.length ? `<div style="margin-top:14px;font-size:11px;color:var(--text-muted);">TAGS: ${content.tags.map(t => esc(t)).join(' · ')}</div>` : ''}
+          ` : '<div class="gate-state"><h2>UNABLE TO DECRYPT</h2><p>Your account does not hold the MILITARY tier key required to view this operation.</p></div>'}
+          <div class="editor-meta">
+            <span>OP ID: ${esc(op.id)}</span>
+            <span>CREATED: ${fmtDate(op.createdAt)} by ${esc(op.createdBy||'—')}</span>
+            <span>UPDATED: ${fmtDate(op.updatedAt)} by ${esc(op.updatedBy||'—')}</span>
+          </div>
+        </div>
+      `;
+      $('d-back').onclick = () => { _activeId=null; _viewMode='list'; renderList(); };
+      const editBtn = $('d-edit'); if (editBtn) editBtn.onclick = () => { _viewMode='edit'; renderEditor(id); };
+      const delBtn = $('d-del'); if (delBtn) delBtn.onclick = async () => {
+        if (!confirm('Delete operation "' + (content ? content.title : op.id) + '"? This cannot be undone.')) return;
+        _data.operations = _data.operations.filter(o => o.id !== id);
+        if (await saveData()) { toast('Operation deleted'); _activeId=null; _viewMode='list'; renderList(); }
+      };
+    }
+
+    async function renderEditor(id){
+      const isNew = !id;
+      const op = id ? _data.operations.find(o => o.id === id) : null;
+      const content = op ? await decryptContent(op) : { title:'', summary:'', body:'', tags:[] };
+      if (op && content === null) {
+        alert('Cannot decrypt this operation — your account does not hold the MILITARY key.');
+        _viewMode='list'; renderList(); return;
+      }
+      const status = op ? (op.status || 'ongoing') : 'ongoing';
+      view.innerHTML = `
+        <div class="editor-page">
+          <div class="editor-title">${isNew ? 'NEW OPERATION' : 'EDIT OPERATION'}</div>
+          <div class="form-row">
+            <span class="fl">Title</span>
+            <input type="text" id="ed-title" value="${escAttr(content.title)}" placeholder="e.g. Operation Sundered Gate">
+          </div>
+          <div class="form-row">
+            <span class="fl">Status</span>
+            <select id="ed-status">
+              ${STATUS_OPTIONS.map(s => `<option value="${s.value}" ${s.value===status?'selected':''}>${s.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-row">
+            <span class="fl">Summary</span>
+            <input type="text" id="ed-summary" value="${escAttr(content.summary||'')}" placeholder="One-line briefing for the card view...">
+          </div>
+          <div class="form-row">
+            <span class="fl">Tags</span>
+            <input type="text" id="ed-tags" value="${escAttr((content.tags||[]).join(', '))}" placeholder="Comma-separated tags (e.g. intel, vanyamar, joint-ops)">
+          </div>
+          <div class="form-row" style="align-items:stretch;">
+            <span class="fl" style="padding-top:10px;">Operation Notes</span>
+            <textarea id="ed-body" placeholder="Full operational details, intel summary, mission goals, asset allocation, status updates...">${esc(content.body||'')}</textarea>
+          </div>
+          <div class="err-msg" id="ed-err"></div>
+          <div class="editor-actions">
+            <button class="muted" id="ed-cancel">Cancel</button>
+            <button class="primary" id="ed-save">${isNew ? '+ Create' : '✓ Save'}</button>
+          </div>
+        </div>
+      `;
+      $('ed-cancel').onclick = () => {
+        if (!isNew && _activeId) { _viewMode='view'; renderDetail(_activeId); }
+        else { _viewMode='list'; renderList(); }
+      };
+      $('ed-save').onclick = async () => {
+        const err = $('ed-err'); err.textContent = '';
+        const title = $('ed-title').value.trim();
+        if (!title) { err.textContent = 'Title required.'; return; }
+        if (!window.SGNAuth || !SGNAuth.currentUser()) { err.textContent = 'Sign in required.'; return; }
+        if (userLevel() < TIER.MILITARY) { err.textContent = 'MILITARY clearance required to save.'; return; }
+
+        const newContent = {
+          title,
+          summary: $('ed-summary').value.trim(),
+          body: $('ed-body').value,
+          tags: $('ed-tags').value.split(',').map(t => t.trim()).filter(Boolean)
+        };
+
+        $('ed-save').disabled = true;
+        try {
+          const enc = await encryptContent(newContent);
+          const now = Date.now();
+          if (isNew) {
+            const newOp = {
+              id: genId(),
+              status: $('ed-status').value || 'ongoing',
+              createdBy: userName(),
+              createdAt: now,
+              updatedBy: userName(),
+              updatedAt: now,
+              contentEnc: enc.contentEnc,
+              contentIv: enc.contentIv
+            };
+            _data.operations.push(newOp);
+            _activeId = newOp.id;
+          } else {
+            op.status = $('ed-status').value || op.status || 'ongoing';
+            op.updatedBy = userName();
+            op.updatedAt = now;
+            op.contentEnc = enc.contentEnc;
+            op.contentIv = enc.contentIv;
+          }
+          if (await saveData()) {
+            toast(isNew ? 'Operation created' : 'Operation saved');
+            _viewMode = 'view';
+            renderDetail(_activeId);
+          }
+        } catch (e) {
+          err.textContent = 'Save failed: ' + (e.message || e);
+        } finally {
+          $('ed-save').disabled = false;
+        }
+      };
+    }
+
+    /* ─────────────────────────── BOOT ─────────────────────────── */
+    async function boot(){
+      await SGNAuth.ready();
+
+      const refresh = async () => {
+        if (userLevel() < TIER.MILITARY) { renderGate(); return; }
+        await loadData();
+        if (_viewMode === 'view' && _activeId)      renderDetail(_activeId);
+        else if (_viewMode === 'edit' && _activeId) renderEditor(_activeId);
+        else if (_viewMode === 'new')               renderEditor(null);
+        else                                        renderList();
+      };
+
+      SGNAuth.onChange(refresh);
+      await refresh();
+    }
+    boot();
+  })();
+  </script>
+</body>
+</html>
