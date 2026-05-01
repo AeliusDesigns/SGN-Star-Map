@@ -516,7 +516,9 @@ function toast(msg) {
 }
 
 function updateCount() {
-  document.getElementById('hud-count').textContent = entries.length + ' ENTRIES';
+  const tot = entries.length;
+  const cls = entries.filter(e => entryClearance(e) > 0).length;
+  document.getElementById('hud-count').textContent = tot + ' ENTRIES · ' + cls + ' CLASSIFIED';
 }
 
 /* ══════════════════════════════════════════
