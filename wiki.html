@@ -658,18 +658,22 @@ async function viewEntry(id) {
     main.innerHTML = `
       <div class="classified-screen">
         <div class="classified-icon" style="color:var(--red-alert);">⚠</div>
-        <div class="classified-badge" style="color:var(--red-alert);border-color:var(--red-alert);">${tierLabel} · Restricted Distribution</div>
+        <div class="classified-badge" style="color:var(--red-alert);border-color:var(--red-alert);">Sealed Record · ${tierLabel}</div>
         <div class="classified-title">${esc(e.title || 'Untitled')}</div>
         <div class="classified-divider"></div>
-        <div class="classified-body" style="font-size:13px; line-height:1.75;">
-          <strong style="color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1.5px;">NOTICE OF CLASSIFICATION</strong><br/><br/>
-          The following document is classified at the <strong>${tierLabel}</strong> level
-          by the authority of the Valarind&euml;, the Council of the Seven Great Houses.
-          Disclosure, reproduction, or transmission of its contents to any individual
-          not holding equivalent clearance is forbidden under Document Control directives.
-          <br/><br/>
-          By proceeding, you confirm your authorization to view this material and
-          acknowledge your obligation to safeguard it.
+        <div class="classified-body">
+          This record has been sealed by<br/>
+          <strong style="color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1px;">The Valarindë, the Council of the Seven Great Houses.</strong>
+        </div>
+        <div class="classified-body" style="margin-top:4px;font-size:13px;">
+          Entrusted to the Grand Archive under the keeping of the Loremasters,<br/>
+          borne at the rank of <strong>${tierLabel}</strong>.
+        </div>
+        <div class="classified-body" style="margin-top:14px;font-size:12px;line-height:1.7;color:var(--text-muted);">
+          Its contents may not be disclosed, reproduced, or conveyed<br/>
+          to any not bearing equivalent rite of access.<br/>
+          In proceeding, you affirm your authorization to read this record<br/>
+          and accept the duty of its safekeeping.
         </div>
         <div class="classified-divider"></div>
         <button class="classified-unlock" id="cls-ack">Acknowledge &amp; Continue</button>
