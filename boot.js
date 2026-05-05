@@ -99,15 +99,63 @@
     document.head.appendChild(style);
   }
 
+  /* Read the count from a localStorage key, given a shape accessor. */
+  function lsCount(key, accessor) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return 0;
+      return accessor(JSON.parse(raw)) || 0;
+    } catch (e) { return 0; }
+  }
+
+  /* Fetch a canonical .json file from the repo and read the count from it.
+     Falls back to 0 on any failure (404, parse error, etc). */
+  function fetchCount(path, accessor) {
+    return fetch(path, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { return d ? (accessor(d) || 0) : 0; })
+      .catch(function () { return 0; });
+  }
+
+  /* Boot screen used to read counts from localStorage only — that's stale
+     when a fresh tab/device has never visited the data pages. We now also
+     fetch the canonical JSON committed in the repo and take the max of
+     (canonical, localStorage) so the count reflects the larger of "what is
+     published" vs "what local in-progress work exists". */
   function getDataCounts() {
-    var counts = { systems: 0, fleets: 0, lexicon: 0, personnel: 0, codex: 0, orbats: 0 };
-    try { var m = localStorage.getItem('sgn_map_state_v1'); if (m) { var d = JSON.parse(m); counts.systems = (d.systems && d.systems.length) || 0; } } catch(e) {}
-    try { var f = localStorage.getItem('sgn_fleets_v1'); if (f) { var d = JSON.parse(f); counts.fleets = Array.isArray(d) ? d.length : 0; } } catch(e) {}
-    try { var l = localStorage.getItem('sgn_language_v1'); if (l) { var d = JSON.parse(l); counts.lexicon = (d.entries && d.entries.length) || 0; } } catch(e) {}
-    try { var p = localStorage.getItem('sgn_personnel_v1'); if (p) { var d = JSON.parse(p); counts.personnel = Array.isArray(d) ? d.length : 0; } } catch(e) {}
-    try { var c = localStorage.getItem('sgn_codex_v1'); if (c) { var d = JSON.parse(c); counts.codex = Array.isArray(d) ? d.length : 0; } } catch(e) {}
-    try { var o = localStorage.getItem('sgn_orbat_v1'); if (o) { var d = JSON.parse(o); counts.orbats = Array.isArray(d) ? d.length : 0; } } catch(e) {}
-    return counts;
+    var arr = function (d) { return Array.isArray(d) ? d.length : 0; };
+    var sysShape = function (d) { return (d && d.systems && d.systems.length) || 0; };
+    var lexShape = function (d) {
+      if (d && d.dictionary && d.dictionary.entries) return d.dictionary.entries.length;
+      if (d && d.entries) return d.entries.length;
+      return 0;
+    };
+
+    return Promise.all([
+      fetchCount('./codex.json',             arr),
+      fetchCount('./personnel.json',         arr),
+      fetchCount('./arandori-language.json', lexShape),
+      fetchCount('./systems.json',           sysShape),
+      fetchCount('./fleets.json',            arr),
+      fetchCount('./orbat.json',             arr)
+    ]).then(function (f) {
+      var l = {
+        codex:     lsCount('sgn_codex_v1',     arr),
+        personnel: lsCount('sgn_personnel_v1', arr),
+        lexicon:   lsCount('sgn_language_v1',  function (d) { return (d && d.entries && d.entries.length) || 0; }),
+        systems:   lsCount('sgn_map_state_v1', sysShape),
+        fleets:    lsCount('sgn_fleets_v1',    arr),
+        orbats:    lsCount('sgn_orbat_v1',     arr)
+      };
+      return {
+        codex:     Math.max(f[0], l.codex),
+        personnel: Math.max(f[1], l.personnel),
+        lexicon:   Math.max(f[2], l.lexicon),
+        systems:   Math.max(f[3], l.systems),
+        fleets:    Math.max(f[4], l.fleets),
+        orbats:    Math.max(f[5], l.orbats)
+      };
+    });
   }
 
   function getStardateString() {
@@ -140,17 +188,25 @@
     injectStyles();
     var overlay = document.createElement('div');
     overlay.id = 'sgn-boot-overlay';
-    var counts = getDataCounts();
     var sd = getStardateString();
 
-    var syncParts = [];
-    if (counts.systems)   syncParts.push(counts.systems + ' systems');
-    if (counts.fleets)    syncParts.push(counts.fleets + ' fleets');
-    if (counts.personnel) syncParts.push(counts.personnel + ' personnel');
-    if (counts.codex)     syncParts.push(counts.codex + ' codex entries');
-    if (counts.orbats)    syncParts.push(counts.orbats + ' ORBATs');
-    if (counts.lexicon)   syncParts.push(counts.lexicon + ' lexicon entries');
-    var syncStr = syncParts.length ? syncParts.join(' \u00B7 ') : 'empty datacore';
+    /* getDataCounts returns a Promise (fetches canonical .json files); chain
+       the rest of the boot sequence onto it so the displayed counts always
+       reflect what's actually in the repo, not a stale localStorage cache. */
+    return getDataCounts().then(function (counts) {
+      var syncParts = [];
+      if (counts.systems)   syncParts.push(counts.systems + ' systems');
+      if (counts.fleets)    syncParts.push(counts.fleets + ' fleets');
+      if (counts.personnel) syncParts.push(counts.personnel + ' personnel');
+      if (counts.codex)     syncParts.push(counts.codex + ' codex entries');
+      if (counts.orbats)    syncParts.push(counts.orbats + ' ORBATs');
+      if (counts.lexicon)   syncParts.push(counts.lexicon + ' lexicon entries');
+      var syncStr = syncParts.length ? syncParts.join(' \u00B7 ') : 'empty datacore';
+      _runBootRender(overlay, sd, syncStr);
+    });
+  }
+
+  function _runBootRender(overlay, sd, syncStr) {
 
     var lines = [
       { prefix: '[SYS]',  text: 'Establishing link to AEN Command Network', cursor: true },
