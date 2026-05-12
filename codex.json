@@ -3505,7 +3505,7 @@
       },
       {
         "key": "Active Crew",
-        "val": "60,000 (navigation, engineering, hospitality, medical, security, biome maintenance, entertainment)"
+        "val": "60,000"
       },
       {
         "key": "Passenger Capacity",
@@ -3516,7 +3516,7 @@
         "val": "Interstellar transit, orbital station approach, planetary orbit"
       }
     ],
-    "updated": 1778557735380,
+    "updated": 1778557752493,
     "opStatus": "Active Service — Civilian Commercial",
     "accessLevel": "Public — Civilian Vessel Registry",
     "origin": "Thalassëar Orbital Yards",
