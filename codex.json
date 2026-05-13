@@ -3594,7 +3594,7 @@
   {
     "id": "CX_MP435AEV_KY0",
     "category": "ship",
-    "title": "Tëlassion-class Star Yacht (Short-Range)",
+    "title": "Tëlassion-class Star Yacht",
     "designation": "Tëlassion Elenissar Galmoryn (TE-G-SYS)",
     "classification": "Short-Range Luxury Yacht / Premium Private Transit Vessel",
     "role": "Short-range luxury yacht providing premium private transit for individuals, families, and small parties within a single star system or between neighboring systems via short-duration soliton transits. The Tëlassion is designed for day cruises, planetary tours, orbital excursions, and short interstellar hops lasting hours to days rather than the extended voyages of the larger Calëndil class. The vessel provides intimate luxury accommodation, dining, and observation facilities in a compact fully enclosed hull optimized for agility, aesthetic refinement, and ease of operation. The Tëlassion is the standard private vessel for system-local leisure, corporate hospitality, and short-range diplomatic transit.",
@@ -3638,7 +3638,7 @@
         "val": "In-system transit, orbital station approach, planetary orbit, short interstellar transit"
       }
     ],
-    "updated": 1778679015712,
+    "updated": 1778688090289,
     "opStatus": "Active Service — Civilian Private",
     "accessLevel": "Public — Civilian Vessel Registry",
     "origin": "Elenissar Orbital Works",
@@ -3699,7 +3699,7 @@
         "val": "Atmospheric flight, surface-to-orbit transit, orbital station approach, station-to-station transfer"
       }
     ],
-    "updated": 1778688059420,
+    "updated": 1778688093660,
     "opStatus": "Active Service — Civilian Private",
     "accessLevel": "Public — Civilian Vessel Registry",
     "origin": "Elenissar Orbital Works",
